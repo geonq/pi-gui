@@ -289,7 +289,7 @@ test("folders list only the app worktrees they own and never remove the user's o
     const unopened = join(root, "elsewhere", "unopened");
     await git(repo, "worktree", "add", "-b", "feature/unopened", unopened, "HEAD");
     await expect(manager.removeWorktree(main, unopened)).rejects.toThrow(
-      "Only worktrees created by pi-gui can be removed here.",
+      "Only worktrees created by Pegasus can be removed here.",
     );
     expect(await pathExists(unopened)).toBe(true);
     await manager.removeWorktree(mine, created.worktreeId);
@@ -310,7 +310,7 @@ test("a user's checkout inside the app worktree folder still cannot be removed",
     await git(repo, "worktree", "add", "-b", "feature/manual", manual, "HEAD");
 
     await expect(manager.removeWorktree(main, manual)).rejects.toThrow(
-      "Only worktrees created by pi-gui can be removed here.",
+      "Only worktrees created by Pegasus can be removed here.",
     );
     expect(await pathExists(manual)).toBe(true);
   } finally {

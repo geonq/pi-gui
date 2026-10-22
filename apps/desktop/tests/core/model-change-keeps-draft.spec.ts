@@ -37,19 +37,25 @@ test("changing model or thinking from the composer footer keeps the typed prompt
     // Wait until the draft is saved, so the picker's state update is not masked by a pending edit.
     await expect.poll(async () => (await getDesktopState(window)).composerDraft).toBe(prompt);
 
-    await footer.getByRole("button", { name: "openai:gpt-5" }).click();
+    await footer.locator(".model-selector__badge").first().click();
     await footer.getByRole("button", { name: "GPT-4o" }).click();
-    await expect(footer.getByRole("button", { name: "openai:gpt-4o" })).toBeVisible();
-    await expect(window.getByTestId("transcript")).toContainText("Model set to openai:gpt-4o");
+    await expect(footer.locator(".model-selector__badge").first()).toHaveAttribute(
+      "aria-label",
+      /GPT-4o$/i,
+    );
+    await expect(window.getByTestId("transcript")).toContainText("Model set to GPT-4o");
     await expect(composer).toHaveValue(prompt);
     await expect(attachment).toHaveCount(1);
 
+    // GPT-4o has no reasoning levels; switch to the reasoning model before testing its effort control.
+    await footer.locator(".model-selector__badge").first().click();
+    await footer.getByRole("button", { name: "GPT-5", exact: true }).click();
     const thinkingBadge = footer.locator(".model-selector__badge").nth(1);
     const initialThinking = (await thinkingBadge.textContent())?.trim();
-    const nextThinking = initialThinking === "high" ? "Low" : "High";
+    const nextThinking = initialThinking === "High" ? "Low" : "High";
     await thinkingBadge.click();
     await footer.getByRole("button", { name: new RegExp(`^${nextThinking}`) }).click();
-    await expect(thinkingBadge).toHaveText(nextThinking.toLowerCase());
+    await expect(thinkingBadge).toHaveText(nextThinking);
     await expect(composer).toHaveValue(prompt);
     await expect(attachment).toHaveCount(1);
     await expect.poll(async () => (await getDesktopState(window)).composerDraft).toBe(prompt);
@@ -60,10 +66,13 @@ test("changing model or thinking from the composer footer keeps the typed prompt
     await expect.poll(async () => (await getDesktopState(window)).composerDraft).toBe("/model");
     const optionsMenu = window.getByTestId("slash-options-menu");
     await optionsMenu.getByRole("button", { name: /GPT-5/ }).first().click();
-    await expect(window.getByTestId("transcript")).toContainText("Model set to openai:gpt-5");
+    await expect(window.getByTestId("transcript")).toContainText("Model set to GPT-5");
     // The cleared draft is saved before the model changes, not after the typing debounce.
     expect((await getDesktopState(window)).composerDraft).toBe("");
-    await expect(footer.getByRole("button", { name: "openai:gpt-5" })).toBeVisible();
+    await expect(footer.locator(".model-selector__badge").first()).toHaveAttribute(
+      "aria-label",
+      /GPT-5$/i,
+    );
     await expect(composer).toHaveValue("");
     await expect.poll(async () => (await getDesktopState(window)).composerDraft).toBe("");
     await expect(composer).toHaveValue("");

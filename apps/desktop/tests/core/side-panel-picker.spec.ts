@@ -27,6 +27,10 @@ test("one icon and keyboard shortcuts toggle the selected workspace tool", async
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveText("");
     await toggle.click();
+    // The panel opens on Agents, ahead of Review.
+    await expect(
+      window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab", { name: "Agents", exact: true }),
+    ).toHaveAttribute("aria-selected", "true");
     const chooser = window.getByTestId("workbench-chooser");
     if (!(await chooser.isVisible())) await window.getByTestId("workbench-add-tab").click();
     const modifierLabel = process.platform === "darwin" ? "⌘" : "Ctrl+";
@@ -78,7 +82,7 @@ test("one icon and keyboard shortcuts toggle the selected workspace tool", async
     await expect(terminal).toBeVisible();
     await expect(
       window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab"),
-    ).toHaveCount(3);
+    ).toHaveCount(4);
 
     // Cmd+R reaches Review from the terminal on macOS; Ctrl+R stays with the shell elsewhere.
     await terminal.locator(".xterm").click();

@@ -119,10 +119,10 @@ test("Files explorer drops the previous workspace tree after a folder switch", a
     ).toHaveCount(0);
 
     await window.locator(".session-row__select", { hasText: "Bravo files" }).click();
+    await expect(window.locator(".chat-header__title")).toHaveText("Bravo files");
+    // Each task keeps its own side panel layout, so Bravo opens it for itself.
+    await selectSidePanel(window, "Files");
     const workbench = window.getByTestId("file-workbench");
-    if ((await workbench.count()) === 0) {
-      await selectSidePanel(window, "Files");
-    }
     await expect(workbench).toBeVisible();
     await expect(
       workbench.locator('.file-workbench__tree-row--file[data-file-path="bravo-only.md"]'),

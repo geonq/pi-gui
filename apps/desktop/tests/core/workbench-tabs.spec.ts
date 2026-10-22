@@ -127,6 +127,11 @@ test("adds singleton tool tabs, closes to a neighbor, and keeps an empty chooser
     await selectSession(window, TASK_A);
     await expect(window.getByTestId("workbench")).toHaveCount(0);
     await openWorkbench(window);
+    await expectActiveTool(window, "Agents");
+    await window
+      .getByRole("tablist", { name: "Workspace tools" })
+      .getByRole("tab", { name: "Review", exact: true })
+      .click();
     await expectActiveTool(window, "Review");
     await addTool(window, "Files");
     await expect(window.getByTestId("file-workbench")).toBeVisible();
@@ -136,7 +141,13 @@ test("adds singleton tool tabs, closes to a neighbor, and keeps an empty chooser
     await addTool(window, "Terminal");
     const terminal = window.getByTestId("integrated-terminal");
     await expect(terminal).toBeVisible();
+    await expect(terminal.locator(".xterm-rows")).toContainText("$");
     await terminal.locator(".xterm").click();
+    // An empty Enter proves the shell is reading input before the command is typed.
+    await window.keyboard.press("Enter");
+    await expect
+      .poll(async () => ((await terminal.locator(".xterm-rows").textContent()) ?? "").split("$").length)
+      .toBeGreaterThan(2);
     await window.keyboard.type("printf 'WORKBENCH_'\"READY\\n\"; pwd");
     await window.keyboard.press("Enter");
     await expect(terminal.locator(".xterm-rows")).toContainText("WORKBENCH_READY");
@@ -152,17 +163,19 @@ test("adds singleton tool tabs, closes to a neighbor, and keeps an empty chooser
     await captureToolWidths(harness, window, testInfo, "Review");
     await expect(
       window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab"),
-    ).toHaveText(["Review", "Files", "Terminal"]);
+    ).toHaveText(["Agents", "Review", "Files", "Terminal"]);
     await addTool(window, "Terminal");
     await expect(
       window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab"),
-    ).toHaveCount(3);
+    ).toHaveCount(4);
 
     await window.getByRole("button", { name: "Close Terminal tab", exact: true }).click();
     await expectActiveTool(window, "Files");
     await window.getByRole("button", { name: "Close Files tab", exact: true }).click();
     await expectActiveTool(window, "Review");
     await window.getByRole("button", { name: "Close Review tab", exact: true }).click();
+    await expectActiveTool(window, "Agents");
+    await window.getByRole("button", { name: "Close Agents tab", exact: true }).click();
     await expect(window.getByTestId("workbench-chooser")).toBeVisible();
     await expect(
       window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab"),
@@ -204,6 +217,11 @@ test("restores each task's tabs and draft through Settings, switching, and resta
     await selectSession(window, TASK_B);
     await expect(window.getByTestId("workbench")).toHaveCount(0);
     await openWorkbench(window);
+    await expectActiveTool(window, "Agents");
+    await window
+      .getByRole("tablist", { name: "Workspace tools" })
+      .getByRole("tab", { name: "Review", exact: true })
+      .click();
     await expectActiveTool(window, "Review");
     await expect(window.getByRole("tab", { name: "Files", exact: true })).toHaveCount(0);
     await addTool(window, "Terminal");
@@ -299,7 +317,7 @@ test("an invalid or orphaned task layout does not block other saved UI state", a
     await expectActiveTool(window, "Terminal");
     await expect(
       window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab"),
-    ).toHaveText(["Review", "Terminal"]);
+    ).toHaveText(["Agents", "Review", "Terminal"]);
     await expect(window.getByTestId("composer")).toHaveValue("Draft for task B");
     await expect.poll(async () => Object.keys(await savedLayouts())).toEqual([layoutB]);
     await selectSession(window, TASK_A);
@@ -518,12 +536,11 @@ test("shows and selects GPT-6 Sol from the upgraded Pi model catalog", async ({}
     const badge = window.locator(".composer__bar .model-selector__badge").first();
     await badge.click();
     const dropdown = window.locator(".composer__bar .model-selector__dropdown").first();
-    await expect(dropdown).toContainText("GPT-6 Sol");
-    await expect(dropdown).toContainText("GPT-6 Luna");
-    await dropdown.getByRole("button", { name: /GPT-6 Sol/ }).click();
-    await expect(badge).toHaveText("openai:gpt-6-sol");
+    await expect(dropdown.getByRole("button", { name: "GPT-6 Luna", exact: true })).toBeVisible();
+    await dropdown.getByRole("button", { name: "GPT-6 Sol", exact: true }).click();
+    await expect(badge).toHaveAccessibleName("OpenAI · GPT-6 Sol");
     await expect(
-      window.locator(".composer").getByRole("button", { name: "medium", exact: true }),
+      window.locator(".composer").getByRole("button", { name: "Medium", exact: true }),
     ).toBeVisible();
     await window.screenshot({ path: testInfo.outputPath("gpt-6-sol-selected.png") });
   } finally {

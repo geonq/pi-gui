@@ -43,7 +43,7 @@ test("switches between app-global and per-repo model scope while worktrees inher
     });
     await expect(window.locator(".chat-header__title")).toHaveText("Repo A global session");
     await expectComposerModelState(window, {
-      activeModel: "openai:gpt-5",
+      activeModel: "OpenAI · GPT-5",
       visibleModelLabels: ["GPT-5", "GPT-4o"],
       hiddenModelLabels: ["GPT-4 Turbo"],
     });
@@ -53,7 +53,7 @@ test("switches between app-global and per-repo model scope while worktrees inher
     });
     await expect(window.locator(".chat-header__title")).toHaveText("Repo B global session");
     await expectComposerModelState(window, {
-      activeModel: "openai:gpt-5",
+      activeModel: "OpenAI · GPT-5",
       visibleModelLabels: ["GPT-5", "GPT-4o"],
       hiddenModelLabels: ["GPT-4 Turbo"],
     });
@@ -85,7 +85,7 @@ test("switches between app-global and per-repo model scope while worktrees inher
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
     await selectSession(window, "Repo B global session");
     await expectComposerModelState(window, {
-      activeModel: "openai:gpt-5",
+      activeModel: "OpenAI · GPT-5",
       visibleModelLabels: ["GPT-5", "GPT-4o"],
       hiddenModelLabels: ["GPT-4 Turbo"],
     });
@@ -99,7 +99,7 @@ test("switches between app-global and per-repo model scope while worktrees inher
     });
     await expect(window.locator(".chat-header__title")).toHaveText("New thread");
     await expectComposerModelState(window, {
-      activeModel: "openai:gpt-4o",
+      activeModel: "OpenAI · GPT-4o",
       visibleModelLabels: ["GPT-4o", "GPT-4 Turbo"],
       hiddenModelLabels: ["GPT-5"],
     });
@@ -107,7 +107,7 @@ test("switches between app-global and per-repo model scope while worktrees inher
     await openNewThread(window);
     await expect(window.locator(".new-thread__workspace")).toHaveValue(rootWorkspaceA.id);
     await expectNewThreadModelState(window, {
-      activeModel: "openai:gpt-4o",
+      activeModel: "OpenAI · GPT-4o",
       visibleModelLabels: ["GPT-4o", "GPT-4 Turbo"],
       hiddenModelLabels: ["GPT-5"],
     });
@@ -115,7 +115,7 @@ test("switches between app-global and per-repo model scope while worktrees inher
     await expect(window.getByTestId("new-thread-composer")).toHaveCount(0);
 
     await selectComposerModel(window, "GPT-4 Turbo");
-    await expect(window.getByRole("button", { name: "openai:gpt-4-turbo" }).first()).toBeVisible();
+    await expect(window.getByRole("button", { name: "OpenAI · GPT-4 Turbo" }).first()).toBeVisible();
 
     await openSettings(window);
     await openSettingsSection(window, "Models");
@@ -130,7 +130,7 @@ test("switches between app-global and per-repo model scope while worktrees inher
     await expect(window.getByLabel("Default model", { exact: true })).toHaveValue("openai:gpt-5");
 
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
-    await expect(window.getByRole("button", { name: "openai:gpt-4-turbo" }).first()).toBeVisible();
+    await expect(window.getByRole("button", { name: "OpenAI · GPT-4 Turbo" }).first()).toBeVisible();
     await expectComposerModelOptions(window, {
       visibleModelLabels: ["GPT-5", "GPT-4 Turbo"],
       hiddenModelLabels: ["GPT-4o"],
@@ -235,11 +235,12 @@ async function expectModelOptions(
   await badge.click();
   const dropdown = scope.locator(".model-selector__dropdown").first();
   await expect(dropdown).toBeVisible();
+  const option = (label: string) => dropdown.getByRole("button", { name: label, exact: true });
   for (const label of expectations.visibleModelLabels) {
-    await expect(dropdown).toContainText(label);
+    await expect(option(label)).toBeVisible();
   }
   for (const label of expectations.hiddenModelLabels) {
-    await expect(dropdown).not.toContainText(label);
+    await expect(option(label)).toHaveCount(0);
   }
   await window.keyboard.press("Escape");
   await expect(dropdown).toHaveCount(0);
@@ -256,3 +257,41 @@ async function selectComposerModel(window: Page, label: string): Promise<void> {
 function settingsWorkspacePicker(window: Page) {
   return window.getByTestId("settings-surface").getByLabel("Workspace", { exact: true });
 }
+
+test("a default reasoning level picked in Settings shows at once and is still chosen after a restart", async () => {
+  test.setTimeout(90_000);
+  const userDataDir = await makeUserDataDir();
+  const agentDir = join(userDataDir, "agent");
+  const workspace = await makeWorkspace("default-reasoning");
+  await seedAgentDir(agentDir);
+  const options = { agentDir, initialWorkspaces: [workspace], testMode: "background" as const };
+
+  const first = await launchDesktop(userDataDir, options);
+  try {
+    const window = await first.firstWindow();
+    await waitForWorkspaceByPath(window, workspace);
+    await window.keyboard.press(desktopShortcut(","));
+    await openSettingsSection(window, "Models");
+    const reasoning = window.getByRole("combobox", { name: "Reasoning", exact: true });
+    const before = await reasoning.inputValue();
+    const next = before === "high" ? "low" : "high";
+    await reasoning.selectOption(next);
+    // Immediately, not after the save's round trip.
+    expect(await reasoning.inputValue()).toBe(next);
+    await expect(reasoning).toHaveValue(next, { timeout: 10_000 });
+    await first.close();
+
+    const second = await launchDesktop(userDataDir, options);
+    try {
+      const again = await second.firstWindow();
+      await waitForWorkspaceByPath(again, workspace);
+      await again.keyboard.press(desktopShortcut(","));
+      await openSettingsSection(again, "Models");
+      await expect(again.getByRole("combobox", { name: "Reasoning", exact: true })).toHaveValue(next);
+    } finally {
+      await second.close();
+    }
+  } finally {
+    await first.close().catch(() => undefined);
+  }
+});

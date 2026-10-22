@@ -31,16 +31,19 @@ test("Control or Alt with 1-9 selects side panel tabs while Cmd or Ctrl keeps sw
     await selectSidePanel(window, "Terminal");
     const tabs = window.getByRole("tablist", { name: "Workspace tools" });
     const tab = (name: string) => tabs.getByRole("tab", { name, exact: true });
-    await expect(tabs.getByRole("tab")).toHaveCount(3);
-    await expect(tab("Review")).toHaveAttribute("title", `Review (${tabLabel(1)})`);
-    await expect(tab("Files")).toHaveAttribute("title", `Files (${tabLabel(2)})`);
+    await expect(tabs.getByRole("tab")).toHaveCount(4);
+    await expect(tab("Agents")).toHaveAttribute("title", `Agents (${tabLabel(1)})`);
+    await expect(tab("Review")).toHaveAttribute("title", `Review (${tabLabel(2)})`);
+    await expect(tab("Files")).toHaveAttribute("title", `Files (${tabLabel(3)})`);
 
     // Renderer keydown path, from the composer.
     const composer = window.getByTestId("composer");
     await composer.click();
     await window.keyboard.press(`${tabModifier}+1`);
-    await expect(tab("Review")).toHaveAttribute("aria-selected", "true");
+    await expect(tab("Agents")).toHaveAttribute("aria-selected", "true");
     await window.keyboard.press(`${tabModifier}+2`);
+    await expect(tab("Review")).toHaveAttribute("aria-selected", "true");
+    await window.keyboard.press(`${tabModifier}+3`);
     await expect(tab("Files")).toHaveAttribute("aria-selected", "true");
     await expect(title).toHaveText("Tab Bravo");
     // No tab 5: nothing changes.
@@ -50,11 +53,11 @@ test("Control or Alt with 1-9 selects side panel tabs while Cmd or Ctrl keeps sw
     // Holding the tab modifier shows the tab numbers until it is released.
     await composer.click();
     await window.keyboard.down(tabModifier);
-    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(3);
-    await expect(tab("Terminal").locator(".workbench__tab-shortcut")).toHaveText(tabLabel(3));
-    await window.keyboard.press("3");
+    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(4);
+    await expect(tab("Terminal").locator(".workbench__tab-shortcut")).toHaveText(tabLabel(4));
+    await window.keyboard.press("4");
     await expect(tab("Terminal")).toHaveAttribute("aria-selected", "true");
-    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(3);
+    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(4);
     await window.keyboard.up(tabModifier);
     await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(0);
 
@@ -64,9 +67,9 @@ test("Control or Alt with 1-9 selects side panel tabs while Cmd or Ctrl keeps sw
     await expect(window.getByTestId("workbench")).toHaveCount(0);
     // Holding the modifier, the panel opens with its tab numbers showing.
     await window.keyboard.down(tabModifier);
-    await window.keyboard.press("1");
+    await window.keyboard.press("2");
     await expect(tab("Review")).toHaveAttribute("aria-selected", "true");
-    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(3);
+    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(4);
     await window.keyboard.up(tabModifier);
     await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(0);
 
@@ -95,15 +98,15 @@ test("Control or Alt with 1-9 selects side panel tabs while Cmd or Ctrl keeps sw
       }).observe(review!, { attributes: true, attributeFilter: ["aria-selected"] });
     });
     // Auto-repeat from a held chord is ignored; the next real press still acts.
-    await sendDigit("1", [mainModifier, "isAutoRepeat"]);
-    await sendDigit("2", [mainModifier]);
+    await sendDigit("2", [mainModifier, "isAutoRepeat"]);
+    await sendDigit("3", [mainModifier]);
     await expect(tab("Files")).toHaveAttribute("aria-selected", "true");
     expect(
       await window.evaluate(
         () => (window as unknown as { reviewSelected?: boolean }).reviewSelected,
       ),
     ).toBe(false);
-    await sendDigit("1", [mainModifier]);
+    await sendDigit("2", [mainModifier]);
     await expect(tab("Review")).toHaveAttribute("aria-selected", "true");
 
     // Main forwards the chord without consuming it, so the modifier's release
@@ -121,9 +124,9 @@ test("Control or Alt with 1-9 selects side panel tabs while Cmd or Ctrl keeps sw
       );
     const modifierKeyCode = isMac ? "Control" : "Alt";
     await sendKey("keyDown", modifierKeyCode, [mainModifier]);
-    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(3);
-    await sendKey("keyDown", "3", [mainModifier]);
-    await sendKey("keyUp", "3", [mainModifier]);
+    await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(4);
+    await sendKey("keyDown", "4", [mainModifier]);
+    await sendKey("keyUp", "4", [mainModifier]);
     await expect(tab("Terminal")).toHaveAttribute("aria-selected", "true");
     await sendKey("keyUp", modifierKeyCode, []);
     await expect(tabs.locator("[data-tab-shortcut]")).toHaveCount(0);

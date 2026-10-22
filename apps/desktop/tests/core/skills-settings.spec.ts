@@ -7,6 +7,7 @@ import {
   launchDesktop,
   makeUserDataDir,
   makeWorkspace,
+  seedAgentDir,
 } from "../helpers/electron-app";
 
 test("shows skills and settings surfaces from runtime data", async () => {
@@ -103,7 +104,7 @@ test("skills and extensions live inside settings as one tabbed page", async () =
       "true",
     );
     const list = window.getByTestId("skills-list");
-    await expect(list.getByRole("heading", { name: /Workspace/ })).toBeVisible();
+    await expect(list.getByRole("heading", { name: /Project/ })).toBeVisible();
 
     const rowSwitch = list.getByRole("switch", { name: "Enable Demo Skill" });
     await expect(rowSwitch).toBeChecked();
@@ -172,6 +173,65 @@ Use this skill for complex or high-risk implementation work that needs plan-firs
 
     await composer.fill("/skill:plan-loop");
     await expect(slashMenu).toContainText("Plan Loop");
+  } finally {
+    await harness.close();
+  }
+});
+
+
+test("skills selection loads shared and project resources for each project", async () => {
+  test.setTimeout(60_000);
+  const userDataDir = await makeUserDataDir();
+  const agentDir = join(userDataDir, "agent");
+  const alphaPath = await makeWorkspace("skills-runtime-alpha");
+  const betaPath = await makeWorkspace("skills-runtime-beta");
+  await seedAgentDir(agentDir, {
+    withOpenAiAuth: false,
+    withDefaultModel: false,
+    enabledModels: [],
+  });
+
+  const addSkill = async (folder: string, directory: string, title: string) => {
+    const skillDir = join(folder, directory);
+    await mkdir(skillDir, { recursive: true });
+    await writeFile(
+      join(skillDir, "SKILL.md"),
+      "# " + title + "\n\nA resource-loading fixture.\n",
+      "utf8",
+    );
+  };
+  await addSkill(join(agentDir, "skills"), "global-guide", "Global guide");
+  await addSkill(join(alphaPath, ".agents", "skills"), "alpha-only", "Alpha only");
+  await addSkill(join(betaPath, ".agents", "skills"), "beta-only", "Beta only");
+
+  const harness = await launchDesktop(userDataDir, {
+    agentDir,
+    initialWorkspaces: [alphaPath, betaPath],
+    testMode: "background",
+  });
+
+  try {
+    const window = await harness.firstWindow();
+    await window.getByRole("button", { name: "Settings", exact: true }).click();
+    await window.getByRole("button", { name: "Skills and extensions", exact: true }).click();
+    const surface = window.getByTestId("skills-surface");
+    await expect(surface).toBeVisible();
+
+    const list = surface.getByTestId("skills-list");
+    await expect(list).toContainText("Global guide");
+    await expect(list).toContainText("Alpha only");
+    await expect(list).not.toContainText("Beta only");
+
+    const workspace = surface.getByRole("combobox", { name: "Workspace" });
+    await workspace.selectOption({ label: "skills-runtime-beta" });
+    await expect(list).toContainText("Global guide");
+    await expect(list).toContainText("Beta only");
+    await expect(list).not.toContainText("Alpha only");
+
+    await workspace.selectOption({ label: "skills-runtime-alpha" });
+    await expect(list).toContainText("Global guide");
+    await expect(list).toContainText("Alpha only");
+    await expect(list).not.toContainText("Beta only");
   } finally {
     await harness.close();
   }

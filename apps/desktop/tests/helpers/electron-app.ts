@@ -1812,7 +1812,9 @@ export async function openReviewOptions(window: Page) {
 
 export async function chooseReviewCheckout(window: Page, checkoutId: string): Promise<void> {
   const menu = await openReviewOptions(window);
-  await menu.locator(`[role="menuitemradio"][data-option-id="${checkoutId}"]`).click();
+  await menu
+    .locator(`[role="menuitemradio"][data-option-id=${JSON.stringify(checkoutId)}]`)
+    .click();
 }
 
 /** The resolved comparison shown at the top of the Review "…" menu; press Escape to close. */
@@ -1833,9 +1835,11 @@ export async function openNewThread(window: Page): Promise<void> {
   if (await composer.isVisible().catch(() => false)) {
     return;
   }
+  // The primary button leads the sidebar; a fresh thread's row can share its name.
   const button = window
     .locator(".sidebar")
-    .getByRole("button", { name: "New thread", exact: true });
+    .getByRole("button", { name: "New thread", exact: true })
+    .first();
   await expect(button).toBeVisible({ timeout: 15_000 });
   await expect(button).toBeEnabled({ timeout: 15_000 });
   await button.click();
@@ -1862,11 +1866,7 @@ export async function startThreadFromSurface(
   if (workspaceName) {
     await window.locator(".new-thread__workspace").selectOption({ label: workspaceName });
   }
-  if (environment === "worktree") {
-    await window.getByRole("button", { name: "Worktree", exact: true }).click();
-  } else {
-    await window.getByRole("button", { name: "Local", exact: true }).click();
-  }
+  await window.getByLabel("Environment", { exact: true }).selectOption(environment);
   const startButton = window.getByRole("button", { name: "Start thread" });
   if (prompt) {
     await window.getByLabel("New thread prompt").fill(prompt);
@@ -2011,10 +2011,10 @@ export async function chooseThreadGrouping(
   window: Page,
   grouping: "time" | "workspace",
 ): Promise<void> {
-  const label = grouping === "time" ? "Time" : "Workspace";
-  await window.getByRole("button", { name: "Customize Sidebar" }).click();
-  await window.getByRole("menuitem", { name: "Grouping" }).click();
-  await window.getByRole("menuitemradio", { name: label, exact: true }).click();
+  await window
+    .getByRole("group", { name: "Thread grouping" })
+    .getByRole("button", { name: grouping === "time" ? "Threads" : "Folders", exact: true })
+    .click();
   await expectThreadGrouping(window, grouping);
 }
 
@@ -2022,33 +2022,11 @@ export async function expectThreadGrouping(
   window: Page,
   grouping: "time" | "workspace",
 ): Promise<void> {
-  const label = grouping === "time" ? "Time" : "Workspace";
-  await window.getByRole("button", { name: "Customize Sidebar" }).click();
-  await window.getByRole("menuitem", { name: "Grouping" }).click();
-  await expect(window.getByRole("menuitemradio", { name: label, exact: true })).toHaveAttribute(
-    "aria-checked",
-    "true",
-  );
-  await expectCompactGroupingMenu(window);
-  await window.keyboard.press("Escape");
-  await expect(window.getByRole("menu", { name: "Customize Sidebar" })).toBeHidden();
-}
-
-async function expectCompactGroupingMenu(window: Page): Promise<void> {
-  const viewportWidth = await window.evaluate(() => document.documentElement.clientWidth);
-  const submenu = window.getByRole("menu", { name: "Grouping" });
-  const submenuBox = await submenu.boundingBox();
-  const timeBox = await window
-    .getByRole("menuitemradio", { name: "Time", exact: true })
-    .boundingBox();
-  expect(submenuBox, "Grouping submenu should be visible").not.toBeNull();
-  expect(timeBox, "Time option should be visible").not.toBeNull();
-  expect(
-    submenuBox!.width,
-    `Grouping submenu is ${submenuBox!.width}px in a ${viewportWidth}px window`,
-  ).toBeLessThan(viewportWidth / 2);
-  expect(submenuBox!.width).toBeLessThan(240);
-  expect(timeBox!.width).toBeGreaterThan(submenuBox!.width * 0.7);
+  await expect(
+    window
+      .getByRole("group", { name: "Thread grouping" })
+      .getByRole("button", { name: grouping === "time" ? "Threads" : "Folders", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
 }
 
 export async function createSessionViaIpc(

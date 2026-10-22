@@ -12,6 +12,7 @@ import {
   sessionThreadKey,
   threadHistoryPreview,
   visibleThreadShortcutOrder,
+  visibleWorkspaceGroups,
   workspaceHistoryExpansionKey,
 } from "../../src/features/threads/thread-groups";
 
@@ -167,6 +168,32 @@ test("excludes archived threads from recencyOrder and date buckets", () => {
   expect(model.archivedThreads.map((thread) => thread.session.title)).toEqual(["Archived"]);
   expect(model.recencyOrder.map((thread) => thread.session.title)).toEqual(["Live"]);
   expect(model.recencySections[0]?.threads.map((thread) => thread.session.title)).toEqual(["Live"]);
+});
+
+test("Chats hides empty and archived-only folders while Folders keeps every folder", () => {
+  const model = buildThreadSidebarModel(
+    state([
+      workspace("active", "Active", [session("live", "Live", { updatedAt: isoDaysAgo(0) })]),
+      workspace("archived", "Archived only", [
+        session("old", "Old", {
+          updatedAt: isoDaysAgo(2),
+          archivedAt: isoDaysAgo(1),
+        }),
+      ]),
+      workspace("empty", "Empty", []),
+    ]),
+    nowMs,
+  );
+
+  expect(visibleWorkspaceGroups(model, "time").map((group) => group.workspace.id)).toEqual([
+    "active",
+  ]);
+  expect(visibleWorkspaceGroups(model, "workspace").map((group) => group.workspace.id)).toEqual([
+    "active",
+    "archived",
+    "empty",
+  ]);
+  expect(model.archivedThreads.map((thread) => thread.session.id)).toEqual(["old"]);
 });
 
 test("does not let a newer lastViewedAt steal recency from lastInteractedAt", () => {

@@ -30,7 +30,7 @@ test("startup copy switches on failure codes and never interpolates error text",
       failure: { code: "bridge-unavailable" },
       retrying: true,
     }).body,
-  ).toContain("Quit pi-gui and reopen it");
+  ).toContain("Quit Pegasus and reopen it");
   expect(JSON.stringify(startupSurfaceCopy({ kind: "crashed" }))).not.toContain(SENTINEL);
 });
 

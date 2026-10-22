@@ -31,11 +31,11 @@ test("new thread reuses composer behaviors for slash commands, image previews, a
 
     const composer = window.getByTestId("new-thread-composer");
     await expect(window.getByTestId("new-thread-logo")).toBeVisible();
-    await expect(window.getByRole("heading", { name: "Let's build" })).toBeVisible();
+    await expect(window.getByRole("heading", { name: "Start a new chat." })).toBeVisible();
     await expect(composer).toBeFocused();
     await expect(composer).toHaveAttribute(
       "placeholder",
-      "Ask pi anything, use / for commands and skills",
+      "Ask pi anything, use / for commands and skills…",
     );
 
     const modelBadge = window.locator(".new-thread__hint .model-selector__badge").first();
@@ -122,19 +122,20 @@ test("new thread hides the onboarding notice after picking a thread model", asyn
 
     await modelBadge.click();
     const dropdown = window.locator(".new-thread__hint .model-selector__dropdown").first();
-    await expect(dropdown).toContainText("GPT-5");
-    await expect(dropdown).toContainText("GPT-4o");
+    const option = (label: string) => dropdown.getByRole("button", { name: label, exact: true });
+    await expect(option("GPT-5")).toBeVisible();
+    await expect(option("GPT-4o")).toBeVisible();
     const modelFilter = dropdown.locator(".model-selector__filter-input");
     await expect(modelFilter).toBeFocused();
     await modelFilter.fill("definitely-no-model");
     await expect(dropdown).toContainText("No matching models");
     await expect(modelBadge).toHaveText("Pick a model");
     await modelFilter.fill("4o");
-    await expect(dropdown).toContainText("GPT-4o");
-    await expect(dropdown).not.toContainText("GPT-5");
-    await dropdown.getByRole("button", { name: /GPT-4o/ }).click();
+    await expect(option("GPT-4o")).toBeVisible();
+    await expect(option("GPT-5")).toHaveCount(0);
+    await option("GPT-4o").click();
 
-    await expect(modelBadge).toHaveText("openai:gpt-4o");
+    await expect(modelBadge).toHaveAccessibleName("OpenAI · GPT-4o");
     await expect(startButton).toBeEnabled();
     await expect(notice).toHaveCount(0);
 
@@ -257,8 +258,8 @@ test("refreshing after a provider becomes available auto-enables that provider's
 
     await modelBadge.click();
     const dropdown = window.locator(".new-thread__hint .model-selector__dropdown").first();
-    await expect(dropdown).toContainText("GPT-5");
-    await expect(dropdown).toContainText("GPT-4o");
+    await expect(dropdown.getByRole("button", { name: "GPT-5", exact: true })).toBeVisible();
+    await expect(dropdown.getByRole("button", { name: "GPT-4o", exact: true })).toBeVisible();
   } finally {
     await harness.close();
   }

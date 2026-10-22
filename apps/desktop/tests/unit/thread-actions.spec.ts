@@ -46,9 +46,9 @@ function titles(actions: readonly { readonly title: string }[]): string[] {
 test("an open thread lists rename, pin, archive, scheduled task and copy with shortcut hints", () => {
   const actions = buildThreadActions({ workspaceId: "ws", session: session() }, handlers("darwin"));
   expect(titles(actions)).toEqual([
-    "Rename thread",
-    "Pin thread",
-    "Archive thread",
+    "Rename chat",
+    "Pin chat",
+    "Archive chat",
     "Add scheduled task…",
     "Copy session ID",
   ]);
@@ -65,9 +65,9 @@ test("state changes the list: pinned, unseen, scheduled and archived threads", (
     recorder,
   );
   expect(titles(actions)).toEqual([
-    "Rename thread",
-    "Unpin thread",
-    "Archive thread",
+    "Rename chat",
+    "Unpin chat",
+    "Archive chat",
     "Mark as read",
     "Edit scheduled task…",
     "Copy session ID",
@@ -75,15 +75,25 @@ test("state changes the list: pinned, unseen, scheduled and archived threads", (
   actions.find((action) => action.id === "pin-thread")?.run();
   expect(recorder.calls).toEqual(["pin:false"]);
 
-  const archived = buildThreadActions(
-    { workspaceId: "ws", session: session({ archivedAt: "x" }) },
-    handlers("linux"),
-  );
+  const restored: Array<{ workspaceId: string; sessionId: string }> = [];
+  const archivedSubject = {
+    workspaceId: "workspace-native-id",
+    session: session({ id: "session-native-id", archivedAt: "x" }),
+  };
+  const archived = buildThreadActions(archivedSubject, {
+    ...handlers("linux"),
+    restore: (subject) =>
+      restored.push({ workspaceId: subject.workspaceId, sessionId: subject.session.id }),
+  });
   expect(titles(archived)).toEqual([
-    "Rename thread",
-    "Restore thread",
+    "Rename chat",
+    "Unarchive chat",
     "Add scheduled task…",
     "Copy session ID",
   ]);
   expect(archived.some((action) => action.id === "archive-thread")).toBe(false);
+  archived.find((action) => action.id === "restore-thread")?.run();
+  expect(restored).toEqual([
+    { workspaceId: "workspace-native-id", sessionId: "session-native-id" },
+  ]);
 });

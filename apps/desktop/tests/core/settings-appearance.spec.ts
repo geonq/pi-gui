@@ -29,17 +29,18 @@ test("toggles and restores window transparency", async () => {
   try {
     const window = await harness.firstWindow();
     await waitForWorkspaceByPath(window, workspacePath);
-    await expect.poll(() => hasTransparencyClass(window)).toBe(false);
+    // Glass is the default look; turning it off must stick across a restart.
+    await expect.poll(() => hasTransparencyClass(window)).toBe(true);
 
     await window.keyboard.press(desktopShortcut(","));
     await expect(window.getByTestId("settings-surface")).toBeVisible();
     await window.getByRole("button", { name: "Appearance", exact: true }).click();
 
     const transparencyToggle = window.getByLabel("Window transparency");
-    await expect(transparencyToggle).not.toBeChecked();
+    await expect(transparencyToggle).toBeChecked();
     await transparencyToggle.click();
-    await expect.poll(async () => (await getDesktopState(window)).enableTransparency).toBe(true);
-    await expect.poll(() => hasTransparencyClass(window)).toBe(true);
+    await expect.poll(async () => (await getDesktopState(window)).enableTransparency).toBe(false);
+    await expect.poll(() => hasTransparencyClass(window)).toBe(false);
     await expect
       .poll(async () => {
         const persisted = JSON.parse(
@@ -49,7 +50,7 @@ test("toggles and restores window transparency", async () => {
         };
         return persisted.enableTransparency;
       })
-      .toBe(true);
+      .toBe(false);
   } finally {
     await harness.close();
   }
@@ -62,8 +63,8 @@ test("toggles and restores window transparency", async () => {
   try {
     const window = await harness.firstWindow();
     await waitForWorkspaceByPath(window, workspacePath);
-    await expect.poll(async () => (await getDesktopState(window)).enableTransparency).toBe(true);
-    await expect.poll(() => hasTransparencyClass(window)).toBe(true);
+    await expect.poll(async () => (await getDesktopState(window)).enableTransparency).toBe(false);
+    await expect.poll(() => hasTransparencyClass(window)).toBe(false);
   } finally {
     await harness.close();
   }
@@ -80,7 +81,7 @@ test("selects and restores theme presets", async () => {
   try {
     const window = await harness.firstWindow();
     await waitForWorkspaceByPath(window, workspacePath);
-    await openAppearance(window);
+    await turnGlassOff(window);
     await window.getByRole("radio", { name: "Light", exact: true }).click();
     await selectThemePreset(window, "Catppuccin");
     await expect.poll(async () => (await getDesktopState(window)).themePresetId).toBe("catppuccin");
@@ -149,6 +150,7 @@ test("every preset recolours the same design instead of restyling it", async () 
         'Preset assertion surface with `inline code`.\n\n```ts\nconst surface = "workbench";\n```',
     });
     await expect(window.getByTestId("transcript")).toContainText("inline code");
+    await turnGlassOff(window);
 
     for (const variant of ["light", "dark"] as const) {
       for (const preset of themePresets) {
@@ -173,6 +175,13 @@ async function openAppearance(window: Page): Promise<void> {
   await window.keyboard.press(desktopShortcut(","));
   await expect(window.getByTestId("settings-surface")).toBeVisible();
   await window.getByRole("button", { name: "Appearance", exact: true }).click();
+}
+
+/** Presets are checked on the opaque design; glass has its own test above. */
+async function turnGlassOff(window: Page): Promise<void> {
+  await openAppearance(window);
+  await window.getByLabel("Window transparency").click();
+  await expect.poll(() => hasTransparencyClass(window)).toBe(false);
 }
 
 async function hasTransparencyClass(window: Page): Promise<boolean> {

@@ -40,7 +40,7 @@ test("caps each time bucket at five and hides workspace headers", async () => {
     const customize = window.getByRole("button", { name: "Customize Sidebar" });
     await customize.hover();
     await expect(window.getByRole("tooltip", { name: "Customize Sidebar" })).toBeVisible();
-    await expectThreadGrouping(window, "time");
+    await chooseThreadGrouping(window, "time");
     const today = recencySection(window, "Today");
     await expect(today).toBeVisible();
     await expect(today.locator(".session-row")).toHaveCount(5);
@@ -69,6 +69,8 @@ test("does not bump Today when a thread is opened", async () => {
   try {
     const window = await harness.firstWindow();
     const workspace = await waitForWorkspaceByPath(window, workspacePath);
+    // Folders are the default grouping; these flows start from the user picking Time.
+    await chooseThreadGrouping(window, "time");
     await createHistoryThreads(window, workspace.id, ["Older today", "Newest today"]);
 
     await expectTodayTitles(window, ["Newest today", "Older today"]);
@@ -103,6 +105,8 @@ test("bumps a sent thread to the top of Today", async () => {
   try {
     const window = await harness.firstWindow();
     const workspace = await waitForWorkspaceByPath(window, workspacePath);
+    // Folders are the default grouping; these flows start from the user picking Time.
+    await chooseThreadGrouping(window, "time");
     await createHistoryThreads(window, workspace.id, ["Older today", "Newest today"]);
     await expectTodayTitles(window, ["Newest today", "Older today"]);
 
@@ -142,6 +146,8 @@ test("selects pinned threads first with 1-9 and paints badges while the modifier
   try {
     const window = await harness.firstWindow();
     const workspace = await waitForWorkspaceByPath(window, workspacePath);
+    // Folders are the default grouping; these flows start from the user picking Time.
+    await chooseThreadGrouping(window, "time");
     await createHistoryThreads(window, workspace.id, ["Alpha", "Bravo", "Charlie"]);
     await expectShortcutBadges(window, ["Charlie", "Bravo", "Alpha"]);
 
@@ -239,6 +245,8 @@ test("groups seeded Last 7 Days, Last 30 Days, and Older threads", async () => {
     const window = await firstRun.firstWindow();
     const workspaceA = await waitForWorkspaceByPath(window, workspaceAPath);
     const workspaceB = await waitForWorkspaceByPath(window, workspaceBPath);
+    // Folders are the default grouping; these flows start from the user picking Time.
+    await chooseThreadGrouping(window, "time");
     await createHistoryThreads(window, workspaceA.id, ["Today thread", "Week thread"]);
     await createHistoryThreads(window, workspaceB.id, ["Month thread", "Older thread"]);
     const state = await getDesktopState(window);
@@ -349,6 +357,8 @@ test("caps a long Last 7 Days bucket and sorts the folder by last send", async (
     const window = await firstRun.firstWindow();
     const workspace = await waitForWorkspaceByPath(window, workspacePath);
     workspaceName = workspace.name;
+    // Folders are the default grouping; these flows start from the user picking Time.
+    await chooseThreadGrouping(window, "time");
     await createHistoryThreads(window, workspace.id, titles);
     const state = await getDesktopState(window);
     keys = Object.fromEntries(

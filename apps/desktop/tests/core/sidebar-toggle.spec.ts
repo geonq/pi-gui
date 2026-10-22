@@ -286,3 +286,27 @@ test("keeps collapsed sidebar out of narrow windows and reopens from the button"
     }
   }
 });
+
+test("the Usage tab keeps the sidebar toggle, and collapsing there gives the charts the width", async () => {
+  const userDataDir = await makeUserDataDir();
+  const workspacePath = await makeWorkspace("sidebar-toggle-usage");
+  const harness = await launchDesktop(userDataDir, {
+    initialWorkspaces: [workspacePath],
+    testMode: "background",
+  });
+  try {
+    const window = await harness.firstWindow();
+    await waitForWorkspaceByPath(window, workspacePath);
+    await window.getByTestId("sidebar-usage").click();
+    await expect(window.locator(".usage-heatmap")).toBeVisible();
+    const before = (await window.locator(".main").boundingBox())!;
+
+    await window.getByTestId("sidebar-toggle").click();
+    await expectSidebarCollapsed(window, true);
+    expect((await window.locator(".main").boundingBox())!.width).toBeGreaterThan(before.width);
+    await window.getByTestId("sidebar-toggle").click();
+    await expectSidebarCollapsed(window, false);
+  } finally {
+    await harness.close();
+  }
+});

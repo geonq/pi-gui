@@ -48,10 +48,7 @@ test("forks a thread from an assistant response into a new sidebar session", asy
     const forkModal = window.getByTestId("fork-modal");
     await expect(forkModal).toBeVisible();
     await expect(window.getByTestId("fork-modal-preview")).toContainText("Second fork answer");
-    await expect(window.getByTestId("fork-environment-local")).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    await expect(forkModal.getByLabel("Fork environment")).toHaveValue("local");
 
     await window.getByTestId("fork-modal-confirm").click();
     await expect(forkModal).toHaveCount(0);
