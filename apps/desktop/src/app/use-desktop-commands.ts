@@ -81,6 +81,7 @@ interface DesktopCommandsInput {
   readonly selectedToolId: string | null;
   readonly extensionViews: readonly DesktopExtensionViewInfo[];
   readonly openNewThread: (rootWorkspaceId?: string) => void;
+  readonly openFolder: () => void;
   readonly openSettings: (workspaceId?: string, section?: SettingsSection) => void;
   readonly openSkills: (workspaceId?: string) => void;
   readonly openExtensions: (workspaceId?: string) => void;
@@ -412,11 +413,7 @@ export function useDesktopCommands(input: DesktopCommandsInput) {
           thread: selectedThread,
           canToggleSidebar: canTogglePrimarySidebar(snapshot?.activeView),
           newThread: openNewThread,
-          openFolder: () => {
-            void updateSnapshot(setSnapshot, () => api.pickWorkspace()).catch((error: unknown) => {
-              console.error("[renderer] pickWorkspace failed", error);
-            });
-          },
+          openFolder: input.openFolder,
           openSettings: (section) => input.openSettings(selectedRootWorkspaceId, section),
           openSkills: () => input.openSkills(selectedRootWorkspaceId),
           openExtensions: () => input.openExtensions(selectedRootWorkspaceId),

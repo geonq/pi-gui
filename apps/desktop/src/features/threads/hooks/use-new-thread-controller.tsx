@@ -27,7 +27,7 @@ import {
   handleClipboardImageShortcut,
   readComposerAttachmentsFromFiles,
 } from "../../conversation/composer-attachments";
-import { buildModelOptions, parseTreeComposerCommand } from "../../conversation/composer-commands";
+import { isModelSelectable, parseTreeComposerCommand } from "../../conversation/composer-commands";
 import type { PiDesktopApi } from "../../../../contracts/ipc";
 import { deriveModelOnboardingState } from "../../settings/model-onboarding";
 import { getEffectiveModelRuntime } from "../../settings/model-settings";
@@ -81,10 +81,10 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
   const workspace =
     rootWorkspaceOptions.find((entry) => entry.id === rootWorkspaceId) ?? rootWorkspaceOptions[0];
   const runtime = snapshot ? getEffectiveModelRuntime(snapshot, workspace) : undefined;
-  const defaultEnabled = buildModelOptions(runtime).some(
-    (m) =>
-      m.providerId === runtime?.settings.defaultProvider &&
-      m.modelId === runtime?.settings.defaultModelId,
+  const defaultEnabled = isModelSelectable(
+    runtime,
+    runtime?.settings.defaultProvider,
+    runtime?.settings.defaultModelId,
   );
   const resolvedProvider =
     provider ?? (defaultEnabled ? runtime?.settings.defaultProvider : undefined);

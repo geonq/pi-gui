@@ -216,6 +216,7 @@ export function TerminalPanel({ workspace, sessionId, onHide }: TerminalPanelPro
     activeTerminalIdRef.current = activeSession.id;
     const terminal = new Terminal({
       allowProposedApi: true,
+      allowTransparency: true,
       convertEol: true,
       cursorBlink: true,
       fontFamily: "Menlo, Monaco, Consolas, 'Liberation Mono', monospace",

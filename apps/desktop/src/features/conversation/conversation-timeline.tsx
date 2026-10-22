@@ -214,7 +214,7 @@ export function ConversationTimeline({
 
 function TranscriptSkeleton() {
   return (
-    <div className="transcript-skeleton" data-testid="transcript-skeleton" aria-hidden="true">
+    <div className="transcript-skeleton" data-testid="transcript-skeleton">
       <div className="transcript-skeleton__row transcript-skeleton__row--user">
         <span className="skeleton-line" style={{ width: "42%" }} />
       </div>
@@ -403,7 +403,11 @@ function isSameDisplayItem(a: DisplayTimelineItem, b: DisplayTimelineItem): bool
   }
   if (a.kind === "activity" && b.kind === "activity") {
     return (
-      a.label === b.label && a.detail === b.detail && a.metadata === b.metadata && a.tone === b.tone
+      a.label === b.label &&
+      a.detail === b.detail &&
+      a.metadata === b.metadata &&
+      a.tone === b.tone &&
+      a.activityState === b.activityState
     );
   }
   if (a.kind === "summary" && b.kind === "summary") {

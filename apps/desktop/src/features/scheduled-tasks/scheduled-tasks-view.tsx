@@ -11,6 +11,7 @@ import {
 import type { PiDesktopApi } from "../../../contracts/ipc";
 import type { Dispatch, SetStateAction } from "react";
 import type { ScheduledEditorState } from "./scheduled-task-editor";
+import { MoreIcon } from "../../ui/icons";
 
 interface ScheduledTasksViewProps {
   readonly tasks: readonly ScheduledTaskRecord[];
@@ -53,7 +54,7 @@ export function ScheduledTasksView({
         <div>
           <h1 className="view-header__title">Scheduled tasks</h1>
           <p className="view-header__body">
-            Ask pi to schedule tasks, set reminders, or monitor for updates.
+            Ask Pegasus to schedule tasks, set reminders, or monitor for updates.
           </p>
         </div>
         <div className="view-header__actions">
@@ -104,6 +105,7 @@ export function ScheduledTasksView({
           className="skills-search"
           data-testid="scheduled-task-search"
           placeholder="Search"
+          spellCheck={false}
           value={query}
           onChange={(event) => setQuery(event.target.value)}
         />
@@ -131,7 +133,7 @@ export function ScheduledTasksView({
           <h2>{filter === "active" ? "No active scheduled tasks" : "No scheduled tasks"}</h2>
           <p>
             {filter === "active"
-              ? "Scheduled tasks run on this device while pi-gui is open. They do not run in the cloud or after you quit."
+              ? "Scheduled tasks run on this device while Pegasus is open. They do not run in the cloud or after you quit."
               : "Create a task manually or ask pi to set one up."}
           </p>
         </div>
@@ -164,7 +166,7 @@ export function ScheduledTasksView({
                     setMenuTaskId((current) => (current === task.id ? undefined : task.id));
                   }}
                 >
-                  …
+                  <MoreIcon />
                 </button>
                 {menuTaskId === task.id ? (
                   <div className="workspace-menu scheduled-task-row__menu" role="menu">

@@ -30,7 +30,7 @@ const STATE_FAILED_COPY: DesktopStartupCopy = {
 
 const BRIDGE_FAILED_COPY: DesktopStartupCopy = {
   title: "Couldn't restore sessions",
-  body: "The desktop shell isn't connected. Quit pi-gui and reopen it.",
+  body: "The desktop shell isn't connected. Quit Pegasus and reopen it.",
   status: "failed",
 };
 
@@ -81,7 +81,7 @@ export function DesktopStartupSurface({ state, onRetry, onRelaunch }: DesktopSta
         data-retrying={retrying ? "true" : "false"}
         data-failure={state.kind === "failed" ? state.failure.code : undefined}
       >
-        <div className="loading-card__eyebrow">pi-gui</div>
+        <div className="loading-card__eyebrow">Pegasus</div>
         <h1>{copy.title}</h1>
         <p>{copy.body}</p>
         {showActions ? (
@@ -102,7 +102,7 @@ export function DesktopStartupSurface({ state, onRetry, onRelaunch }: DesktopSta
                 type="button"
                 onClick={onRelaunch}
               >
-                Relaunch pi-gui
+                Relaunch Pegasus
               </button>
             ) : null}
           </div>

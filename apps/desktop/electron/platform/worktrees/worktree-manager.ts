@@ -198,7 +198,7 @@ export class GitWorktreeManager {
       throw new Error("The primary workspace cannot be removed as a git worktree.");
     }
     if (this.options.isAppWorktreePath && !(await this.isRemovableAppWorktree(targetPath))) {
-      throw new Error("Only worktrees created by pi-gui can be removed here.");
+      throw new Error("Only worktrees created by Pegasus can be removed here.");
     }
 
     try {
@@ -420,14 +420,17 @@ function errorMessage(error: unknown): string {
 }
 
 async function resolveRepositoryRoot(workspacePath: string): Promise<string> {
-  const output = await runGit(["-C", workspacePath, "rev-parse", "--show-toplevel"]);
+  const output = await runGit(["-C", workspacePath, "rev-parse", "--show-toplevel"], 5_000);
   return canonicalPath(output.trim());
 }
 
 async function inspectGitWorkspace(workspacePath: string): Promise<GitWorkspaceInspection> {
   const canonicalPathValue = await canonicalPath(workspacePath);
   const commonDirPath = (
-    await runGit(["-C", workspacePath, "rev-parse", "--path-format=absolute", "--git-common-dir"])
+    await runGit(
+      ["-C", workspacePath, "rev-parse", "--path-format=absolute", "--git-common-dir"],
+      5_000,
+    )
   ).trim();
 
   return {
@@ -441,7 +444,7 @@ async function listGitWorktrees(
   workspace: WorkspaceRef,
   existingEntries: readonly WorktreeCatalogEntry[],
 ): Promise<WorktreeCatalogEntry[]> {
-  const output = await runGit(["-C", repoRoot, "worktree", "list", "--porcelain"]);
+  const output = await runGit(["-C", repoRoot, "worktree", "list", "--porcelain"], 5_000);
   const existing = new Map(existingEntries.map((entry) => [entry.worktreeId, entry]));
   const discovered = new Map<string, WorktreeCatalogEntry>();
 
@@ -577,10 +580,13 @@ function normalizeBranchName(value: string): string | undefined {
   return branch.length > 0 && branch !== "detached" ? branch : undefined;
 }
 
-async function runGit(args: readonly string[]): Promise<string> {
+async function runGit(args: readonly string[], timeout?: number): Promise<string> {
   const { stdout } = await execFileAsync("git", [...args], {
+    windowsHide: true,
     encoding: "utf8",
     maxBuffer: 10 * 1024 * 1024,
+    timeout,
+    killSignal: "SIGKILL",
   });
   return stdout;
 }

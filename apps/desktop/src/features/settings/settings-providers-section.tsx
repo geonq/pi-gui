@@ -15,12 +15,18 @@ interface SettingsProvidersSectionProps {
   readonly onDeleteCustomProvider: (providerId: string) => Promise<string | undefined>;
 }
 
+import { subscriptionAccount, subscriptionGroups } from "./subscription-accounts";
+
 const COLLAPSED_AVAILABLE_COUNT = 8;
 
 /** Sign-in providers first, then API key providers, then the rest, each alphabetical. */
 function compareAvailableProviders(left: RuntimeProviderRecord, right: RuntimeProviderRecord) {
   const rank = (provider: RuntimeProviderRecord) =>
-    provider.oauthSupported ? 0 : provider.apiKeySetupSupported ? 1 : 2;
+    provider.oauthSupported || provider.id === "antigravity"
+      ? 0
+      : provider.apiKeySetupSupported
+        ? 1
+        : 2;
   return rank(left) - rank(right) || left.name.localeCompare(right.name);
 }
 
@@ -41,13 +47,20 @@ export function SettingsProvidersSection({
   const [apiKeyPending, setApiKeyPending] = useState(false);
 
   const providers = runtime?.providers ?? [];
+  const accountGroups = subscriptionGroups(providers);
+  const accountIds = new Set(
+    accountGroups.flatMap((group) => group.accounts.map((provider) => provider.id)),
+  );
   const connectedProviders = providers.filter((provider) => provider.hasAuth);
   const defaultProviderId = runtime?.settings.defaultProvider;
   const attentionProviders = providers.filter(
     (provider) => provider.id === defaultProviderId && !provider.hasAuth,
   );
   const availableProviders = providers
-    .filter((provider) => !provider.hasAuth && provider.id !== defaultProviderId)
+    .filter(
+      (provider) =>
+        !provider.hasAuth && provider.id !== defaultProviderId && !accountIds.has(provider.id),
+    )
     .sort(compareAvailableProviders);
   const filteredAvailable = filterProviders(availableProviders, providerQuery);
   const expandAvailable = showAllAvailable || providerQuery.trim().length > 0;
@@ -126,7 +139,7 @@ export function SettingsProvidersSection({
           Connected <span className="resource-list__count">{connectedProviders.length}</span>
         </h3>
         <p className="settings-section__description">
-          pi picks models from connected providers first.
+          Connections are shared across every project in Pegasus.
         </p>
         <div className="settings-group">
           {connectedProviders.length > 0 ? (
@@ -136,13 +149,88 @@ export function SettingsProvidersSection({
           ) : (
             <div className="settings-row">
               <span className="settings-row__description">
-                No providers connected yet. Sign in or add an API key below.
+                {accountGroups.length > 0
+                  ? "Your subscription accounts are listed below."
+                  : "No providers connected yet. Sign in or add an API key below."}
               </span>
             </div>
           )}
         </div>
       </section>
 
+      {accountGroups.length > 0 ? (
+        <section
+          className="settings-section subscription-accounts"
+          aria-label="Subscription accounts"
+        >
+          <div className="subscription-accounts__intro">
+            <div>
+              <p className="subscription-accounts__eyebrow">Your workspace, your accounts</p>
+              <h3 className="subscription-accounts__title">Connected accounts</h3>
+            </div>
+            <p className="settings-section__description">
+              Each account has its own sign-in. Your first accounts stay connected.
+            </p>
+          </div>
+          <div className="subscription-accounts__grid">
+            {accountGroups.map((group) => (
+              <section
+                className="subscription-account-card"
+                key={group.id}
+                aria-label={`${group.name} accounts`}
+              >
+                <header className="subscription-account-card__header">
+                  <span
+                    className={`subscription-account-card__mark subscription-account-card__mark--${group.id}`}
+                    aria-hidden="true"
+                  >
+                    {group.mark}
+                  </span>
+                  <div className="subscription-account-card__heading">
+                    <h4>{group.name}</h4>
+                    <p>
+                      {group.connected} of {group.accounts.length} connected
+                    </p>
+                  </div>
+                  {group.next ? (
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      onClick={() => onLoginProvider(group.next!.id)}
+                    >
+                      Add {group.shortName} account
+                    </button>
+                  ) : (
+                    <span className="subscription-account-card__complete">All connected</span>
+                  )}
+                </header>
+                {group.id === "anthropic" ? (
+                  <p className="subscription-account-card__billing-note">
+                    Native Claude OAuth may require paid extra usage. Included subscription access
+                    is unverified; paid usage is blocked by default in this setup.
+                  </p>
+                ) : null}
+                <div className="subscription-account-card__rows">
+                  {group.accounts.map((provider) => (
+                    <ProviderRow
+                      key={provider.id}
+                      provider={{
+                        ...provider,
+                        name: `Account ${subscriptionAccount(provider.id)!.number}`,
+                      }}
+                      {...rowHandlers}
+                    />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+          <p className="settings-section__description">
+            Choose a model and account when starting a thread. Additional accounts do not combine
+            provider quotas or caches.
+          </p>
+        </section>
+      ) : null}
       <SettingsCustomEndpointsSection
         existingProviderIds={existingProviderIds}
         onSaveCustomProvider={onSaveCustomProvider}
@@ -243,10 +331,12 @@ function ProviderApiKeyDialog({
         <p className="extension-dialog__body">{body}</p>
         <input
           aria-label={`${provider.name} API key`}
+          autoComplete="off"
           autoFocus
           className="settings-search"
           disabled={pending}
-          placeholder="Enter API key"
+          placeholder="Enter API key…"
+          spellCheck={false}
           type="password"
           value={draft}
           onChange={(event) => onChangeDraft(event.target.value)}

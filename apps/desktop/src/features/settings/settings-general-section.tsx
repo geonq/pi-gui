@@ -70,7 +70,7 @@ export function SettingsGeneralSection({
           <input
             aria-label="Shell of integrated terminal"
             className="settings-text-input"
-            placeholder="/bin/zsh"
+            placeholder={window.piApp?.platform === "win32" ? "pwsh.exe" : "/bin/zsh"}
             spellCheck={false}
             type="text"
             value={terminalShellDraft}

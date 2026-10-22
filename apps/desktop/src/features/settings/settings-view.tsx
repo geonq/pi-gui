@@ -31,6 +31,8 @@ interface SettingsViewProps {
   readonly platform: NodeJS.Platform;
   /** Shown beside the page title, such as the workspace a page edits. */
   readonly headerAccessory?: ReactNode;
+  readonly runtimeLoadStatus?: "loading" | "error" | "unavailable" | "ready";
+  readonly onRetryRuntime?: () => void;
   readonly onSelectSection: (section: SettingsSection) => void;
   readonly notificationPreferences: NotificationPreferences;
   readonly notificationPermissionStatus: DesktopNotificationPermissionStatus;
@@ -69,6 +71,8 @@ export function SettingsView({
   section,
   platform,
   headerAccessory,
+  runtimeLoadStatus,
+  onRetryRuntime,
   onSelectSection,
   notificationPreferences,
   notificationPermissionStatus,
@@ -121,7 +125,7 @@ export function SettingsView({
               <div className="settings-row__label">
                 <div className="settings-row__title">Select a workspace</div>
                 <div className="settings-row__description">
-                  Providers and models are set per workspace. Choose one, or open a folder first.
+                  Models and MCP servers are set per workspace. Choose one, or open a folder first.
                 </div>
               </div>
             </div>
@@ -161,7 +165,38 @@ export function SettingsView({
 
           {section === "shortcuts" ? <SettingsShortcutsSection platform={platform} /> : null}
 
-          {section === "providers" ? (
+          {section === "providers" && runtimeLoadStatus && runtimeLoadStatus !== "ready" ? (
+            <div
+              className="settings-group resource-empty"
+              role={runtimeLoadStatus === "error" ? "alert" : "status"}
+            >
+              <div className="resource-empty__title">
+                {runtimeLoadStatus === "error"
+                  ? "Provider status could not be loaded"
+                  : runtimeLoadStatus === "unavailable"
+                    ? "Open a project to load provider details"
+                    : "Loading shared provider status…"}
+              </div>
+              {runtimeLoadStatus !== "loading" ? (
+                <>
+                  <p className="resource-empty__body">
+                    {runtimeLoadStatus === "unavailable"
+                      ? "Provider accounts are shared across projects. Open a folder to read their current status."
+                      : "Check the connection and try loading provider status again."}
+                  </p>
+                  {runtimeLoadStatus === "error" && onRetryRuntime ? (
+                    <button
+                      className="button button--secondary"
+                      type="button"
+                      onClick={onRetryRuntime}
+                    >
+                      Retry
+                    </button>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          ) : section === "providers" ? (
             <SettingsProvidersSection
               runtime={runtime}
               onLoginProvider={onLoginProvider}

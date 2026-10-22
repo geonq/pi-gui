@@ -55,7 +55,7 @@ export function FileExplorer({
   const emptyCopy = error
     ? error
     : files === null
-      ? "Loading files..."
+      ? "Loading files…"
       : files.length === 0
         ? "No indexed files"
         : visibleFiles.length === 0

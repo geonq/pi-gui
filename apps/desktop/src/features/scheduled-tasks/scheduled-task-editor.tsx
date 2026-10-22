@@ -20,6 +20,7 @@ import {
   type Weekday,
 } from "../../../contracts/scheduled-tasks";
 import { trapDialogFocus } from "../../ui/dialog-focus";
+import { CloseIcon } from "../../ui/icons";
 
 export type ScheduledEditorState =
   | { readonly mode: "create"; readonly prefill?: Partial<CreateScheduledTaskInput> }
@@ -228,7 +229,7 @@ export function ScheduledTaskEditor({
             {editor.mode === "edit" ? "Edit scheduled task" : "Set up scheduled task"}
           </h2>
           <button className="icon-button" type="button" aria-label="Close" onClick={onClose}>
-            ×
+            <CloseIcon />
           </button>
         </header>
 

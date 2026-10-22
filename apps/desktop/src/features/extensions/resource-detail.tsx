@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { ChevronRightIcon } from "../../ui/icons";
 import { SettingsSwitch } from "../settings/settings-controls";
 
 /** Drill-in page for one skill or extension, in the style of Codex's Hooks detail. */
@@ -46,7 +47,9 @@ export function ResourceDetail({
   return (
     <div className="skill-detail resource-detail">
       <button className="resource-detail__back" ref={backButtonRef} type="button" onClick={onBack}>
-        <span aria-hidden="true">←</span>
+        <span className="icon-flip">
+          <ChevronRightIcon />
+        </span>
         <span>{backLabel}</span>
       </button>
       <div className="resource-detail__header">

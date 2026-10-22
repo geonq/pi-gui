@@ -112,6 +112,7 @@ function git(cwd: string, args: readonly string[], maxBuffer = MAX_GIT_BYTES): P
       ["--literal-pathspecs", "-c", "core.fsmonitor=false", "-c", "core.quotepath=false", ...args],
       {
         cwd,
+        windowsHide: true,
         encoding: "buffer",
         maxBuffer,
         timeout: 15_000,

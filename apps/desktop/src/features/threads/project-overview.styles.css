@@ -1,0 +1,219 @@
+.canvas.project-overview-canvas {
+  display: block;
+  padding: 0;
+}
+
+.project-overview {
+  display: grid;
+  align-content: start;
+  gap: 24px;
+  width: min(840px, 100%);
+  min-height: 100%;
+  margin: 0 auto;
+  padding: clamp(32px, 6vh, 56px) clamp(20px, 4vw, 48px) 40px;
+}
+
+.project-overview__header {
+  display: grid;
+  justify-items: start;
+  gap: 9px;
+  min-width: 0;
+}
+
+.project-overview__eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.project-overview__eyebrow-icon,
+.project-overview__action-icon {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+}
+
+.project-overview__eyebrow-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.project-overview__title {
+  max-width: 24ch;
+  margin: 0;
+  color: var(--text-strong);
+  font-size: clamp(26px, 2.2vw, 30px);
+  font-weight: var(--font-semibold);
+  letter-spacing: -0.025em;
+  line-height: 1.14;
+  overflow-wrap: anywhere;
+}
+
+.project-overview__metadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  color: var(--muted);
+}
+
+.project-overview__location {
+  display: flex;
+  min-width: 0;
+  max-width: min(620px, 100%);
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+
+.project-overview__location code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-strong);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-overview__branch {
+  max-width: 100%;
+  overflow: hidden;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-overlay-muted);
+  color: var(--muted-strong);
+  font-family: inherit;
+  font-size: var(--text-xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-overview__body {
+  display: grid;
+  gap: 32px;
+}
+
+.project-overview__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.project-overview__action-icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.project-overview__recent {
+  display: grid;
+  gap: 8px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.project-overview__recent h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+}
+
+.project-overview__recent p {
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.project-overview__recent-list {
+  display: grid;
+  gap: 4px;
+  max-width: 620px;
+}
+
+.project-overview__recent-chat {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 9px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.project-overview__recent-chat:hover,
+.project-overview__recent-chat:focus-visible {
+  border-color: var(--line);
+  background: var(--surface-overlay-muted);
+}
+
+.project-overview__recent-chat span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-overview__recent-chat time {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+@media (max-width: 560px) {
+  .project-overview__actions .button {
+    flex: 0 0 auto;
+  }
+}
+
+/* Compact project actions match the sidebar and composer control scale. */
+.project-overview__actions .button {
+  min-height: 30px;
+  padding: 0 10px;
+  gap: 6px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  line-height: 18px;
+  box-shadow: none;
+}
+
+.project-overview__actions .button--primary,
+.project-overview__actions .button--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted-strong);
+}
+
+.project-overview__actions .button--primary:hover:not(:disabled),
+.project-overview__actions .button--ghost:hover:not(:disabled) {
+  background: var(--surface-overlay-hover);
+  border-color: var(--surface-overlay-border);
+  color: var(--text-strong);
+}
+
+.project-overview__eyebrow {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.project-overview__backend {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}

@@ -30,6 +30,7 @@ import {
 } from "../contracts/ipc";
 import type { ExtensionActionEffect, ExtensionActionRequest } from "../contracts/extension-actions";
 import type { ClipboardImageRead } from "../contracts/composer-attachments";
+import type { AccountLimits, AccountStatus, SignInStatus, UsageReport } from "../contracts/usage";
 import type { SaveTaskWorkbenchTemplateInput, TaskWorkbenchTemplate } from "../contracts/workbench";
 import type {
   TurnChangesInput,
@@ -44,6 +45,12 @@ import type {
   ChangeReviewFileStageResult,
 } from "../contracts/review";
 import type { SessionRef } from "@pi-gui/session-driver/types";
+import { createRemoteDesktopClientApi } from "./remote/remote-desktop-client-preload";
+import { remoteClientIpc } from "./remote/remote-desktop-protocol";
+import type {
+  RemoteDesktopClientPreferences,
+  RemoteDesktopClientPreferencesPatch,
+} from "./remote/remote-desktop-client-preferences";
 import type {
   NavigateSessionTreeOptions,
   NavigateSessionTreeResult,
@@ -51,6 +58,14 @@ import type {
 } from "@pi-gui/session-driver/types";
 import type { HostUiResponse } from "@pi-gui/session-driver";
 import type { RuntimeSettingsSnapshot } from "@pi-gui/session-driver/runtime-types";
+import type {
+  WorkspaceFolderAdapters,
+  WorkspaceFolderCreateResult,
+  WorkspaceFolderDevice,
+  WorkspaceFolderListing,
+  WorkspaceFolderOpenResult,
+  WorkspaceFolderRoot,
+} from "../contracts/workspace-folders";
 import type {
   AppView,
   ComposerAttachment,
@@ -112,9 +127,17 @@ ipcRenderer.on(desktopIpc.appCommand, (_event, command: PiDesktopCommand) => {
   appCommands.deliver(command);
 });
 
-contextBridge.exposeInMainWorld("piApp", {
+const localPiDesktopApi = {
   platform: process.platform,
   versions: process.versions,
+  ...(process.platform === "win32"
+    ? {
+        workspaceFolders: {
+          windows: createIpcWorkspaceFolderAdapter("windows"),
+          mac: createIpcWorkspaceFolderAdapter("mac"),
+        } satisfies WorkspaceFolderAdapters,
+      }
+    : {}),
   ping: () => ipcRenderer.invoke(desktopIpc.ping) as Promise<string>,
   getState: () => ipcRenderer.invoke(desktopIpc.stateRequest) as Promise<DesktopAppState>,
   getTaskWorkbenchTemplate: (target: SessionRef) =>
@@ -208,7 +231,8 @@ contextBridge.exposeInMainWorld("piApp", {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   addWorkspacePath: (workspacePath: string) =>
     ipcRenderer.invoke(desktopIpc.addWorkspacePath, workspacePath) as Promise<DesktopAppState>,
-  pickWorkspace: () => ipcRenderer.invoke(desktopIpc.pickWorkspace) as Promise<DesktopAppState>,
+  pickWorkspace: (createNew) =>
+    ipcRenderer.invoke(desktopIpc.pickWorkspace, createNew) as Promise<DesktopAppState>,
   selectWorkspace: (workspaceId: string) =>
     ipcRenderer.invoke(desktopIpc.selectWorkspace, workspaceId) as Promise<DesktopAppState>,
   renameWorkspace: (workspaceId: string, displayName: string) =>
@@ -274,6 +298,12 @@ contextBridge.exposeInMainWorld("piApp", {
     ipcRenderer.invoke(desktopIpc.setActiveView, view) as Promise<DesktopAppState>,
   setSidebarCollapsed: (collapsed: boolean) =>
     ipcRenderer.invoke(desktopIpc.setSidebarCollapsed, collapsed) as Promise<DesktopAppState>,
+  setWorkspaceDescription: (workspaceId: string, description: string) =>
+    ipcRenderer.invoke(
+      desktopIpc.setWorkspaceDescription,
+      workspaceId,
+      description,
+    ) as Promise<DesktopAppState>,
   setThreadGrouping: (grouping: ThreadGrouping) =>
     ipcRenderer.invoke(desktopIpc.setThreadGrouping, grouping) as Promise<DesktopAppState>,
   setWorkspaceCollapsed: (workspaceId: string, collapsed: boolean) =>
@@ -284,6 +314,8 @@ contextBridge.exposeInMainWorld("piApp", {
     ) as Promise<DesktopAppState>,
   refreshRuntime: (workspaceId?: string) =>
     ipcRenderer.invoke(desktopIpc.refreshRuntime, workspaceId) as Promise<DesktopAppState>,
+  loadWorkspaceRuntime: (workspaceId: string, options?: { readonly refresh?: boolean }) =>
+    ipcRenderer.invoke(desktopIpc.loadWorkspaceRuntime, workspaceId, options) as Promise<DesktopAppState>,
   setModelSettingsScopeMode: (mode: "app-global" | "per-repo") =>
     ipcRenderer.invoke(desktopIpc.setModelSettingsScopeMode, mode) as Promise<DesktopAppState>,
   setDefaultModel: (workspaceId: string, provider: string, modelId: string) =>
@@ -571,6 +603,12 @@ contextBridge.exposeInMainWorld("piApp", {
     }>,
   listWorkspaceFiles: (workspaceId: string, options?: { readonly force?: boolean }) =>
     ipcRenderer.invoke(desktopIpc.listWorkspaceFiles, workspaceId, options) as Promise<string[]>,
+  getUsageReport: () => ipcRenderer.invoke(desktopIpc.getUsageReport) as Promise<UsageReport>,
+  getAccountStates: () =>
+    ipcRenderer.invoke(desktopIpc.getAccountStates) as Promise<readonly AccountStatus[]>,
+  getAccountLimits: (options?: { readonly cachedOnly?: boolean }) =>
+    ipcRenderer.invoke(desktopIpc.getAccountLimits, options) as Promise<readonly AccountLimits[]>,
+  getSignIns: () => ipcRenderer.invoke(desktopIpc.getSignIns) as Promise<readonly SignInStatus[]>,
   readWorkspaceFile: (workspaceId: string, filePath: string) =>
     ipcRenderer.invoke(
       desktopIpc.readWorkspaceFile,
@@ -607,4 +645,71 @@ contextBridge.exposeInMainWorld("piApp", {
     };
   },
   relaunchApplication: () => ipcRenderer.invoke(desktopIpc.relaunchApplication) as Promise<void>,
-} satisfies PiDesktopApi);
+} satisfies PiDesktopApi;
+
+const piDesktopApi =
+  process.env.PI_REMOTE_DESKTOP_CLIENT === "1"
+    ? createRemoteDesktopClientApi(
+        localPiDesktopApi,
+        (method, args) => ipcRenderer.invoke(remoteClientIpc.invoke, { method, args }),
+        (listener) => {
+          const stateChanged = (
+            _event: Electron.IpcRendererEvent,
+            state: DesktopAppState,
+          ) => listener({ type: "stateChanged", state });
+          const transcriptChanged = (
+            _event: Electron.IpcRendererEvent,
+            transcript: SelectedTranscriptRecord | null,
+          ) => listener({ type: "selectedTranscriptChanged", transcript });
+          ipcRenderer.on(remoteClientIpc.stateChanged, stateChanged);
+          ipcRenderer.on(remoteClientIpc.selectedTranscriptChanged, transcriptChanged);
+          return () => {
+            ipcRenderer.removeListener(remoteClientIpc.stateChanged, stateChanged);
+            ipcRenderer.removeListener(remoteClientIpc.selectedTranscriptChanged, transcriptChanged);
+          };
+        },
+        () =>
+          ipcRenderer.invoke(
+            remoteClientIpc.getLocalPreferences,
+          ) as Promise<RemoteDesktopClientPreferences>,
+        (patch) =>
+          ipcRenderer.invoke(
+            remoteClientIpc.setLocalPreferences,
+            patch,
+          ) as Promise<RemoteDesktopClientPreferences>,
+      )
+    : localPiDesktopApi;
+
+contextBridge.exposeInMainWorld("piApp", piDesktopApi);
+
+function createIpcWorkspaceFolderAdapter(device: WorkspaceFolderDevice): WorkspaceFolderAdapters["windows"] {
+  return {
+    listRoots: () =>
+      ipcRenderer.invoke(
+        desktopIpc.listWorkspaceFolderRoots,
+        device,
+      ) as Promise<readonly WorkspaceFolderRoot[]>,
+    list: (rootId, relativePath) =>
+      ipcRenderer.invoke(
+        desktopIpc.listWorkspaceFolders,
+        device,
+        rootId,
+        relativePath,
+      ) as Promise<WorkspaceFolderListing>,
+    open: (rootId, relativePath) =>
+      ipcRenderer.invoke(
+        desktopIpc.openWorkspaceFolder,
+        device,
+        rootId,
+        relativePath,
+      ) as Promise<WorkspaceFolderOpenResult>,
+    create: (rootId, parentRelativePath, name) =>
+      ipcRenderer.invoke(
+        desktopIpc.createWorkspaceFolder,
+        device,
+        rootId,
+        parentRelativePath,
+        name,
+      ) as Promise<WorkspaceFolderCreateResult>,
+  };
+}

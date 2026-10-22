@@ -42,6 +42,7 @@ export interface PersistedUiState {
   readonly disabledBuiltinExtensions?: readonly string[];
   readonly integratedTerminalShell?: string;
   readonly lastViewedAtBySession?: Record<string, string>;
+  readonly workspaceDescriptions?: Record<string, string>;
   readonly lastInteractedAtBySession?: Record<string, string>;
   readonly pinnedAtBySession?: Record<string, string>;
   readonly pinnedSessionOrder?: readonly string[];
@@ -111,6 +112,7 @@ export function decodePersistedUiState(parsed: unknown): LegacyPersistedUiState 
         ? candidate.integratedTerminalShell
         : undefined,
     lastViewedAtBySession: toStringRecord(candidate.lastViewedAtBySession),
+    workspaceDescriptions: toStringRecord(candidate.workspaceDescriptions),
     lastInteractedAtBySession: toStringRecord(candidate.lastInteractedAtBySession),
     pinnedAtBySession: toStringRecord(candidate.pinnedAtBySession),
     pinnedSessionOrder: toStringArray(candidate.pinnedSessionOrder),
@@ -214,6 +216,7 @@ function validateUiState(value: unknown): Record<string, unknown> {
       "disabledBuiltinExtensions",
       "integratedTerminalShell",
       "lastViewedAtBySession",
+      "workspaceDescriptions",
       "lastInteractedAtBySession",
       "pinnedAtBySession",
       "pinnedSessionOrder",
@@ -267,6 +270,7 @@ function validateUiState(value: unknown): Record<string, unknown> {
     "lastViewedAtBySession",
     "lastInteractedAtBySession",
     "pinnedAtBySession",
+    "workspaceDescriptions",
   ])
     optional(root, key, stringRecord);
   for (const key of [
@@ -525,6 +529,7 @@ function toAppView(value: unknown): AppView | undefined {
   return value === "threads" ||
     value === "new-thread" ||
     value === "scheduled" ||
+    value === "usage" ||
     value === "skills" ||
     value === "extensions" ||
     value === "settings"

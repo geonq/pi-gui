@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import {
   buildModelOptions,
@@ -6,6 +6,25 @@ import {
   THINKING_OPTIONS,
   type ComposerModelOption,
 } from "./composer-commands";
+import { ProviderIcon, ReasoningIcon } from "../../ui/icons";
+import { ProviderStatusBadge, useProviderStatuses } from "../usage/account-state";
+
+/** The provider logo stands in for the brand, so labels drop "Claude", "GPT", "(Claude Code)" etc. */
+const withoutBrand = (label: string) =>
+  label
+    .replace(/\(Claude Code\)/i, "")
+    .replace(/\b(Claude Code|Claude|OpenAI|Codex|GPT)\b[\s-]*/gi, "")
+    .trim();
+const accountHeading = (providerId: string, label: string) =>
+  providerId === "antigravity"
+    ? "AGY"
+    : (
+        withoutBrand(label)
+          .replace(/^[\s·:-]+/, "")
+          .trim() || label
+      ).toLocaleUpperCase();
+const modelName = (option: ComposerModelOption) =>
+  withoutBrand(option.label.split(" · ").at(-1) ?? "");
 
 interface ModelSelectorProps {
   readonly runtime: RuntimeSnapshot | undefined;
@@ -41,47 +60,69 @@ export function ModelSelector({
   const [open, setOpen] = useState<OpenDropdown>("none");
   const [modelFilter, setModelFilter] = useState("");
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const statuses = useProviderStatuses();
+
+  const closeDropdown = () => {
+    setOpen("none");
+    setModelFilter("");
+  };
 
   const modelOptions = useMemo(() => buildModelOptions(runtime), [runtime]);
+  const deferredFilter = useDeferredValue(modelFilter);
   const filteredModels = useMemo(() => {
-    if (!modelFilter) return modelOptions;
-    const q = modelFilter.toLowerCase();
+    if (!deferredFilter) return modelOptions;
+    const q = deferredFilter.toLowerCase();
     return modelOptions.filter(
       (opt) =>
         opt.label.toLowerCase().includes(q) ||
         opt.description.toLowerCase().includes(q) ||
         opt.providerId.toLowerCase().includes(q),
     );
-  }, [modelOptions, modelFilter]);
+  }, [modelOptions, deferredFilter]);
 
   const groupedModels = useMemo(() => groupByProvider(filteredModels), [filteredModels]);
   const hasAvailableModelOptions = modelOptions.length > 0;
   const hasModelControl = Boolean(provider && modelId) || hasAvailableModelOptions;
   const shouldRenderModelControl = hasModelControl || showEmptyModelControl;
+  const activeModel = modelOptions.find(
+    (option) => option.providerId === provider && option.modelId === modelId,
+  );
+  // Effort levels come from the model itself (Claude, Codex and Gemini alike); a model that reports none
+  // gets no effort control. Unknown models (catalog not loaded yet) keep the full list.
+  const modelLevels = runtime?.models.find(
+    (model) => model.providerId === provider && model.modelId === modelId,
+  )?.thinkingLevels;
+  const thinkingOptions = modelLevels
+    ? THINKING_OPTIONS.filter((option) => modelLevels.includes(option.value))
+    : THINKING_OPTIONS;
   const modelBadgeLabel =
-    provider && modelId
-      ? `${provider}:${modelId}`
-      : hasAvailableModelOptions
-        ? unselectedModelLabel
-        : emptyModelLabel;
+    provider && modelId ? (
+      <>
+        <ProviderIcon providerId={provider} />
+        <span>{activeModel ? modelName(activeModel) : modelId}</span>
+      </>
+    ) : hasAvailableModelOptions ? (
+      unselectedModelLabel
+    ) : (
+      emptyModelLabel
+    );
   const noMatchingModels =
     hasAvailableModelOptions && modelFilter.trim().length > 0 && groupedModels.length === 0;
 
   useEffect(() => {
     if (open === "none") {
-      setModelFilter("");
       return undefined;
     }
 
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen("none");
+        closeDropdown();
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen("none");
+        closeDropdown();
       }
     };
 
@@ -93,7 +134,7 @@ export function ModelSelector({
     };
   }, [open]);
 
-  if (!shouldRenderModelControl && !thinkingLevel) {
+  if (!shouldRenderModelControl && !(thinkingLevel && thinkingOptions.length > 0)) {
     return null;
   }
 
@@ -102,10 +143,16 @@ export function ModelSelector({
       {shouldRenderModelControl ? (
         <span className="model-selector__anchor">
           <button
+            aria-expanded={open === "model"}
+            aria-haspopup="true"
+            // The logo carries the brand visually; assistive tech gets the full name.
+            aria-label={
+              provider && modelId ? (activeModel?.label ?? `${provider} ${modelId}`) : undefined
+            }
             className="model-selector__badge"
             type="button"
             disabled={disabled}
-            onClick={() => setOpen(open === "model" ? "none" : "model")}
+            onClick={() => (open === "model" ? closeDropdown() : setOpen("model"))}
           >
             {modelBadgeLabel}
           </button>
@@ -116,8 +163,11 @@ export function ModelSelector({
             >
               <div className="model-selector__filter">
                 <input
+                  aria-label="Filter models"
                   className="model-selector__filter-input"
-                  placeholder="Filter models..."
+                  autoComplete="off"
+                  placeholder="Filter models…"
+                  spellCheck={false}
                   value={modelFilter}
                   onChange={(e) => setModelFilter(e.target.value)}
                   autoFocus
@@ -125,11 +175,20 @@ export function ModelSelector({
               </div>
               {groupedModels.map((group) => (
                 <div key={group.provider}>
-                  <div className="model-selector__group-title">{group.provider}</div>
+                  <div className="model-selector__group-title">
+                    <ProviderIcon providerId={group.provider} />
+                    {accountHeading(
+                      group.provider,
+                      group.items[0]?.label.split(" · ").slice(0, -1).join(" · ") ?? "",
+                    )}
+                    <ProviderStatusBadge status={statuses.get(group.provider)} />
+                  </div>
                   {group.items.map((option) => {
                     const isActive = option.providerId === provider && option.modelId === modelId;
                     return (
                       <button
+                        aria-label={option.label.split(" · ").at(-1)}
+                        aria-pressed={isActive}
                         className={`model-selector__item${isActive ? " model-selector__item--active" : ""}`}
                         key={`${option.providerId}:${option.modelId}`}
                         type="button"
@@ -137,10 +196,10 @@ export function ModelSelector({
                           if (!isActive) {
                             onSetModel(option.providerId, option.modelId);
                           }
-                          setOpen("none");
+                          closeDropdown();
                         }}
                       >
-                        <span className="model-selector__item-label">{option.label}</span>
+                        <span className="model-selector__item-label">{modelName(option)}</span>
                         {isActive ? (
                           <span className="model-selector__item-meta">active</span>
                         ) : null}
@@ -163,15 +222,21 @@ export function ModelSelector({
           ) : null}
         </span>
       ) : null}
-      {thinkingLevel ? (
+      {thinkingLevel && thinkingOptions.length > 0 ? (
         <span className="model-selector__anchor">
           <button
+            aria-expanded={open === "thinking"}
+            aria-haspopup="true"
             className="model-selector__badge"
             type="button"
             disabled={disabled}
-            onClick={() => setOpen(open === "thinking" ? "none" : "thinking")}
+            onClick={() => (open === "thinking" ? closeDropdown() : setOpen("thinking"))}
           >
-            {thinkingLevel}
+            <ReasoningIcon />
+            <span>
+              {THINKING_OPTIONS.find((option) => option.value === thinkingLevel)?.label ??
+                thinkingLevel}
+            </span>
           </button>
           {open === "thinking" ? (
             <div
@@ -179,7 +244,7 @@ export function ModelSelector({
               onWheel={(event) => event.stopPropagation()}
             >
               <div className="model-selector__group-title">Thinking Level</div>
-              {THINKING_OPTIONS.map((option) => {
+              {thinkingOptions.map((option) => {
                 const isActive = option.value === thinkingLevel;
                 return (
                   <button
@@ -190,7 +255,7 @@ export function ModelSelector({
                       if (!isActive) {
                         onSetThinking(option.value);
                       }
-                      setOpen("none");
+                      closeDropdown();
                     }}
                   >
                     <span className="model-selector__item-label">{option.label}</span>

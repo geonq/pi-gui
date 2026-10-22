@@ -16,6 +16,12 @@ import {
   type CustomProviderProbeInput,
   type CustomProviderProbeResult,
 } from "../../contracts/ipc";
+import type {
+  AccountLimits,
+  AccountStatus,
+  SignInStatus,
+  UsageReport,
+} from "../../contracts/usage";
 import type { DesktopAppStore } from "../application/app-store";
 import type { NotificationPermissionService } from "../platform/notification-permission";
 import type { TerminalService } from "../platform/terminal-service";
@@ -75,6 +81,7 @@ type StateOwner = Pick<
   | "setActiveView"
   | "setSidebarCollapsed"
   | "setThreadGrouping"
+  | "setWorkspaceDescription"
   | "setWorkspaceCollapsed"
   | "setThemeMode"
   | "setThemePresetId"
@@ -142,6 +149,7 @@ type ScheduledTaskOwner = Pick<
 type SettingsOwner = Pick<
   DesktopAppStore,
   | "refreshRuntime"
+  | "loadWorkspaceRuntime"
   | "setModelSettingsScopeMode"
   | "setDefaultModel"
   | "setDefaultThinkingLevel"
@@ -184,7 +192,7 @@ export interface DesktopIpcCapabilities {
   readonly ping: () => string;
   readonly theme: ThemeManager;
   readonly openExternal: (url: string) => Promise<void>;
-  readonly pickWorkspace: (window: BrowserWindow) => Promise<DesktopAppState>;
+  readonly pickWorkspace: (window: BrowserWindow, createNew?: boolean) => Promise<DesktopAppState>;
   readonly createLoginCallbacks: (
     window: BrowserWindow,
   ) => Parameters<DesktopAppStore["loginProvider"]>[2];
@@ -210,6 +218,10 @@ export interface DesktopIpcCapabilities {
     options?: { readonly force?: boolean },
   ) => Promise<readonly unknown[]>;
   readonly readWorkspaceFile: (workspacePath: string, filePath: string) => Promise<unknown>;
+  readonly getUsageReport: () => Promise<UsageReport>;
+  readonly getAccountStates: () => Promise<readonly AccountStatus[]>;
+  readonly getAccountLimits: (cachedOnly: boolean) => Promise<readonly AccountLimits[]>;
+  readonly getSignIns: () => readonly SignInStatus[];
   readonly revealWorkspaceFile: (workspacePath: string, filePath: string) => Promise<void>;
   readonly getChangedFiles: (workspacePath: string) => Promise<ChangedFilesResult>;
   readonly getFileDiff: (workspacePath: string, filePath: string) => Promise<string>;
@@ -320,8 +332,8 @@ export function registerDesktopIpc({
   ipcMain.handle(desktopIpc.addWorkspacePath, (event, rawPath: unknown) =>
     run(event, () => owners.workspace.addWorkspace(expectNonEmptyString(rawPath, "workspacePath"))),
   );
-  ipcMain.handle(desktopIpc.pickWorkspace, (event) =>
-    capabilities.pickWorkspace(senderWindow(windows, event)),
+  ipcMain.handle(desktopIpc.pickWorkspace, (event, createNew: unknown) =>
+    capabilities.pickWorkspace(senderWindow(windows, event), createNew === true),
   );
   ipcMain.handle(desktopIpc.selectWorkspace, (event, rawWorkspaceId: unknown) =>
     run(event, () =>
@@ -404,6 +416,20 @@ export function registerDesktopIpc({
   ipcMain.handle(desktopIpc.setSidebarCollapsed, (event, rawCollapsed: unknown) =>
     run(event, () => owners.state.setSidebarCollapsed(expectBoolean(rawCollapsed, "collapsed"))),
   );
+  ipcMain.handle(
+    desktopIpc.setWorkspaceDescription,
+    (event, rawWorkspaceId: unknown, rawDescription: unknown) => {
+      const description = expectString(rawDescription, "description");
+      if (description.length > 500)
+        throw new TypeError("description must be at most 500 characters");
+      return run(event, () =>
+        owners.state.setWorkspaceDescription(
+          expectNonEmptyString(rawWorkspaceId, "workspaceId"),
+          description,
+        ),
+      );
+    },
+  );
   ipcMain.handle(desktopIpc.setThreadGrouping, (event, rawGrouping: unknown) =>
     run(event, () => owners.state.setThreadGrouping(expectThreadGrouping(rawGrouping))),
   );
@@ -420,6 +446,24 @@ export function registerDesktopIpc({
     run(event, () =>
       owners.settings.refreshRuntime(expectOptionalString(rawWorkspaceId, "workspaceId")),
     ),
+  );
+  ipcMain.handle(
+    desktopIpc.loadWorkspaceRuntime,
+    (event, rawWorkspaceId: unknown, rawOptions?: unknown) => {
+      const workspaceId = expectNonEmptyString(rawWorkspaceId, "workspaceId");
+      let options: { readonly refresh?: boolean } | undefined;
+      if (rawOptions !== undefined) {
+        const input = expectRecord(rawOptions, "options");
+        if (Object.keys(input).some((key) => key !== "refresh")) {
+          throw new TypeError("options contains an unsupported field");
+        }
+        if (input.refresh !== undefined && typeof input.refresh !== "boolean") {
+          throw new TypeError("options.refresh must be a boolean");
+        }
+        options = input.refresh === undefined ? {} : { refresh: input.refresh };
+      }
+      return run(event, () => owners.settings.loadWorkspaceRuntime(workspaceId, options));
+    },
   );
   ipcMain.handle(desktopIpc.setModelSettingsScopeMode, (event, rawMode: unknown) => {
     const mode = expectModelSettingsScopeMode(rawMode);
@@ -1075,6 +1119,22 @@ function registerWorkspaceFileIpc(
       return capabilities.listWorkspaceFiles(workspacePath, options);
     },
   );
+  ipcMain.handle(desktopIpc.getUsageReport, async (event) => {
+    windows.windowForSender(event.sender);
+    return capabilities.getUsageReport();
+  });
+  ipcMain.handle(desktopIpc.getAccountStates, async (event) => {
+    windows.windowForSender(event.sender);
+    return capabilities.getAccountStates();
+  });
+  ipcMain.handle(desktopIpc.getAccountLimits, async (event, options?: { cachedOnly?: unknown }) => {
+    windows.windowForSender(event.sender);
+    return capabilities.getAccountLimits(options?.cachedOnly === true);
+  });
+  ipcMain.handle(desktopIpc.getSignIns, async (event) => {
+    windows.windowForSender(event.sender);
+    return capabilities.getSignIns();
+  });
   ipcMain.handle(
     desktopIpc.readWorkspaceFile,
     async (event, rawWorkspaceId: unknown, rawFilePath: unknown) => {

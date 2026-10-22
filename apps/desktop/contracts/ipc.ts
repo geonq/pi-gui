@@ -15,6 +15,7 @@ import type {
 } from "@pi-gui/session-driver/types";
 import type { ClipboardImageRead } from "./composer-attachments";
 import type { SessionRef } from "@pi-gui/session-driver/types";
+import type { AccountLimits, AccountStatus, SignInStatus, UsageReport } from "./usage";
 import type { SaveTaskWorkbenchTemplateInput, TaskWorkbenchTemplate } from "./workbench";
 import type {
   TurnChangesInput,
@@ -48,6 +49,7 @@ import type {
   CreateScheduledTaskInput,
   UpdateScheduledTaskInput,
 } from "./desktop-state";
+import type { WorkspaceFolderAdapters } from "./workspace-folders";
 
 export type DesktopNotificationPermissionStatus =
   "granted" | "denied" | "default" | "unsupported" | "unknown";
@@ -154,8 +156,10 @@ export const desktopIpc = {
   setActiveView: "pi-gui:set-active-view",
   setSidebarCollapsed: "pi-gui:set-sidebar-collapsed",
   setThreadGrouping: "pi-gui:set-thread-grouping",
+  setWorkspaceDescription: "pi-gui:set-workspace-description",
   setWorkspaceCollapsed: "pi-gui:set-workspace-collapsed",
   refreshRuntime: "pi-gui:refresh-runtime",
+  loadWorkspaceRuntime: "pi-gui:load-workspace-runtime",
   setModelSettingsScopeMode: "pi-gui:set-model-settings-scope-mode",
   setDefaultModel: "pi-gui:set-default-model",
   setDefaultThinkingLevel: "pi-gui:set-default-thinking-level",
@@ -216,6 +220,14 @@ export const desktopIpc = {
   toggleWindowMaximize: "pi-gui:toggle-window-maximize",
   listWorkspaceFiles: "pi-gui:list-workspace-files",
   readWorkspaceFile: "pi-gui:read-workspace-file",
+  listWorkspaceFolderRoots: "pi-gui:list-workspace-folder-roots",
+  listWorkspaceFolders: "pi-gui:list-workspace-folders",
+  openWorkspaceFolder: "pi-gui:open-workspace-folder",
+  createWorkspaceFolder: "pi-gui:create-workspace-folder",
+  getUsageReport: "pi-gui:get-usage-report",
+  getAccountStates: "pi-gui:get-account-states",
+  getAccountLimits: "pi-gui:get-account-limits",
+  getSignIns: "pi-gui:get-sign-ins",
   revealWorkspaceFile: "pi-gui:reveal-workspace-file",
   getChangedFiles: "pi-gui:get-changed-files",
   getFileDiff: "pi-gui:get-file-diff",
@@ -693,6 +705,10 @@ export function isCloseFocusedSurfaceShortcut(input: {
 export interface PiDesktopApi {
   platform: NodeJS.Platform;
   versions: NodeJS.ProcessVersions;
+  /** Present when the visible app window is a client of a remote Windows backend. */
+  readonly backend?: "windows";
+  /** Remote project creation and device-aware folder browsing, when configured. */
+  readonly workspaceFolders?: WorkspaceFolderAdapters;
   ping(): Promise<string>;
   getState(): Promise<DesktopAppState>;
   getTaskWorkbenchTemplate(target: SessionRef): Promise<TaskWorkbenchTemplate | null>;
@@ -705,7 +721,7 @@ export interface PiDesktopApi {
   onClipboardImagePasted(listener: (result: ClipboardImageRead) => void): () => void;
   getPathForFile(file: File): string;
   addWorkspacePath(path: string): Promise<DesktopAppState>;
-  pickWorkspace(): Promise<DesktopAppState>;
+  pickWorkspace(createNew?: boolean): Promise<DesktopAppState>;
   selectWorkspace(workspaceId: string): Promise<DesktopAppState>;
   renameWorkspace(workspaceId: string, displayName: string): Promise<DesktopAppState>;
   removeWorkspace(workspaceId: string): Promise<DesktopAppState>;
@@ -736,8 +752,14 @@ export interface PiDesktopApi {
   setActiveView(view: AppView): Promise<DesktopAppState>;
   setSidebarCollapsed(collapsed: boolean): Promise<DesktopAppState>;
   setThreadGrouping(grouping: ThreadGrouping): Promise<DesktopAppState>;
+  /** Saves what a project is for; an empty description removes it. */
+  setWorkspaceDescription(workspaceId: string, description: string): Promise<DesktopAppState>;
   setWorkspaceCollapsed(workspaceId: string, collapsed: boolean): Promise<DesktopAppState>;
   refreshRuntime(workspaceId?: string): Promise<DesktopAppState>;
+  loadWorkspaceRuntime(
+    workspaceId: string,
+    options?: { readonly refresh?: boolean },
+  ): Promise<DesktopAppState>;
   setModelSettingsScopeMode(mode: ModelSettingsScopeMode): Promise<DesktopAppState>;
   setDefaultModel(workspaceId: string, provider: string, modelId: string): Promise<DesktopAppState>;
   setDefaultThinkingLevel(
@@ -873,6 +895,14 @@ export interface PiDesktopApi {
     options?: { readonly force?: boolean },
   ): Promise<string[]>;
   readWorkspaceFile(workspaceId: string, filePath: string): Promise<WorkspaceFilePreview>;
+  /** Token usage summed across every saved session, model and workspace. */
+  getUsageReport(): Promise<UsageReport>;
+  /** Claude account slots from the ecosystem's ledger: a file read, never a model call. */
+  getAccountStates(): Promise<readonly AccountStatus[]>;
+  /** Plan windows (5-hour, weekly) per signed-in account; re-read from the providers at most every 2 min. */
+  getAccountLimits(options?: { readonly cachedOnly?: boolean }): Promise<readonly AccountLimits[]>;
+  /** The latest hourly sign-in check for every provider (a memory read). */
+  getSignIns(): Promise<readonly SignInStatus[]>;
   revealWorkspaceFile(workspaceId: string, filePath: string): Promise<void>;
   getChangedFiles(workspaceId: string): Promise<ChangedFilesResult>;
   getFileDiff(workspaceId: string, filePath: string): Promise<string>;

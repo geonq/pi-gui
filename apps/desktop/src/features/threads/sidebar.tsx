@@ -1,13 +1,13 @@
 import {
   createContext,
-  forwardRef,
-  useContext,
+  use,
   useEffect,
   useLayoutEffect,
   useRef,
   useState,
   type CSSProperties,
   type MutableRefObject,
+  type Ref,
 } from "react";
 import { createPortal } from "react-dom";
 import {
@@ -41,9 +41,10 @@ import {
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  CustomizeSidebarIcon,
   ExtensionIcon,
   FolderIcon,
+  MoreIcon,
+  UsageIcon,
   PinIcon,
   PlusIcon,
   RestoreIcon,
@@ -51,6 +52,7 @@ import {
   SkillIcon,
   ClockIcon,
   WorktreeIcon,
+  AppBrand,
 } from "../../ui/icons";
 import {
   getDesktopShortcutLabel,
@@ -69,13 +71,14 @@ import {
   sessionThreadKey,
   threadHistoryPreview,
   visibleThreadShortcutOrder,
+  visibleWorkspaceGroups,
   workspaceHistoryExpansionKey,
   type RecencyThreadSection,
   type ThreadSidebarModel,
   type ThreadListEntry,
-  type WorkspaceThreadGroup,
 } from "./thread-groups";
 import { useThreadShortcutHintsVisible } from "./thread-shortcut-hints";
+import { useSignIns } from "../usage/account-state";
 import type { Dispatch, SetStateAction } from "react";
 import type { DesktopAppState } from "../../../contracts/desktop-state";
 
@@ -97,6 +100,7 @@ interface SidebarProps {
     action: () => Promise<DesktopAppState>,
   ) => Promise<DesktopAppState>;
   readonly onNewThread: (workspaceId?: string) => void;
+  readonly onBrowseFiles: () => void;
   readonly onSetActiveView: (view: AppView) => void;
   readonly onOpenSkills: (workspaceId?: string) => void;
   readonly onOpenExtensions: (workspaceId?: string) => void;
@@ -132,6 +136,7 @@ const ThreadShortcutContext = createContext<ReadonlyMap<string, ThreadShortcutBa
 );
 
 export function Sidebar(props: SidebarProps) {
+  const signInNeedsOwner = useSignIns().some((signIn) => signIn.state !== "ok");
   const {
     activeView,
     selectedWorkspace,
@@ -147,6 +152,7 @@ export function Sidebar(props: SidebarProps) {
     setSnapshot,
     updateSnapshot,
     onNewThread,
+    onBrowseFiles,
     onSetActiveView,
     onOpenSkills,
     onOpenExtensions,
@@ -302,20 +308,9 @@ export function Sidebar(props: SidebarProps) {
       : [];
   };
 
-  const folderHasThreads = (folderId: string) =>
-    threadSidebarModel.workspaceGroups.some(
-      (group) => group.workspace.id === folderId && group.threads.length > 0,
-    ) ||
-    threadSidebarModel.pinnedThreads.some((thread) => thread.folderId === folderId) ||
-    threadSidebarModel.archivedThreads.some((thread) => thread.folderId === folderId);
-  const showFolderRow = (group: WorkspaceThreadGroup) =>
-    threadGrouping === "workspace" || !folderHasThreads(group.workspace.id);
-  const rootGroups = threadSidebarModel.workspaceGroups.filter(
-    (group) => group.workspace.kind === "primary" && showFolderRow(group),
-  );
-  const orphanGroups = threadSidebarModel.workspaceGroups.filter(
-    (group) => group.workspace.kind !== "primary" && showFolderRow(group),
-  );
+  const sidebarFolderGroups = visibleWorkspaceGroups(threadSidebarModel, threadGrouping);
+  const rootGroups = sidebarFolderGroups.filter((group) => group.workspace.kind === "primary");
+  const orphanGroups = sidebarFolderGroups.filter((group) => group.workspace.kind !== "primary");
   const pinnedThreads = threadSidebarModel.pinnedThreads;
   const pinnedSortableIds = pinnedThreads.map(pinnedSortableId);
   const rootGroupIds = rootGroups.map((group) => group.workspace.id);
@@ -404,6 +399,7 @@ export function Sidebar(props: SidebarProps) {
         onReset={() => setSidebarWidth(undefined)}
       />
       <div className="sidebar__top">
+        <AppBrand />
         <button
           className="sidebar__new"
           type="button"
@@ -411,19 +407,21 @@ export function Sidebar(props: SidebarProps) {
           onClick={() => onNewThread()}
         >
           <PlusIcon />
-          <span>New thread</span>
+          <span>New chat</span>
         </button>
 
         <div className="sidebar__nav">
           <button
+            aria-current={activeView === "threads" ? "page" : undefined}
             className={`sidebar__nav-item ${activeView === "threads" ? "sidebar__nav-item--active" : ""}`}
             type="button"
             onClick={() => onSetActiveView("threads")}
           >
             <FolderIcon />
-            <span>Threads</span>
+            <span>Chats</span>
           </button>
           <button
+            aria-current={activeView === "scheduled" ? "page" : undefined}
             className={`sidebar__nav-item ${activeView === "scheduled" ? "sidebar__nav-item--active" : ""}`}
             type="button"
             data-testid="sidebar-scheduled"
@@ -431,6 +429,23 @@ export function Sidebar(props: SidebarProps) {
           >
             <ClockIcon />
             <span>Scheduled</span>
+          </button>
+          <button
+            aria-current={activeView === "usage" ? "page" : undefined}
+            className={`sidebar__nav-item ${activeView === "usage" ? "sidebar__nav-item--active" : ""}`}
+            type="button"
+            data-testid="sidebar-usage"
+            onClick={() => onSetActiveView("usage")}
+          >
+            <UsageIcon />
+            <span>Usage</span>
+            {signInNeedsOwner ? (
+              <span
+                aria-label="A sign-in needs attention"
+                className="sidebar__nav-item-alert"
+                role="img"
+              />
+            ) : null}
           </button>
           <button
             className="sidebar__nav-item"
@@ -467,7 +482,7 @@ export function Sidebar(props: SidebarProps) {
 
       <div className="sidebar__section">
         <div className="section__head">
-          <span>Threads</span>
+          <span>Chats & Folders</span>
           <div className="section__tools">
             <ThreadGroupingControl
               grouping={threadGrouping}
@@ -479,22 +494,38 @@ export function Sidebar(props: SidebarProps) {
                 );
               }}
             />
-            <button
-              aria-label="Open folder"
-              className="icon-button"
-              type="button"
-              onClick={() => {
-                void updateSnapshot(setSnapshot, () => api.pickWorkspace()).catch(
-                  (error: unknown) => {
-                    console.error("[renderer] pickWorkspace failed", error);
-                  },
-                );
-              }}
-            >
-              <FolderIcon />
-            </button>
           </div>
         </div>
+
+        {threadGrouping === "workspace" ? (
+          <div className="sidebar__folder-actions">
+            <button
+              className="sidebar__nav-item"
+              type="button"
+              onClick={() => wsMenu.addWorkspace()}
+            >
+              <FolderIcon />
+              <span>Open folder</span>
+            </button>
+            <button
+              className="sidebar__nav-item"
+              type="button"
+              onClick={() => wsMenu.addWorkspace(true)}
+            >
+              <PlusIcon />
+              <span>New folder</span>
+            </button>
+            <button
+              className="sidebar__nav-item"
+              type="button"
+              disabled={!selectedWorkspace}
+              onClick={onBrowseFiles}
+            >
+              <FolderIcon />
+              <span>Browse files</span>
+            </button>
+          </div>
+        ) : null}
 
         {visibleWorkspaces.length === 0 ? (
           <div className="empty-state" data-testid="empty-state">
@@ -503,13 +534,7 @@ export function Sidebar(props: SidebarProps) {
             <button
               className="button button--primary"
               type="button"
-              onClick={() => {
-                void updateSnapshot(setSnapshot, () => api.pickWorkspace()).catch(
-                  (error: unknown) => {
-                    console.error("[renderer] pickWorkspace failed", error);
-                  },
-                );
-              }}
+              onClick={() => wsMenu.addWorkspace()}
             >
               Open first folder
             </button>
@@ -523,6 +548,19 @@ export function Sidebar(props: SidebarProps) {
           >
             <ThreadShortcutContext.Provider value={shortcutByKey}>
               <div className="workspace-list" data-testid="workspace-list">
+                {threadSidebarModel.archivedThreads.length > 0 ? (
+                  <ArchivedThreadsSection
+                    archivedThreads={threadSidebarModel.archivedThreads}
+                    open={archivedOpen}
+                    onToggle={() => setArchivedOpen((current) => !current)}
+                    selectedWorkspace={selectedWorkspace}
+                    selectedSession={selectedSession}
+                    threadMenu={threadMenu}
+                    onUnarchiveSession={onUnarchiveSession}
+                    onSelectSession={onSelectSession}
+                    onSetSessionPinned={onSetSessionPinned}
+                  />
+                ) : null}
                 <SortableContext items={rootGroupIds} strategy={verticalListSortingStrategy}>
                   {rootGroups.map((group) => (
                     <SortableWorkspaceFolder
@@ -625,19 +663,6 @@ export function Sidebar(props: SidebarProps) {
                       />
                     ))
                   : null}
-                {threadSidebarModel.archivedThreads.length > 0 ? (
-                  <ArchivedThreadsSection
-                    archivedThreads={threadSidebarModel.archivedThreads}
-                    open={archivedOpen}
-                    onToggle={() => setArchivedOpen((current) => !current)}
-                    selectedWorkspace={selectedWorkspace}
-                    selectedSession={selectedSession}
-                    threadMenu={threadMenu}
-                    onUnarchiveSession={onUnarchiveSession}
-                    onSelectSession={onSelectSession}
-                    onSetSessionPinned={onSetSessionPinned}
-                  />
-                ) : null}
               </div>
               <DragOverlay>
                 {activePinnedThread ? (
@@ -795,14 +820,19 @@ function WorkspaceFolderContent(
               </span>
             ) : null}
           </span>
-          <span className="workspace-row__name">{workspace.name}</span>
+          <span
+            className="workspace-row__name"
+            title={[workspace.name, wsMenu.descriptions[workspace.id]].filter(Boolean).join("\n")}
+          >
+            {workspace.name}
+          </span>
         </button>
         <span className="workspace-row__actions">
           {onNewThread ? (
             <button
-              aria-label={`New thread in ${workspace.name}`}
+              aria-label={`New chat in ${workspace.name}`}
               className="icon-button workspace-row__action-button"
-              title="New thread"
+              title="New chat"
               type="button"
               onClick={() => {
                 // The new thread lands in this folder, so open it to keep the row in view.
@@ -831,12 +861,13 @@ function WorkspaceFolderContent(
                 wsMenu.openWorkspaceMenu(workspace.id);
               }}
             >
-              …
+              <MoreIcon />
             </button>
             {wsMenu.workspaceMenuId === workspace.id ? (
-              <div className="workspace-menu">
+              <div aria-label={`${workspace.name} actions`} className="workspace-menu" role="menu">
                 <button
                   className="workspace-menu__item"
+                  role="menuitem"
                   type="button"
                   onClick={(event) =>
                     wsMenu.runWorkspaceMenuAction(event, () => {
@@ -851,6 +882,7 @@ function WorkspaceFolderContent(
                 {linkedWorktree ? (
                   <button
                     className="workspace-menu__item workspace-menu__item--danger"
+                    role="menuitem"
                     type="button"
                     onClick={(event) =>
                       wsMenu.runWorkspaceMenuAction(event, () =>
@@ -866,6 +898,7 @@ function WorkspaceFolderContent(
                 ) : (
                   <button
                     className="workspace-menu__item"
+                    role="menuitem"
                     type="button"
                     onClick={(event) =>
                       wsMenu.runWorkspaceMenuAction(event, () =>
@@ -878,15 +911,17 @@ function WorkspaceFolderContent(
                 )}
                 <button
                   className="workspace-menu__item"
+                  role="menuitem"
                   type="button"
                   onClick={(event) =>
                     wsMenu.runWorkspaceMenuAction(event, () => wsMenu.startRename(workspace))
                   }
                 >
-                  Edit name
+                  Edit name and description
                 </button>
                 <button
                   className="workspace-menu__item workspace-menu__item--danger"
+                  role="menuitem"
                   type="button"
                   onClick={(event) =>
                     wsMenu.runWorkspaceMenuAction(event, () => wsMenu.removeWorkspace(workspace))
@@ -910,8 +945,10 @@ function WorkspaceFolderContent(
         >
           <input
             aria-label={`Rename ${workspace.name}`}
+            autoComplete="off"
             className="workspace-rename__input"
             ref={wsMenu.workspaceRenameInputRef}
+            spellCheck={false}
             value={wsMenu.workspaceRenameDraft}
             onChange={(event) => {
               wsMenu.setWorkspaceRenameDraft(event.target.value);
@@ -920,6 +957,27 @@ function WorkspaceFolderContent(
               if (event.key === "Escape") {
                 event.preventDefault();
                 wsMenu.cancelRename();
+              }
+            }}
+          />
+          <textarea
+            aria-label={`Description of ${workspace.name}`}
+            className="workspace-rename__input workspace-rename__description"
+            maxLength={500}
+            placeholder="What is this project for?"
+            ref={wsMenu.workspaceDescriptionInputRef}
+            rows={3}
+            value={wsMenu.workspaceDescriptionDraft}
+            onChange={(event) => {
+              wsMenu.setWorkspaceDescriptionDraft(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                wsMenu.cancelRename();
+              } else if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                event.currentTarget.form?.requestSubmit();
               }
             }}
           />
@@ -1109,203 +1167,24 @@ function ThreadGroupingControl({
   readonly grouping: ThreadGrouping;
   readonly onChange: (grouping: ThreadGrouping) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [submenuOpen, setSubmenuOpen] = useState(false);
-  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
-  const [submenuStyle, setSubmenuStyle] = useState<CSSProperties>({});
-  const wrapRef = useRef<HTMLSpanElement | null>(null);
-  const buttonRef = useRef<HTMLButtonElement | null>(null);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const groupingRef = useRef<HTMLButtonElement | null>(null);
-  const submenuRef = useRef<HTMLDivElement | null>(null);
-  const submenuTimer = useRef<number | null>(null);
-
-  const closeSubmenuSoon = () => {
-    if (submenuTimer.current !== null) {
-      window.clearTimeout(submenuTimer.current);
-    }
-    submenuTimer.current = window.setTimeout(() => {
-      submenuTimer.current = null;
-      setSubmenuOpen(false);
-    }, 140);
-  };
-
-  const keepSubmenu = () => {
-    if (submenuTimer.current !== null) {
-      window.clearTimeout(submenuTimer.current);
-      submenuTimer.current = null;
-    }
-    setSubmenuOpen(true);
-  };
-
-  const closeMenu = () => {
-    if (submenuTimer.current !== null) {
-      window.clearTimeout(submenuTimer.current);
-      submenuTimer.current = null;
-    }
-    setSubmenuOpen(false);
-    setOpen(false);
-  };
-
-  useEffect(() => {
-    if (!open) {
-      return undefined;
-    }
-    const handlePointerDown = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (wrapRef.current?.contains(target) || menuRef.current?.contains(target)) {
-        return;
-      }
-      closeMenu();
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        closeMenu();
-      }
-    };
-    window.addEventListener("mousedown", handlePointerDown);
-    window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("mousedown", handlePointerDown);
-      window.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
-
-  useEffect(
-    () => () => {
-      if (submenuTimer.current !== null) {
-        window.clearTimeout(submenuTimer.current);
-      }
-    },
-    [],
-  );
-
-  useLayoutEffect(() => {
-    if (!open || !buttonRef.current) {
-      return;
-    }
-    const rect = buttonRef.current.getBoundingClientRect();
-    setMenuStyle({
-      top: rect.bottom + 6,
-      left: rect.right,
-      right: "auto",
-      width: "max-content",
-      transform: "translateX(-100%)",
-    });
-  }, [open]);
-
-  useLayoutEffect(() => {
-    if (!submenuOpen || !groupingRef.current) {
-      return;
-    }
-    const rect = groupingRef.current.getBoundingClientRect();
-    const gap = 6;
-    const width = submenuRef.current?.offsetWidth ?? 0;
-    const openRight = rect.right + gap;
-    const left =
-      width > 0 && openRight + width > window.innerWidth - 8
-        ? Math.max(8, rect.left - gap - width)
-        : openRight;
-    setSubmenuStyle({
-      top: rect.top - 6,
-      left,
-      right: "auto",
-      width: "max-content",
-    });
-  }, [submenuOpen]);
-
   return (
-    <span className="shortcut-tooltip-wrap thread-grouping" ref={wrapRef}>
-      <button
-        ref={buttonRef}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label="Customize Sidebar"
-        className="icon-button"
-        type="button"
-        onClick={() => {
-          if (open) {
-            closeMenu();
-            return;
-          }
-          setOpen(true);
-        }}
-      >
-        <CustomizeSidebarIcon />
-      </button>
-      {open ? null : (
-        <span className="shortcut-tooltip" role="tooltip">
-          Customize Sidebar
-        </span>
-      )}
-      {open
-        ? createPortal(
-            <div ref={menuRef}>
-              <div
-                aria-label="Customize Sidebar"
-                className="workspace-menu thread-grouping__menu"
-                role="menu"
-                style={menuStyle}
-              >
-                <button
-                  ref={groupingRef}
-                  aria-expanded={submenuOpen}
-                  aria-haspopup="menu"
-                  className={`workspace-menu__item${submenuOpen ? " thread-grouping__parent--open" : ""}`}
-                  role="menuitem"
-                  type="button"
-                  onClick={() => {
-                    keepSubmenu();
-                  }}
-                  onMouseEnter={keepSubmenu}
-                  onMouseLeave={closeSubmenuSoon}
-                >
-                  <span>Grouping</span>
-                  <ChevronRightIcon />
-                </button>
-              </div>
-              {submenuOpen ? (
-                <div
-                  ref={submenuRef}
-                  aria-label="Grouping"
-                  className="workspace-menu thread-grouping__submenu"
-                  role="menu"
-                  style={submenuStyle}
-                  onMouseEnter={keepSubmenu}
-                  onMouseLeave={closeSubmenuSoon}
-                >
-                  {(
-                    [
-                      ["time", "Time"],
-                      ["workspace", "Workspace"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      aria-checked={grouping === value}
-                      className="workspace-menu__item thread-grouping__option"
-                      role="menuitemradio"
-                      type="button"
-                      onClick={() => {
-                        closeMenu();
-                        if (value !== grouping) {
-                          onChange(value);
-                        }
-                      }}
-                    >
-                      <span aria-hidden="true" className="thread-grouping__check">
-                        {grouping === value ? <CheckIcon /> : null}
-                      </span>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>,
-            document.body,
-          )
-        : null}
-    </span>
+    <div className="sidebar__grouping" role="group" aria-label="Sidebar view">
+      {(
+        [
+          ["time", "Chats"],
+          ["workspace", "Folders"],
+        ] as const
+      ).map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          aria-pressed={grouping === value}
+          onClick={() => onChange(value)}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -1336,8 +1215,10 @@ function ArchivedThreadsSection({
   return (
     <div className="archived-thread-group">
       <button
+        aria-label={`Archived chats (${archivedThreads.length})`}
         aria-expanded={open}
         className="archived-thread-group__toggle"
+        title={open ? "Hide archived chats" : "Show archived chats"}
         type="button"
         onClick={onToggle}
       >
@@ -1532,202 +1413,204 @@ interface ThreadSessionRowProps {
   readonly onAction: () => void;
   readonly onSelect: () => void;
   readonly onTogglePinned: () => void;
+  readonly ref?: Ref<HTMLDivElement>;
 }
 
-const ThreadSessionRow = forwardRef<HTMLDivElement, ThreadSessionRowProps>(
-  function ThreadSessionRow(
-    {
-      active,
-      archived = false,
-      showContext = false,
-      overlay = false,
-      dragging = false,
-      style,
-      dragAttributes,
-      dragListeners,
-      thread,
-      threadMenu,
-      onAction,
-      onSelect,
-      onTogglePinned,
-    },
-    ref,
-  ) {
-    const indicatorVariant = sessionIndicatorVariant(thread);
-    const pinned = Boolean(thread.session.pinnedAt);
-    const actionContext = showContext ? ` in ${thread.contextLabel}` : "";
-    const shortcut = useContext(ThreadShortcutContext)?.get(sessionThreadKey(thread));
-    const shortcutBadge = overlay ? undefined : shortcut;
-    const menuOpen =
-      !overlay &&
-      threadMenu?.openMenu?.surface === "sidebar" &&
-      threadMenu.openMenu.sessionId === thread.session.id;
-    const classes = [
-      "session-row",
-      active ? "session-row--active" : "",
-      pinned ? "session-row--pinned" : "",
-      dragging ? "session-row--dragging" : "",
-      overlay ? "session-row--overlay" : "",
-      shortcutBadge ? "session-row--shortcut" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-    return (
-      <>
-        <div
-          ref={ref}
-          style={style}
-          className={classes}
-          data-sidebar-indicator={indicatorVariant}
-          data-session-pinned={pinned ? "true" : "false"}
-          data-session-id={thread.session.id}
-          data-thread-shortcut={shortcutBadge ? String(shortcutBadge.slot) : undefined}
-          aria-keyshortcuts={
-            shortcutBadge ? `${IS_MAC ? "Meta" : "Control"}+${shortcutBadge.slot}` : undefined
-          }
-          onClick={() => {
-            if (!dragging) onSelect();
-          }}
-          onContextMenu={(event) => {
-            if (!threadMenu || overlay) return;
-            event.preventDefault();
+function ThreadSessionRow({
+  active,
+  archived = false,
+  showContext = false,
+  overlay = false,
+  dragging = false,
+  style,
+  dragAttributes,
+  dragListeners,
+  thread,
+  threadMenu,
+  onAction,
+  onSelect,
+  onTogglePinned,
+  ref,
+}: ThreadSessionRowProps) {
+  const indicatorVariant = sessionIndicatorVariant(thread);
+  const pinned = Boolean(thread.session.pinnedAt);
+  const actionContext = showContext ? ` in ${thread.contextLabel}` : "";
+  const shortcut = use(ThreadShortcutContext)?.get(sessionThreadKey(thread));
+  const shortcutBadge = overlay ? undefined : shortcut;
+  const menuOpen =
+    !overlay &&
+    threadMenu?.openMenu?.surface === "sidebar" &&
+    threadMenu.openMenu.sessionId === thread.session.id;
+  const classes = [
+    "session-row",
+    active ? "session-row--active" : "",
+    pinned ? "session-row--pinned" : "",
+    dragging ? "session-row--dragging" : "",
+    overlay ? "session-row--overlay" : "",
+    shortcutBadge ? "session-row--shortcut" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    <>
+      <div
+        ref={ref}
+        style={style}
+        className={classes}
+        data-sidebar-indicator={indicatorVariant}
+        data-session-pinned={pinned ? "true" : "false"}
+        data-session-id={thread.session.id}
+        data-thread-shortcut={shortcutBadge ? String(shortcutBadge.slot) : undefined}
+        aria-keyshortcuts={
+          shortcutBadge ? `${IS_MAC ? "Meta" : "Control"}+${shortcutBadge.slot}` : undefined
+        }
+        onClick={() => {
+          if (!dragging) onSelect();
+        }}
+        onContextMenu={(event) => {
+          if (!threadMenu || overlay) return;
+          event.preventDefault();
+          event.stopPropagation();
+          threadMenu.openSidebarMenu(thread.session.id);
+        }}
+      >
+        <button
+          aria-current={active ? "page" : undefined}
+          className="session-row__select"
+          onClick={(event) => {
             event.stopPropagation();
-            threadMenu.openSidebarMenu(thread.session.id);
+            onSelect();
           }}
+          type="button"
+          {...dragAttributes}
+          {...dragListeners}
         >
-          <button
-            className="session-row__select"
-            onClick={(event) => {
-              event.stopPropagation();
-              onSelect();
-            }}
-            type="button"
-            {...dragAttributes}
-            {...dragListeners}
-          >
-            <span className="session-row__leading" aria-hidden="true">
-              {indicatorVariant === "running" ? (
-                <span className="session-row__status session-row__status--running" />
-              ) : null}
-              {indicatorVariant === "failed" ? (
-                <span className="session-row__status session-row__status--failed" />
-              ) : null}
-              {indicatorVariant === "unseen" ? (
-                <span className="session-row__status session-row__status--unseen" />
-              ) : null}
-            </span>
-            <span className="session-row__body">
-              <span className="session-row__title-line">
-                <span className="session-row__title">{thread.session.title}</span>
-              </span>
-              {showContext ? (
-                <span className="session-row__context">{thread.contextLabel}</span>
-              ) : null}
-            </span>
-          </button>
-          <span className="session-row__trailing">
-            {thread.environment.kind === "worktree" ? (
-              <span className="session-row__workspace-icon" aria-hidden="true" title="Worktree">
-                <WorktreeIcon />
-              </span>
+          <span className="session-row__leading" aria-hidden="true">
+            {indicatorVariant === "running" ? (
+              <span className="session-row__status session-row__status--running" />
             ) : null}
-            {shortcutBadge ? (
-              <span className="session-row__shortcut" aria-hidden="true">
-                {shortcutBadge.label}
-              </span>
-            ) : (
-              <span className="session-row__time">
-                {formatRelativeTime(sessionLastInteractedAt(thread.session))}
-              </span>
-            )}
-            <span className="session-row__action-cluster">
-              {!archived ? (
-                <button
-                  aria-label={`${pinned ? "Unpin" : "Pin"} ${thread.session.title}${actionContext}`}
-                  aria-pressed={pinned}
-                  className="icon-button session-row__action session-row__pin-action"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onTogglePinned();
-                  }}
-                >
-                  <PinIcon filled={pinned} />
-                </button>
-              ) : null}
-              <span className="shortcut-tooltip-wrap session-row__tooltip-wrap">
-                <button
-                  aria-label={`${archived ? "Restore" : "Archive"} ${thread.session.title}${actionContext}`}
-                  className="icon-button session-row__action"
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onAction();
-                  }}
-                >
-                  {archived ? <RestoreIcon /> : <ArchiveIcon />}
-                </button>
-                {threadMenu && !overlay && !menuOpen ? (
-                  <span className="shortcut-tooltip session-row__tooltip" role="tooltip">
-                    <span>{archived ? "Restore thread" : "Archive thread"}</span>
-                    {archived ? null : <kbd>{archiveThreadShortcut(threadMenu.platform)}</kbd>}
-                  </span>
-                ) : null}
-              </span>
-            </span>
-            {threadMenu && menuOpen ? (
-              <div className="session-row__menu-wrap" ref={threadMenu.menuWrapRef}>
-                <ThreadActionsMenu
-                  actions={threadMenu.actionsFor(thread)}
-                  className="session-row__menu"
-                />
-              </div>
+            {indicatorVariant === "failed" ? (
+              <span className="session-row__status session-row__status--failed" />
+            ) : null}
+            {indicatorVariant === "unseen" ? (
+              <span className="session-row__status session-row__status--unseen" />
             ) : null}
           </span>
-        </div>
-        {threadMenu?.renameSessionId === thread.session.id ? (
-          <form
-            className="workspace-rename session-rename"
-            ref={threadMenu.renamePanelRef}
-            onSubmit={(event) => {
-              event.preventDefault();
-              threadMenu.submitRename(thread);
-            }}
-          >
-            <input
-              aria-label={`Rename thread ${thread.session.title}`}
-              className="workspace-rename__input"
-              // Mounts when a rename starts, including after the sidebar or a
-              // collapsed group opens to reveal the row.
-              autoFocus
-              onFocus={(event) => event.currentTarget.select()}
-              value={threadMenu.renameDraft}
-              onChange={(event) => threadMenu.setRenameDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  threadMenu.cancelRename();
-                }
-              }}
-            />
-            <div className="workspace-rename__actions">
+          <span className="session-row__body">
+            <span className="session-row__title-line">
+              <span className="session-row__title" title={thread.session.title}>
+                {thread.session.title}
+              </span>
+            </span>
+            {showContext ? (
+              <span className="session-row__context">{thread.contextLabel}</span>
+            ) : null}
+          </span>
+        </button>
+        <span className="session-row__trailing">
+          {thread.environment.kind === "worktree" ? (
+            <span className="session-row__workspace-icon" aria-hidden="true" title="Worktree">
+              <WorktreeIcon />
+            </span>
+          ) : null}
+          {shortcutBadge ? (
+            <span className="session-row__shortcut" aria-hidden="true">
+              {shortcutBadge.label}
+            </span>
+          ) : (
+            <span className="session-row__time">
+              {formatRelativeTime(sessionLastInteractedAt(thread.session))}
+            </span>
+          )}
+          <span className="session-row__action-cluster">
+            {!archived ? (
               <button
-                className="workspace-rename__button"
+                aria-label={`${pinned ? "Unpin" : "Pin"} ${thread.session.title}${actionContext}`}
+                aria-pressed={pinned}
+                className="icon-button session-row__action session-row__pin-action"
                 type="button"
-                onClick={threadMenu.cancelRename}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onTogglePinned();
+                }}
               >
-                Cancel
+                <PinIcon filled={pinned} />
               </button>
+            ) : null}
+            <span className="shortcut-tooltip-wrap session-row__tooltip-wrap">
               <button
-                className="workspace-rename__button workspace-rename__button--primary"
-                type="submit"
+                aria-label={`${archived ? "Unarchive" : "Archive"} chat ${thread.session.title}${actionContext}`}
+                className="icon-button session-row__action"
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onAction();
+                }}
               >
-                Save
+                {archived ? <RestoreIcon /> : <ArchiveIcon />}
               </button>
+              {threadMenu && !overlay && !menuOpen ? (
+                <span className="shortcut-tooltip session-row__tooltip" role="tooltip">
+                  <span>{archived ? "Unarchive chat" : "Archive chat"}</span>
+                  {archived ? null : <kbd>{archiveThreadShortcut(threadMenu.platform)}</kbd>}
+                </span>
+              ) : null}
+            </span>
+          </span>
+          {threadMenu && menuOpen ? (
+            <div className="session-row__menu-wrap" ref={threadMenu.menuWrapRef}>
+              <ThreadActionsMenu
+                actions={threadMenu.actionsFor(thread)}
+                className="session-row__menu"
+              />
             </div>
-          </form>
-        ) : null}
-      </>
-    );
-  },
-);
+          ) : null}
+        </span>
+      </div>
+      {threadMenu?.renameSessionId === thread.session.id ? (
+        <form
+          className="workspace-rename session-rename"
+          ref={threadMenu.renamePanelRef}
+          onSubmit={(event) => {
+            event.preventDefault();
+            threadMenu.submitRename(thread);
+          }}
+        >
+          <input
+            aria-label={`Rename thread ${thread.session.title}`}
+            autoComplete="off"
+            className="workspace-rename__input"
+            // Mounts when a rename starts, including after the sidebar or a
+            // collapsed group opens to reveal the row.
+            autoFocus
+            spellCheck={false}
+            onFocus={(event) => event.currentTarget.select()}
+            value={threadMenu.renameDraft}
+            onChange={(event) => threadMenu.setRenameDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                threadMenu.cancelRename();
+              }
+            }}
+          />
+          <div className="workspace-rename__actions">
+            <button
+              className="workspace-rename__button"
+              type="button"
+              onClick={threadMenu.cancelRename}
+            >
+              Cancel
+            </button>
+            <button
+              className="workspace-rename__button workspace-rename__button--primary"
+              type="submit"
+            >
+              Save
+            </button>
+          </div>
+        </form>
+      ) : null}
+    </>
+  );
+}

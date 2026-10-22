@@ -33,13 +33,16 @@ export function extensionScopeLabel(extension: RuntimeExtensionRecord): string {
   return extension.sourceInfo.scope;
 }
 
+/** Global (every project) first, then this project, then anything loaded for one session. */
+export const SCOPE_GROUP_ORDER = ["Global", "Project", "This session"];
+
 /** Group heading for where a skill or extension was discovered. */
 export function sourceScopeGroupLabel(scope: RuntimeSourceScope): string {
   switch (scope) {
     case "project":
-      return "Workspace";
+      return "Project";
     case "user":
-      return "User";
+      return "Global";
     case "temporary":
       return "This session";
   }

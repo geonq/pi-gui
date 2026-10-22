@@ -1,4 +1,6 @@
 import { useMemo, useRef } from "react";
+import { StateOrb } from "../../app/activity-indicator";
+import { activityForTool } from "../../../contracts/agent-activity";
 import type {
   SessionTranscriptCustomMessage,
   SessionTranscriptMessage,
@@ -251,6 +253,7 @@ function TimelineMessage({
 function TimelineActivityItem({ item }: { readonly item: TimelineActivity }) {
   return (
     <div className={`timeline-activity timeline-activity--${item.tone ?? "neutral"}`}>
+      {item.tone === "working" ? <StateOrb state={item.activityState ?? "solving"} /> : null}
       <span className="timeline-activity__label">{item.label}</span>
       {item.detail ? <span className="timeline-activity__detail">{item.detail}</span> : null}
       {item.metadata ? <span className="timeline-activity__meta">{item.metadata}</span> : null}
@@ -295,7 +298,13 @@ function TimelineToolCallItem({
     <article className={`timeline-tool timeline-tool--${item.status}`}>
       <div className="timeline-tool__header-row">
         <span className="timeline-tool__glyph" aria-hidden="true">
-          {extensionLabel === undefined || diffText ? toolGlyph(item.toolName) : <SparkIcon />}
+          {item.status === "running" ? (
+            <StateOrb state={activityForTool(item.toolName).state} />
+          ) : extensionLabel === undefined || diffText ? (
+            toolGlyph(item.toolName)
+          ) : (
+            <SparkIcon />
+          )}
         </span>
         <button
           className="timeline-tool__header"
@@ -311,12 +320,14 @@ function TimelineToolCallItem({
               <ChevronRightIcon />
             </span>
           ) : null}
-          <span className="timeline-tool__label">{compactLabel}</span>
+          <span className="timeline-tool__label" title={compactLabel}>
+            {compactLabel}
+          </span>
           {inlineDetail ? <span className="timeline-tool__detail">{inlineDetail}</span> : null}
           {diffStats ? (
             <span className="timeline-tool__diff-stats">
               <span className="timeline-tool__stat-add">+{diffStats.added}</span>{" "}
-              <span className="timeline-tool__stat-del">-{diffStats.removed}</span>
+              <span className="timeline-tool__stat-del">−{diffStats.removed}</span>
             </span>
           ) : null}
           <span className="timeline-tool__meta-inline">
@@ -363,7 +374,7 @@ function TimelineToolCallItem({
                     <span className="timeline-tool__diff-stats">
                       {" "}
                       <span className="timeline-tool__stat-add">+{diffStats.added}</span>{" "}
-                      <span className="timeline-tool__stat-del">-{diffStats.removed}</span>
+                      <span className="timeline-tool__stat-del">−{diffStats.removed}</span>
                     </span>
                   ) : null}
                 </span>

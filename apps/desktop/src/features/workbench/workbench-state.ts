@@ -28,8 +28,8 @@ export type WorkbenchAction =
 export function initialWorkbenchView(workspaceId: string): TaskWorkbenchTemplate {
   return {
     visibility: "hidden",
-    tools: [{ kind: "changes" }],
-    selection: { kind: "tool", toolId: "changes" },
+    tools: [{ kind: "agents" }, { kind: "changes" }],
+    selection: { kind: "tool", toolId: "agents" },
     files: { workspaceId, tabs: EMPTY_FILE_TABS },
     changes: { workspaceId, selectedPath: null, scope: { kind: "uncommitted" } },
   };

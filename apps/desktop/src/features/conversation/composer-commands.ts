@@ -303,6 +303,23 @@ export function buildProviderOptions(
     }));
 }
 
+export function isModelSelectable(
+  runtime: RuntimeSnapshot | undefined,
+  providerId: string | undefined,
+  modelId: string | undefined,
+): boolean {
+  if (!runtime) return false;
+  const patterns = runtime.settings.enabledModelPatterns;
+  const pattern = String(providerId) + "/" + String(modelId);
+  return runtime.models.some(
+    (model) =>
+      model.available &&
+      model.providerId === providerId &&
+      model.modelId === modelId &&
+      (patterns.length === 0 || patterns.includes(pattern)),
+  );
+}
+
 export function buildModelOptions(
   runtime: RuntimeSnapshot | undefined,
 ): readonly ComposerModelOption[] {

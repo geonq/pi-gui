@@ -1,4 +1,4 @@
-import { createContext, useContext, useMemo } from "react";
+import { createContext, use, useMemo } from "react";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import { extensionToolLabels, type ExtensionToolLabels } from "../../../contracts/tool-labels";
 
@@ -16,5 +16,5 @@ export function useExtensionToolLabels(runtime: RuntimeSnapshot | undefined): Ex
 }
 
 export function useExtensionToolLabel(toolName: string): string | undefined {
-  return useContext(ExtensionToolLabelsContext).get(toolName);
+  return use(ExtensionToolLabelsContext).get(toolName);
 }

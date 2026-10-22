@@ -6,9 +6,10 @@ import type {
   SessionTranscriptRole,
 } from "@pi-gui/session-driver";
 import type { TurnChangeSummary } from "./review";
+import type { AgentActivityState } from "./agent-activity";
 
 export type SessionRole = SessionTranscriptRole;
-export type TimelineTone = "neutral" | "success" | "warning" | "error";
+export type TimelineTone = "neutral" | "success" | "warning" | "error" | "working";
 export type TimelineToolStatus = "running" | "success" | "error";
 export type TimelineSummaryPresentation = "inline" | "divider";
 
@@ -20,6 +21,7 @@ export interface TimelineActivity {
   readonly detail?: string;
   readonly metadata?: string;
   readonly tone?: TimelineTone;
+  readonly activityState?: AgentActivityState;
 }
 
 export interface TimelineToolCall {

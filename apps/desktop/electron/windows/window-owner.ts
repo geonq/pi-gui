@@ -60,6 +60,7 @@ function canPublishToWindow(window: BrowserWindow): boolean {
 export class WindowOwner {
   private readonly lastPublishedTranscript = new Map<number, SelectedTranscriptRecord | null>();
   private readonly windows = new Set<BrowserWindow>();
+  private readonly passiveRemoteViews = new Set<BrowserWindow>();
   private readonly windowIds = new WeakMap<BrowserWindow, number>();
   private readonly views = new Map<number, WindowViewState>();
   private readonly stopPublishingState = new Map<number, () => void>();
@@ -77,13 +78,32 @@ export class WindowOwner {
   ) {}
 
   add(window: BrowserWindow, sourceView?: DesktopAppViewState): void {
+    this.registerWindow(window, sourceView, false);
+  }
+
+  addPassiveRemoteView(window: BrowserWindow, sourceView?: DesktopAppViewState): void {
+    this.registerWindow(window, sourceView, true);
+  }
+
+  private registerWindow(
+    window: BrowserWindow,
+    sourceView: DesktopAppViewState | undefined,
+    passiveRemoteView: boolean,
+  ): void {
     const webContentsId = window.webContents.id;
     this.windows.add(window);
+    if (passiveRemoteView) {
+      this.passiveRemoteViews.add(window);
+    }
     this.windowIds.set(window, webContentsId);
     this.views.set(webContentsId, this.resolveView(sourceView));
-    this.setActiveWindow(window);
+    if (!passiveRemoteView) {
+      this.setActiveWindow(window);
+    }
     this.attachStatePublisher(window);
-    this.attachActivationTracking(window);
+    if (!passiveRemoteView) {
+      this.attachActivationTracking(window);
+    }
   }
 
   remove(window: BrowserWindow): void {
@@ -98,12 +118,19 @@ export class WindowOwner {
     this.stopTrackingActivation.get(webContentsId)?.();
     this.stopTrackingActivation.delete(webContentsId);
     this.windows.delete(window);
+    this.passiveRemoteViews.delete(window);
     this.windowIds.delete(window);
     this.views.delete(webContentsId);
     this.lastPublishedTranscript.delete(webContentsId);
 
     if (this.activeWindow === window) {
-      this.activeWindow = [...this.windows].find((candidate) => !candidate.isDestroyed()) ?? null;
+      this.activeWindow =
+        [...this.windows].find(
+          (candidate) =>
+            !this.passiveRemoteViews.has(candidate) &&
+            !candidate.isDestroyed() &&
+            !candidate.webContents.isDestroyed(),
+        ) ?? null;
       if (this.activeWindow) {
         this.setActiveWindow(this.activeWindow);
         this.applyViewToStateOwner(this.activeWindow.webContents.id);
@@ -115,30 +142,43 @@ export class WindowOwner {
   }
 
   allWindows(): readonly BrowserWindow[] {
-    return [...this.windows];
+    return [...this.windows].filter((window) => !this.passiveRemoteViews.has(window));
   }
 
   size(): number {
-    return this.windows.size;
+    return this.windows.size - this.passiveRemoteViews.size;
   }
 
   active(): BrowserWindow | null {
-    return this.activeWindow && canPublishToWindow(this.activeWindow) ? this.activeWindow : null;
+    return this.activeWindow &&
+      !this.passiveRemoteViews.has(this.activeWindow) &&
+      canPublishToWindow(this.activeWindow)
+      ? this.activeWindow
+      : null;
   }
 
   foreground(): BrowserWindow | null {
     const focusedWindow = BrowserWindow.getFocusedWindow();
     if (
       focusedWindow &&
+      !this.passiveRemoteViews.has(focusedWindow) &&
       this.views.has(focusedWindow.webContents.id) &&
       canPublishToWindow(focusedWindow)
     ) {
       return focusedWindow;
     }
-    if (this.activeWindow && canPublishToWindow(this.activeWindow)) {
+    if (
+      this.activeWindow &&
+      !this.passiveRemoteViews.has(this.activeWindow) &&
+      canPublishToWindow(this.activeWindow)
+    ) {
       return this.activeWindow;
     }
-    return [...this.windows].find(canPublishToWindow) ?? null;
+    return (
+      [...this.windows].find(
+        (window) => !this.passiveRemoteViews.has(window) && canPublishToWindow(window),
+      ) ?? null
+    );
   }
 
   foregroundView(): DesktopAppViewState | undefined {
@@ -147,16 +187,29 @@ export class WindowOwner {
   }
 
   resolveDialogWindow(parentWindow?: BrowserWindow | null): BrowserWindow | undefined {
-    if (parentWindow && canPublishToWindow(parentWindow)) {
+    if (
+      parentWindow &&
+      !this.passiveRemoteViews.has(parentWindow) &&
+      canPublishToWindow(parentWindow)
+    ) {
       return parentWindow;
     }
     return this.active() ?? undefined;
   }
 
+  isPassiveRemoteView(window: BrowserWindow): boolean {
+    return this.windows.has(window) && this.passiveRemoteViews.has(window);
+  }
+
+  isPassiveRemoteSender(sender: WebContents): boolean {
+    const window = BrowserWindow.fromWebContents(sender);
+    return Boolean(window && this.isPassiveRemoteView(window) && canPublishToWindow(window));
+  }
+
   windowForSender(sender: WebContents): BrowserWindow {
     const window = BrowserWindow.fromWebContents(sender);
     if (!window || !this.windows.has(window) || !canPublishToWindow(window)) {
-      throw new Error("IPC sender is not an active pi-gui window");
+      throw new Error("IPC sender is not a registered pi-gui window");
     }
     return window;
   }
@@ -186,7 +239,12 @@ export class WindowOwner {
 
   isSessionVisibleInAnotherWindow(sessionRef: SessionRef): boolean {
     for (const window of this.windows) {
-      if (!canPublishToWindow(window) || window.isMinimized() || !window.isVisible()) {
+      if (
+        this.passiveRemoteViews.has(window) ||
+        !canPublishToWindow(window) ||
+        window.isMinimized() ||
+        !window.isVisible()
+      ) {
         continue;
       }
       const webContentsId = window.webContents.id;
@@ -206,7 +264,7 @@ export class WindowOwner {
   }
 
   activate(window: BrowserWindow): void {
-    if (!this.windows.has(window) || window.isDestroyed()) {
+    if (!this.windows.has(window) || this.passiveRemoteViews.has(window) || window.isDestroyed()) {
       return;
     }
     if (this.activeActionWebContentsId !== undefined) {
@@ -387,7 +445,7 @@ export class WindowOwner {
   }
 
   private setActiveWindow(window: BrowserWindow): void {
-    if (window.isDestroyed()) {
+    if (window.isDestroyed() || this.passiveRemoteViews.has(window)) {
       return;
     }
     this.activeWindow = window;
@@ -445,7 +503,7 @@ export class WindowOwner {
     const windowIsFocused =
       Boolean(liveWindow?.isFocused()) || senderIsForeground || options.forceActiveWindow === true;
     if (liveWindow && webContentsId !== undefined) {
-      if (windowIsFocused) {
+      if (windowIsFocused && !this.passiveRemoteViews.has(liveWindow)) {
         this.setActiveWindow(liveWindow);
       }
       this.applyViewToStateOwner(webContentsId);

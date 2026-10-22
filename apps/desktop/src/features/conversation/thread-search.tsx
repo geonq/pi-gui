@@ -1,4 +1,5 @@
 import type { RefObject } from "react";
+import { ChevronDownIcon, CloseIcon } from "../../ui/icons";
 
 interface ThreadSearchBarProps {
   readonly query: string;
@@ -27,7 +28,9 @@ export function ThreadSearchBar({
         ref={inputRef}
         className="thread-search-bar__input"
         type="text"
-        placeholder="Search thread..."
+        autoComplete="off"
+        placeholder="Search thread…"
+        spellCheck={false}
         value={query}
         onChange={(e) => onSearch(e.target.value)}
         onKeyDown={(e) => {
@@ -44,7 +47,7 @@ export function ThreadSearchBar({
           }
         }}
       />
-      <span className="thread-search-bar__count">
+      <span aria-live="polite" className="thread-search-bar__count">
         {query ? (matchCount > 0 ? `${activeIndex + 1} / ${matchCount}` : "0 results") : ""}
       </span>
       <div className="thread-search-bar__actions">
@@ -55,7 +58,9 @@ export function ThreadSearchBar({
           disabled={matchCount === 0}
           onClick={onPrev}
         >
-          &#x25B2;
+          <span className="icon-flip">
+            <ChevronDownIcon />
+          </span>
         </button>
         <button
           aria-label="Next match"
@@ -64,10 +69,10 @@ export function ThreadSearchBar({
           disabled={matchCount === 0}
           onClick={onNext}
         >
-          &#x25BC;
+          <ChevronDownIcon />
         </button>
         <button aria-label="Close search" className="icon-button" type="button" onClick={onClose}>
-          &#x2715;
+          <CloseIcon />
         </button>
       </div>
     </div>

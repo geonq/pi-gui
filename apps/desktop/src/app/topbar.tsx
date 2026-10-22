@@ -51,19 +51,25 @@ export function Topbar({
         </span>
         {sessionTitle ? (
           <>
-            <span className="topbar__separator">/</span>
+            <span aria-hidden="true" className="topbar__separator">
+              /
+            </span>
             <h1 className="chat-header__title" title={sessionTitle}>
               {sessionTitle}
             </h1>
           </>
         ) : activeView === "threads" && checkoutLabel ? (
           <>
-            <span className="topbar__separator">/</span>
+            <span aria-hidden="true" className="topbar__separator">
+              /
+            </span>
             <span className="topbar__session">{checkoutLabel}</span>
           </>
         ) : activeView === "new-thread" && rootWorkspace ? (
           <>
-            <span className="topbar__separator">/</span>
+            <span aria-hidden="true" className="topbar__separator">
+              /
+            </span>
             <span className="topbar__session">New thread</span>
           </>
         ) : null}
@@ -75,17 +81,17 @@ export function Topbar({
             <button
               type="button"
               aria-label="Toggle side panel"
-              aria-pressed={panelVisible}
+              aria-pressed="false"
               aria-controls="task-workbench"
               data-testid="toggle-side-panel"
-              className={`icon-button topbar__icon${panelVisible ? " icon-button--active" : ""}`}
+              className="icon-button topbar__icon"
               disabled={!panelAvailable}
               onClick={onTogglePanel}
             >
               <SidePanelIcon />
             </button>
             <span className="shortcut-tooltip topbar__tooltip" role="tooltip">
-              <span>{panelVisible ? "Hide side panel" : "Show side panel"}</span>
+              <span>Show side panel</span>
               <kbd>{getSidePanelToggleShortcutLabel(api.platform)}</kbd>
             </span>
           </div>

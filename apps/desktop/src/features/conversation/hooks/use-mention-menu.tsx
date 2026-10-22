@@ -1,5 +1,6 @@
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useMemo,
   useRef,
@@ -125,27 +126,25 @@ export function useMentionMenu({
     return extractMentionQuery(composerDraft);
   }, [composerDraft, suppressed]);
 
+  const deferredQuery = useDeferredValue(mentionMatch?.query ?? "");
   const mentionOptions = useMemo<MentionOption[]>(() => {
     if (!mentionMatch) {
       return [];
     }
-    const lowerQuery = mentionMatch.query.toLowerCase();
+    const lowerQuery = deferredQuery.toLowerCase();
     const extensionOptions = buildExtensionMentionOptions(
       runtime?.extensions ?? [],
       lowerQuery,
       pendingEnablePaths,
     );
-    const fileOptions = allFiles
-      .filter((file) => file.toLowerCase().includes(lowerQuery))
-      .slice(0, 10)
-      .map<MentionOption>((filePath) => ({
-        kind: "file",
-        id: `file:${filePath}`,
-        insertText: filePath,
-        filePath,
-      }));
+    const fileOptions: MentionOption[] = [];
+    for (const filePath of allFiles) {
+      if (!filePath.toLowerCase().includes(lowerQuery)) continue;
+      fileOptions.push({ kind: "file", id: `file:${filePath}`, insertText: filePath, filePath });
+      if (fileOptions.length === 10) break;
+    }
     return [...extensionOptions, ...fileOptions];
-  }, [allFiles, mentionMatch, pendingEnablePaths, runtime?.extensions]);
+  }, [allFiles, deferredQuery, mentionMatch, pendingEnablePaths, runtime?.extensions]);
 
   const showMentionMenu = mentionOptions.length > 0;
 

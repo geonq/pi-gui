@@ -336,6 +336,8 @@ function CustomEndpointDialog({
               className="settings-search"
               disabled={savePending}
               placeholder="http://localhost:11434/v1"
+              spellCheck={false}
+              type="url"
               value={baseUrl}
               onChange={(event) => setBaseUrl(event.target.value)}
             />

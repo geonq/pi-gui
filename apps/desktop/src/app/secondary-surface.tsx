@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { SearchIcon } from "../ui/icons";
+import { ChevronRightIcon, AppBrand, SearchIcon } from "../ui/icons";
 
 export interface SecondarySurfaceNavItem {
   readonly id: string;
@@ -53,10 +53,15 @@ export function SecondarySurface({
   return (
     <div className="secondary-surface" data-testid={testId}>
       <aside className="secondary-surface__sidebar">
-        <button className="secondary-surface__back" type="button" onClick={onBack}>
-          <span aria-hidden="true">←</span>
-          <span>Back to app</span>
-        </button>
+        <div className="secondary-surface__top">
+          <AppBrand />
+          <button className="secondary-surface__back" type="button" onClick={onBack}>
+            <span className="icon-flip">
+              <ChevronRightIcon />
+            </span>
+            <span>Back to app</span>
+          </button>
+        </div>
         {navItems.length > 0 ? (
           <SecondarySurfaceNav
             activeNavId={activeNavId}

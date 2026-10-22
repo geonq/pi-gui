@@ -667,6 +667,18 @@ async function sendExtensionCommand(
   await store.driver.sendUserMessage(sessionRef, { text, extensionCommandOnly: true });
 }
 
+function modelChangeLabel(
+  store: ComposerStore,
+  sessionRef: SessionRef,
+  provider: string,
+  modelId: string,
+): string {
+  const model = store
+    .runtimeForWorkspace(sessionRef.workspaceId)
+    ?.models.find((entry) => entry.providerId === provider && entry.modelId === modelId);
+  return model ? `${model.label} (${model.providerName})` : "the selected model";
+}
+
 async function setSessionModel(
   store: ComposerStore,
   target: WorkspaceSessionTarget,
@@ -680,7 +692,12 @@ async function setSessionModel(
   return store.withErrorHandling(async () => {
     await store.driver.setSessionModel(sessionRef, { provider, modelId });
     syncSessionConfig(store, key, { provider, modelId });
-    return finishSessionChange(store, sessionRef, key, `Model set to ${provider}:${modelId}`);
+    return finishSessionChange(
+      store,
+      sessionRef,
+      key,
+      `Model set to ${modelChangeLabel(store, sessionRef, provider, modelId)}`,
+    );
   });
 }
 
@@ -895,7 +912,7 @@ async function runComposerCommand(
       store,
       sessionRef,
       key,
-      `Model set to ${parsed.provider}:${parsed.modelId}`,
+      `Model set to ${modelChangeLabel(store, sessionRef, parsed.provider, parsed.modelId)}`,
     );
   }
 

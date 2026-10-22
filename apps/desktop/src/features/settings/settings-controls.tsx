@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { ChevronDownIcon } from "../../ui/icons";
 
 /** A checkbox drawn as a switch, so it keeps native checkbox keyboard and form behaviour. */
@@ -70,17 +71,29 @@ export function SettingsSelect<T extends string>({
   readonly value: T | undefined;
   readonly onChange: (value: T) => void;
 }) {
+  // Saving is a round trip, and a select bound only to the saved value snaps back to the old
+  // choice until it lands, which reads as "it won't change". Show the pick until the saved value
+  // moves, or for 5 s if the save never lands (then the real value shows again).
+  const [pick, setPick] = useState<{ readonly from: T | undefined; readonly to: T }>();
+  useEffect(() => {
+    if (!pick) return;
+    const timer = window.setTimeout(() => setPick(undefined), 5_000);
+    return () => window.clearTimeout(timer);
+  }, [pick]);
+  const shown = pick && pick.from === value ? pick.to : value;
   // Without a matching option Chromium shows the first one as chosen, and choosing it
   // fires no change, so an unset value gets an explicit placeholder instead.
-  const hasValue = options.some((option) => option.value === value);
+  const hasValue = options.some((option) => option.value === shown);
   return (
     <span className="settings-select-control">
       <select
         aria-label={label}
-        value={hasValue ? value : ""}
+        value={hasValue ? shown : ""}
         onChange={(event) => {
           const selected = options.find((option) => option.value === event.currentTarget.value);
-          if (selected) onChange(selected.value);
+          if (!selected) return;
+          setPick({ from: value, to: selected.value });
+          onChange(selected.value);
         }}
       >
         {hasValue ? null : (

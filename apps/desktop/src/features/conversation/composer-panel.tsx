@@ -7,6 +7,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
+import { BorderBeam } from "border-beam";
 import type { ExtensionFlagValues, SessionUsageSnapshot } from "@pi-gui/session-driver";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type {
@@ -17,6 +18,7 @@ import type {
 } from "../../../contracts/desktop-state";
 import type { MentionOption } from "./hooks/use-mention-menu";
 import { ArrowUpIcon, PlusIcon, StopSquareIcon } from "../../ui/icons";
+import { useActiveTheme } from "../../ui/active-theme";
 import type {
   ComposerSlashCommand,
   ComposerSlashCommandSection,
@@ -155,114 +157,125 @@ export function ComposerPanel({
 }: ComposerPanelProps) {
   const hasComposerInput =
     composerDraft.trim().length > 0 || attachments.length > 0 || annotations.list.length > 0;
-  const primaryActionIsStop = selectedSession.status === "running" && !hasComposerInput;
+  const running = selectedSession.status === "running";
+  const primaryActionIsStop = running && !hasComposerInput;
+  const { variant } = useActiveTheme();
 
   return (
     <footer className="composer" aria-busy={preparingTaskDraft}>
       <div className="conversation conversation--composer" inert={preparingTaskDraft}>
         <ExtensionNotices notices={extensionNotices} />
-        <ComposerSurface
-          lastError={lastError}
-          activeSlashCommand={activeSlashCommand}
-          activeSlashCommandMeta={activeSlashCommandMeta}
-          topNotice={
-            <ModelOnboardingNoticeBanner
-              notice={modelOnboarding.notice}
-              onOpenSettings={onOpenModelSettings}
-            />
-          }
-          composerDraft={composerDraft}
-          setComposerDraft={setComposerDraft}
-          composerRef={composerRef}
-          attachments={attachments}
-          queuedMessages={queuedMessages}
-          editingQueuedMessageId={editingQueuedMessageId}
-          slashSections={slashSections}
-          slashOptions={slashOptions}
-          selectedSlashCommand={selectedSlashCommand}
-          selectedSlashOption={selectedSlashOption}
-          showSlashMenu={showSlashMenu}
-          showSlashOptionMenu={showSlashOptionMenu}
-          slashOptionEmptyState={slashOptionEmptyState}
-          onClearSlashCommand={onClearSlashCommand}
-          onComposerKeyDown={onComposerKeyDown}
-          onComposerPaste={onComposerPaste}
-          onComposerDrop={onComposerDrop}
-          onRemoveAttachment={onRemoveAttachment}
-          onEditQueuedMessage={onEditQueuedMessage}
-          onCancelQueuedEdit={onCancelQueuedEdit}
-          onRemoveQueuedMessage={onRemoveQueuedMessage}
-          onSteerQueuedMessage={onSteerQueuedMessage}
-          onSelectSlashCommand={onSelectSlashCommand}
-          onSelectSlashOption={onSelectSlashOption}
-          showMentionMenu={showMentionMenu}
-          mentionOptions={mentionOptions}
-          selectedMentionIndex={selectedMentionIndex}
-          onSelectMention={onSelectMention}
-          onEnableMentionExtension={onEnableMentionExtension}
-          textareaLabel="Composer"
-          textareaTestId="composer"
-          textareaPlaceholder="Ask pi to inspect the repo, run a fix, or continue the current thread..."
-          pinnedCards={pinnedCards}
-          extensionDock={extensionDock}
-          extensionDockExpanded={extensionDockExpanded}
-          onToggleExtensionDock={onToggleExtensionDock}
-          onDismissExtensionDock={onDismissExtensionDock}
-          annotationChip={
-            <AnnotationChip annotations={annotations.list} onRemove={annotations.remove} />
-          }
-          footer={
-            <div className="composer__footer">
-              <div className="composer__footer-row">
-                <div className="composer__config">
-                  <ModelSelector
-                    runtime={runtime}
-                    provider={provider}
-                    modelId={modelId}
-                    thinkingLevel={thinkingLevel}
-                    disabled={selectedSession.status === "running"}
-                    unselectedModelLabel={modelOnboarding.unselectedModelLabel}
-                    emptyModelTitle={modelOnboarding.emptyModelTitle}
-                    onSetModel={onSetModel}
-                    onSetThinking={onSetThinking}
-                  />
-                  <ExtensionFlagsBadge values={extensionFlags} />
-                  <ContextMeter usage={usage} />
-                </div>
-                <div className="composer__actions">
-                  <button
-                    aria-label="Attach files"
-                    className="icon-button composer__attach"
-                    type="button"
-                    onClick={onPickAttachments}
-                  >
-                    <PlusIcon />
-                  </button>
-                  <button
-                    aria-label={primaryActionIsStop ? "Stop run" : "Send message"}
-                    className="button button--primary button--cta-icon"
-                    data-testid="send"
-                    type="button"
-                    disabled={
-                      !primaryActionIsStop &&
-                      (!hasComposerInput || modelOnboarding.requiresModelSelection)
-                    }
-                    onClick={onSubmit}
-                  >
-                    {primaryActionIsStop ? <StopSquareIcon /> : <ArrowUpIcon />}
-                  </button>
+        {/* The libraries.dev beam travels around the composer while a request or task runs. */}
+        <BorderBeam
+          active={running || preparingTaskDraft}
+          className="composer__beam"
+          colorVariant="mono"
+          staticColors
+          theme={variant}
+        >
+          <ComposerSurface
+            lastError={lastError}
+            activeSlashCommand={activeSlashCommand}
+            activeSlashCommandMeta={activeSlashCommandMeta}
+            topNotice={
+              <ModelOnboardingNoticeBanner
+                notice={modelOnboarding.notice}
+                onOpenSettings={onOpenModelSettings}
+              />
+            }
+            composerDraft={composerDraft}
+            setComposerDraft={setComposerDraft}
+            composerRef={composerRef}
+            attachments={attachments}
+            queuedMessages={queuedMessages}
+            editingQueuedMessageId={editingQueuedMessageId}
+            slashSections={slashSections}
+            slashOptions={slashOptions}
+            selectedSlashCommand={selectedSlashCommand}
+            selectedSlashOption={selectedSlashOption}
+            showSlashMenu={showSlashMenu}
+            showSlashOptionMenu={showSlashOptionMenu}
+            slashOptionEmptyState={slashOptionEmptyState}
+            onClearSlashCommand={onClearSlashCommand}
+            onComposerKeyDown={onComposerKeyDown}
+            onComposerPaste={onComposerPaste}
+            onComposerDrop={onComposerDrop}
+            onRemoveAttachment={onRemoveAttachment}
+            onEditQueuedMessage={onEditQueuedMessage}
+            onCancelQueuedEdit={onCancelQueuedEdit}
+            onRemoveQueuedMessage={onRemoveQueuedMessage}
+            onSteerQueuedMessage={onSteerQueuedMessage}
+            onSelectSlashCommand={onSelectSlashCommand}
+            onSelectSlashOption={onSelectSlashOption}
+            showMentionMenu={showMentionMenu}
+            mentionOptions={mentionOptions}
+            selectedMentionIndex={selectedMentionIndex}
+            onSelectMention={onSelectMention}
+            onEnableMentionExtension={onEnableMentionExtension}
+            textareaLabel="Composer"
+            textareaTestId="composer"
+            textareaPlaceholder="Ask Pegasus to inspect the repo, run a fix, or continue the current thread…"
+            pinnedCards={pinnedCards}
+            extensionDock={extensionDock}
+            extensionDockExpanded={extensionDockExpanded}
+            onToggleExtensionDock={onToggleExtensionDock}
+            onDismissExtensionDock={onDismissExtensionDock}
+            annotationChip={
+              <AnnotationChip annotations={annotations.list} onRemove={annotations.remove} />
+            }
+            footer={
+              <div className="composer__footer">
+                <div className="composer__footer-row">
+                  <div className="composer__config">
+                    <ModelSelector
+                      runtime={runtime}
+                      provider={provider}
+                      modelId={modelId}
+                      thinkingLevel={thinkingLevel}
+                      disabled={running}
+                      unselectedModelLabel={modelOnboarding.unselectedModelLabel}
+                      emptyModelTitle={modelOnboarding.emptyModelTitle}
+                      onSetModel={onSetModel}
+                      onSetThinking={onSetThinking}
+                    />
+                    <ExtensionFlagsBadge values={extensionFlags} />
+                    <ContextMeter usage={usage} />
+                  </div>
+                  <div className="composer__actions">
+                    <button
+                      aria-label="Attach files"
+                      className="icon-button composer__attach"
+                      type="button"
+                      onClick={onPickAttachments}
+                    >
+                      <PlusIcon />
+                    </button>
+                    <button
+                      aria-label={primaryActionIsStop ? "Stop run" : "Send message"}
+                      className="button button--primary button--cta-icon"
+                      data-testid="send"
+                      type="button"
+                      disabled={
+                        !primaryActionIsStop &&
+                        (!hasComposerInput || modelOnboarding.requiresModelSelection)
+                      }
+                      onClick={onSubmit}
+                    >
+                      {primaryActionIsStop ? <StopSquareIcon /> : <ArrowUpIcon />}
+                    </button>
+                  </div>
                 </div>
               </div>
-            </div>
-          }
-        />
+            }
+          />
+        </BorderBeam>
       </div>
       {preparingTaskDraft ? (
         <div className="composer__footer-row">
           <p className="composer__hint" role="status" data-testid="composer-prepare-task-status">
             Preparing task… Your current draft is saved before opening it.
           </p>
-          {selectedSession.status === "running" ? (
+          {running ? (
             <button
               aria-label="Stop run"
               className="button button--primary button--cta-icon"

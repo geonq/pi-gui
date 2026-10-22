@@ -32,6 +32,8 @@ window.addEventListener(
 );
 
 applyLastTheme();
+// Window chrome differs per OS (traffic lights vs. caption buttons); CSS keys off this.
+document.documentElement.dataset.platform = window.piApp?.platform ?? "linux";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

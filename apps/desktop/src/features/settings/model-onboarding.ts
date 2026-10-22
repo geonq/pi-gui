@@ -110,7 +110,11 @@ export function deriveModelOnboardingState(
   }
 
   if (!defaultModelUsable) {
-    const defaultLabel = `${settingsDefault.provider}:${settingsDefault.modelId}`;
+    const defaultLabel = formatUnavailableModelLabel(
+      runtime,
+      settingsDefault.provider ?? "",
+      settingsDefault.modelId ?? "",
+    );
     return {
       hasSelectableModels: true,
       requiresModelSelection: !currentSelectionUsable,
@@ -135,6 +139,44 @@ export function deriveModelOnboardingState(
     emptyModelTitle: "No models available",
     emptyModelDescription: "Pick a model.",
   };
+}
+
+function formatUnavailableModelLabel(
+  runtime: RuntimeSnapshot | undefined,
+  providerId: string,
+  modelId: string,
+): string {
+  const provider = runtime?.providers.find((entry) => entry.id === providerId);
+  const model = runtime?.models.find(
+    (entry) => entry.providerId === providerId && entry.modelId === modelId,
+  );
+  const recordedProviderName = provider?.name.trim();
+  const providerLabel =
+    recordedProviderName && recordedProviderName !== providerId
+      ? readableAccountLabel(providerId, recordedProviderName)
+      : readableIdentifier(providerId);
+  const modelLabel = model?.label.trim() || readableIdentifier(modelId);
+  return [providerLabel, modelLabel].filter(Boolean).join(" / ");
+}
+
+function readableAccountLabel(providerId: string, name: string): string {
+  if (!providerId.startsWith("claude-code-account-")) return name;
+  const separator = name.lastIndexOf(" · ");
+  if (separator < 0) return name;
+  const providerName = name.slice(0, separator).trim();
+  const accountName = name.slice(separator + 3).trim();
+  return accountName ? `${providerName} · ${accountName.toUpperCase()}` : name;
+}
+
+function readableIdentifier(value: string): string {
+  return value
+    .replace(/-(\d+)-(\d+)(?=-|$)/g, " $1.$2")
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((part) =>
+      /^\d+(?:\.\d+)*$/.test(part) ? part : `${part[0]!.toUpperCase()}${part.slice(1)}`,
+    )
+    .join(" ");
 }
 
 function isUsableSelection(

@@ -1,3 +1,4 @@
+import { activityForTool } from "../../contracts/agent-activity";
 import { isCardEntryItem, sessionKey } from "@pi-gui/session-driver";
 import type { SessionTranscriptItem, SessionTranscriptPin } from "@pi-gui/session-driver";
 import type { SessionDriverEvent, SessionQueuedMessage, SessionRef } from "@pi-gui/session-driver";
@@ -126,6 +127,7 @@ export function appendAssistantDelta(
   const key = sessionKey(sessionRef);
   const transcript = [...(transcriptCache.get(key) ?? [])];
   const activeId = activeAssistantMessageBySession.get(key);
+  updateWorkingActivity(transcript, { state: "composing", label: "Responding…" });
 
   if (activeId) {
     const index = transcript.findIndex((message) => message.id === activeId);
@@ -170,6 +172,9 @@ export function applyTimelineEvent(
   const currentMetrics = state.runMetricsBySession.get(key);
 
   switch (event.type) {
+    case "assistantActivity":
+      updateWorkingActivity(transcript, activityForTool(event.toolName));
+      break;
     case "assistantMessageEnded": {
       const activeId = state.activeAssistantMessageBySession.get(key);
       if (activeId) state.pendingAssistantMessageBySession.set(key, activeId);
@@ -205,7 +210,7 @@ export function applyTimelineEvent(
           searchCount: 0,
           fileCount: 0,
         });
-        const activity = makeActivityItem("Working…");
+        const activity = makeActivityItem("Thinking…", { tone: "working" });
         state.activeWorkingActivityBySession.set(key, activity.id);
         transcript.push(activity);
       }
@@ -216,6 +221,7 @@ export function applyTimelineEvent(
       appendQueuedUserMessage(transcriptCache, event.sessionRef, event.message);
       return;
     case "toolStarted": {
+      updateWorkingActivity(transcript, activityForTool(event.toolName));
       clearActiveAssistantMessage(state.activeAssistantMessageBySession, event.sessionRef);
       const metrics = currentMetrics ?? {
         startedAt: event.timestamp,
@@ -267,6 +273,18 @@ export function applyTimelineEvent(
         undefined,
         event.output,
       );
+      {
+        const active = transcript
+          .slice()
+          .reverse()
+          .find((item) => item.kind === "tool" && item.status === "running");
+        updateWorkingActivity(
+          transcript,
+          active?.kind === "tool"
+            ? activityForTool(active.toolName)
+            : { state: "solving", label: "Thinking…" },
+        );
+      }
       break;
     case "runCompleted": {
       const metrics = currentMetrics;
@@ -406,6 +424,19 @@ function upsertToolRow(
   }
 
   transcript.push(next);
+}
+
+function updateWorkingActivity(
+  transcript: TranscriptMessage[],
+  activity: ReturnType<typeof activityForTool>,
+): void {
+  const index = transcript.findIndex((item) => item.kind === "activity" && item.tone === "working");
+  const item = transcript[index];
+  if (
+    item?.kind === "activity" &&
+    (item.activityState !== activity.state || item.label !== activity.label)
+  )
+    transcript[index] = { ...item, label: activity.label, activityState: activity.state };
 }
 
 function removeWorkingActivity(

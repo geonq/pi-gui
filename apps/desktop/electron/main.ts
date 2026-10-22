@@ -3,10 +3,12 @@ import {
   BrowserWindow,
   clipboard,
   dialog,
+  ipcMain,
   Menu,
   nativeImage,
   nativeTheme,
   net,
+  Notification,
   protocol,
   shell,
   type MenuItemConstructorOptions,
@@ -15,16 +17,25 @@ import {
 import { isValidHttpBaseUrl } from "@pi-gui/pi-sdk-driver";
 import { createRequire } from "node:module";
 import { randomUUID } from "node:crypto";
+import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import type {
   AgentToolResult,
   ExtensionContext,
   ExtensionToolContext,
 } from "@earendil-works/pi-coding-agent";
-import { readFile, stat } from "node:fs/promises";
+import { lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import {
+  startAutomationIngress,
+  type AutomationRoute,
+  type NativeAutomationIngress,
+} from "./automation/native-automation-ingress";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { augmentPosixPath } from "../scripts/augment-path.cjs";
-import { DesktopAppStore } from "./application/app-store";
+import { DesktopAppStore, resolveAgentDir } from "./application/app-store";
+import { handOffManagedWindowsLaunch } from "./platform/managed-windows-launch";
+import { handOffManagedMacLaunch } from "./platform/managed-macos-launch";
 import { WindowOwner } from "./windows/window-owner";
 import { PendingComposerDraftFlusher } from "./windows/pending-draft-flush";
 import { TurnCheckpointStore } from "./workbench/checkpoint-store";
@@ -48,6 +59,11 @@ import {
 } from "./scheduled-tasks/scheduled-task-runtime";
 import { getChangedFiles, getFileDiff, stageFile } from "./platform/files/app-store-diff";
 import { listWorkspaceFiles, readWorkspaceFile } from "./platform/files/app-store-files";
+import { readAccountLimits } from "./usage/account-limits";
+import { readAccountStates } from "./usage/account-states";
+import { startSignInMonitor } from "./usage/sign-ins";
+import { loadWindowState, trackWindowState } from "./platform/window-state";
+import { collectUsage } from "./usage/collect-usage";
 import { resolveExistingWorkspacePath } from "./platform/files/workspace-paths";
 import { MAIN_DEV_RELOAD_MARKER } from "./dev-reload-main-probe";
 import { NotificationManager } from "./platform/notification-manager";
@@ -56,6 +72,35 @@ import { checkForUpdate, initUpdateChecker, openReleasesPage } from "./platform/
 import { ThemeManager } from "./platform/theme-manager";
 import { windowBackgroundFor } from "../contracts/theme";
 import { TerminalService } from "./platform/terminal-service";
+import { RemoteDesktopBroker } from "./remote/remote-desktop-broker";
+import {
+  createWorkspaceFolderService,
+  type WorkspaceFolderService,
+  type WindowsWorkspaceFolderRootConfig,
+} from "./remote/workspace-folder-service";
+import { registerWorkspaceFolderIpc } from "./remote/register-workspace-folder-ipc";
+import { createRemoteWorkspaceFolders } from "./remote/remote-workspace-folders";
+import {
+  parseRemoteDesktopClientConfig,
+  parseRemoteDesktopHostConfig,
+  readPrivateRemoteDesktopConfig,
+  type RemoteDesktopHostFileConfig,
+  type RemoteDesktopMacFoldersConfig,
+} from "./remote/remote-desktop-config";
+import { RemoteDesktopHttpClient } from "./remote/remote-desktop-http-client";
+import { startRemoteDesktopHttpHost, type RemoteDesktopHttpHost } from "./remote/remote-desktop-http-host";
+import {
+  DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES,
+  loadRemoteDesktopClientPreferences,
+  persistRemoteDesktopClientPreferences,
+  validateRemoteDesktopClientPreferencesPatch,
+  type RemoteDesktopClientPreferences,
+} from "./remote/remote-desktop-client-preferences";
+import {
+  remoteClientIpc,
+  type RemoteDesktopEvent,
+} from "./remote/remote-desktop-protocol";
+import { remoteClientInvocationFromIpc } from "./remote/remote-desktop-client-preload";
 import type { DesktopAppState, DesktopAppViewState } from "../contracts/desktop-state";
 import {
   desktopCommands,
@@ -83,6 +128,48 @@ import type {
 import type { SessionDriverEvent } from "@pi-gui/session-driver";
 import type { GenerateThreadTitleOptions } from "@pi-gui/pi-sdk-driver";
 import type { SessionRef, WorkspaceRef } from "@pi-gui/session-driver";
+import type { WorkspaceFolderAdapter, WorkspaceFolderRoot } from "../contracts/workspace-folders";
+
+const remoteDesktopDefaultsDisabled =
+  process.env.PI_REMOTE_DESKTOP_CLIENT === "0" ||
+  process.env.PI_APP_TEST_MODE !== undefined ||
+  process.env.PI_APP_TEST_LANE !== undefined;
+if (process.platform === "darwin" && !remoteDesktopDefaultsDisabled) {
+  const clientConfigPath =
+    process.env.PI_REMOTE_DESKTOP_CLIENT_CONFIG?.trim() ||
+    path.join(homedir(), "Pi", "runtime", "remote-desktop", "client.json");
+  if (existsSync(clientConfigPath)) {
+    process.env.PI_REMOTE_DESKTOP_CLIENT = "1";
+    process.env.PI_REMOTE_DESKTOP_CLIENT_CONFIG = clientConfigPath;
+    process.env.PI_APP_USER_DATA_DIR ||= path.join(homedir(), "Pi", "runtime", "remote-desktop", "gui");
+    // A remote client must not run the managed local provider/profile preparation step.
+    process.env.PI_GUI_INTEGRATED_LAUNCH = "1";
+  }
+}
+if (
+  process.platform === "win32" &&
+  process.env.PI_APP_TEST_MODE === undefined &&
+  process.env.PI_APP_TEST_LANE === undefined
+) {
+  const hostConfigPath =
+    process.env.PI_REMOTE_DESKTOP_HOST_CONFIG?.trim() ||
+    "D:\\Pi\\pi-ecosystem\\.state\\remote-desktop\\host.json";
+  if (existsSync(hostConfigPath)) process.env.PI_REMOTE_DESKTOP_HOST_CONFIG = hostConfigPath;
+}
+const remoteDesktopClientMode = process.env.PI_REMOTE_DESKTOP_CLIENT === "1";
+
+function traceStartup(stage: string): void {
+  if (process.env.PI_APP_STARTUP_TRACE === "1")
+    console.info(`[startup] ${stage}: ${Math.round(performance.now())}ms`);
+}
+function traceStartupDuration(stage: string, startedAt: number): void {
+  if (process.env.PI_APP_STARTUP_TRACE === "1")
+    console.info(`[startup] ${stage}: ${Math.round(performance.now() - startedAt)}ms`);
+}
+traceStartup("main imports loaded");
+handOffManagedWindowsLaunch();
+handOffManagedMacLaunch();
+traceStartup("managed profile ready");
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -94,13 +181,24 @@ protocol.registerSchemesAsPrivileged([
 const isDev = Boolean(process.env.ELECTRON_RENDERER_URL);
 const appTestMode = resolveAppTestMode(process.env.PI_APP_TEST_MODE);
 const windowTestMode = appTestMode ?? "foreground";
+let windowStateRestored = false;
 const devReloadMarkersEnabled = process.env.PI_APP_DEV_RELOAD_MARKERS === "1";
 const TURN_CAPTURE_BACKSTOP_MS = 10_000;
 let store: DesktopAppStore;
+let automationIngress: NativeAutomationIngress | undefined;
 let extensionViewOwner: DesktopExtensionViewOwner | undefined;
 let windowOwner: WindowOwner;
+let remoteDesktopClient: RemoteDesktopHttpClient | undefined;
+let remoteDesktopHost: RemoteDesktopHttpHost | undefined;
+let remoteDesktopHostConfig: RemoteDesktopHostFileConfig | undefined;
+let macWorkspaceFolderAdapter: WorkspaceFolderAdapter | undefined;
+let remoteDesktopClientPreferences: RemoteDesktopClientPreferences =
+  DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES;
+const remoteDesktopBrokers = new Set<RemoteDesktopBroker>();
 const themeManager = new ThemeManager();
 let mainWindow: BrowserWindow | null = null;
+// Windows-only frame shown before the store starts; it receives the content afterwards.
+let launchWindow: BrowserWindow | undefined;
 let notificationManager: NotificationManager | undefined;
 let notificationPermissionService: NotificationPermissionService | undefined;
 let terminalService: TerminalService | undefined;
@@ -114,6 +212,77 @@ function requestApplicationRelaunch(): void {
   applicationRelaunchRequested = true;
   app.relaunch();
   app.quit();
+}
+
+function createWindowsWorkspaceFolderRoots(
+  store: DesktopAppStore,
+  rootIds: ReadonlySet<string>,
+  createRootIds: ReadonlySet<string>,
+) {
+  const records = new Map(store.getWorkspaceRecords().map((record) => [record.id, record]));
+  const roots: WindowsWorkspaceFolderRootConfig[] = [];
+  for (const id of rootIds) {
+    const record = records.get(id);
+    if (!record || !existsSync(record.path)) {
+      if (createRootIds.has(id)) {
+        throw new Error("A configured Windows folder root is unavailable.");
+      }
+      continue;
+    }
+    roots.push({
+      id,
+      label: record.name,
+      workspaceId: id,
+      canCreate: createRootIds.has(id),
+      path: record.path,
+    });
+  }
+  return roots;
+}
+
+async function loadMacWorkspaceFolderAdapter(
+  config: RemoteDesktopMacFoldersConfig,
+): Promise<WorkspaceFolderAdapter> {
+  const discoveryPath = path.resolve(config.configPath);
+  const discoveryDirectory = path.dirname(discoveryPath);
+  if (
+    path.basename(discoveryPath).toLowerCase() !== "mac-discovery.json" ||
+    path.basename(discoveryDirectory).toLowerCase() !== ".state" ||
+    path.basename(path.dirname(discoveryDirectory)).toLowerCase() !== "pi-ecosystem"
+  ) {
+    throw new Error("The configured Mac folder discovery path is not approved.");
+  }
+  const expectedPath = path.resolve(discoveryDirectory, "..", "src", "mac-folder-browser.mjs");
+  const modulePath = path.resolve(config.modulePath);
+  if (modulePath.toLowerCase() !== expectedPath.toLowerCase()) {
+    throw new Error("The configured Mac folder adapter is not an approved host module.");
+  }
+  const [metadata, canonicalPath] = await Promise.all([lstat(modulePath), realpath(modulePath)]);
+  if (!metadata.isFile() || metadata.isSymbolicLink() || canonicalPath.toLowerCase() !== modulePath.toLowerCase()) {
+    throw new Error("The configured Mac folder adapter is unavailable.");
+  }
+  const loaded = (await import(pathToFileURL(modulePath).href)) as {
+    createMacWorkspaceFolderAdapter?: unknown;
+  };
+  if (typeof loaded.createMacWorkspaceFolderAdapter !== "function") {
+    throw new Error("The configured Mac folder adapter has an invalid entry point.");
+  }
+  const adapter = await (
+    loaded.createMacWorkspaceFolderAdapter as (input: {
+      readonly configPath: string;
+      readonly roots: readonly WorkspaceFolderRoot[];
+    }) => Promise<WorkspaceFolderAdapter>
+  )({ configPath: config.configPath, roots: config.roots });
+  if (
+    !adapter ||
+    typeof adapter.listRoots !== "function" ||
+    typeof adapter.list !== "function" ||
+    typeof adapter.open !== "function" ||
+    typeof adapter.create !== "function"
+  ) {
+    throw new Error("The configured Mac folder adapter is unavailable.");
+  }
+  return adapter;
 }
 
 interface OrchestrationRuntimeToolTestInput {
@@ -169,6 +338,8 @@ async function runScheduledTaskRuntimeToolForTest(
 
 let stopNotifications: (() => void) | undefined;
 let stopUpdateChecker: (() => void) | undefined;
+let signIns: ReturnType<typeof startSignInMonitor> | undefined;
+let stopLimitRefresh: (() => void) | undefined;
 let stopPruningTerminals: (() => void) | undefined;
 let retainedTerminalWorkspacePathSignature = "";
 const terminalFocusedWebContentsIds = new Set<number>();
@@ -351,12 +522,12 @@ function openMcpSignInUrl(url: string): void {
     console.error(
       `Refusing to open an MCP sign-in URL${parsed ? ` on ${parsed.origin}` : " that is not http or https"}`,
     );
-    showMcpSignInUrl(url, "pi-gui opens only https links, or http links on this computer.");
+    showMcpSignInUrl(url, "Pegasus opens only https links, or http links on this computer.");
     return;
   }
   shell.openExternal(parsed.toString()).catch((error: unknown) => {
     console.error(`Failed to open an MCP sign-in URL on ${parsed.origin}`, error);
-    showMcpSignInUrl(parsed.toString(), "pi-gui could not open your browser.");
+    showMcpSignInUrl(parsed.toString(), "Pegasus could not open your browser.");
   });
 }
 
@@ -365,7 +536,7 @@ function showMcpSignInUrl(url: string, reason: string): void {
   const window = mainWindow && canPublishToWindow(mainWindow) ? mainWindow : undefined;
   const options: MessageBoxOptions = {
     type: "warning",
-    title: "pi-gui",
+    title: "Pegasus",
     message: "Open this MCP sign-in link yourself",
     detail: `${reason} Check the link before you open it:\n\n${url}`,
     buttons: ["Copy link", "Close"],
@@ -444,12 +615,29 @@ function dispatchCloseFocusedSurface(window: BrowserWindow, event: Electron.Even
 // resize never flash another theme's colour.
 function currentWindowBackground(): string {
   return windowBackgroundFor(
-    store?.snapshot().themePresetId ?? "default",
+    remoteDesktopClientMode
+      ? remoteDesktopClientPreferences.themePresetId
+      : store?.snapshot().themePresetId ?? "default",
     themeManager.getResolvedTheme(),
   );
 }
 
-// Windows created transparent keep their glass until the next launch.
+function nativeWindowTransparencyEnabled(): boolean {
+  return remoteDesktopClientMode
+    ? remoteDesktopClientPreferences.enableTransparency
+    : (store?.snapshot().enableTransparency ?? true);
+}
+
+function isDesktopAppState(value: unknown): value is DesktopAppState {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Array.isArray((value as { readonly workspaces?: unknown }).workspaces)
+  );
+}
+
+// Opaque windows track the current theme background while glass is disabled.
 const opaqueAppWindows = new Set<BrowserWindow>();
 
 function refreshWindowBackgrounds(): void {
@@ -458,21 +646,73 @@ function refreshWindowBackgrounds(): void {
   for (const window of opaqueAppWindows) {
     if (!window.isDestroyed()) window.setBackgroundColor(color);
   }
+  if (process.platform === "win32") {
+    for (const window of BrowserWindow.getAllWindows()) {
+      if (!window.isDestroyed()) {
+        window.setTitleBarOverlay(windowsTitleBarOverlay());
+        setWindowTransparency(window, nativeWindowTransparencyEnabled());
+      }
+    }
+  }
 }
 
-function createWindow(): BrowserWindow {
+// The hidden Windows title bar keeps its caption buttons as an overlay at the
+// topbar's height; their glyphs follow the theme, their background stays clear.
+function windowsTitleBarOverlay(): Electron.TitleBarOverlayOptions {
+  const dark = themeManager.getResolvedTheme() === "dark";
+  return { color: "#00000000", symbolColor: dark ? "#ffffffd9" : "#000000d9", height: 48 };
+}
+
+function supportsNativeWindowGlass(): boolean {
+  if (process.platform === "darwin") return true;
+  if (process.platform !== "win32") return false;
+  const build = Number(process.getSystemVersion().split(".")[2]);
+  return Number.isInteger(build) && build >= 22621;
+}
+
+function setWindowTransparency(window: BrowserWindow, enabled: boolean): void {
+  const nativeGlassEnabled = enabled && supportsNativeWindowGlass();
+  window.setBackgroundColor(nativeGlassEnabled ? "#00000000" : currentWindowBackground());
+  if (process.platform === "darwin") {
+    window.setVibrancy(nativeGlassEnabled ? "under-window" : null);
+  } else if (process.platform === "win32") {
+    // Apply DWM material after updating the underlying window surface.
+    window.setBackgroundMaterial(nativeGlassEnabled ? "acrylic" : "none");
+  }
+  if (nativeGlassEnabled) {
+    opaqueAppWindows.delete(window);
+  } else {
+    opaqueAppWindows.add(window);
+  }
+}
+function createWindow({ deferContent = false }: { deferContent?: boolean } = {}): BrowserWindow {
   const backgroundTestMode = windowTestMode === "background";
-  const enableTransparency = store ? store.snapshot().enableTransparency : false;
+  const enableTransparency = nativeWindowTransparencyEnabled();
+  const nativeGlassAvailable = supportsNativeWindowGlass();
+  const nativeGlassEnabled = enableTransparency && nativeGlassAvailable;
+  const macVibrancyEnabled = process.platform === "darwin" && nativeGlassEnabled;
+  // Acrylic blurs what is behind the window (frosted, like Windows Terminal);
+  // Mica only tints with the wallpaper.
+  const windowsGlassMaterial =
+    process.platform === "win32" ? (nativeGlassEnabled ? "acrylic" : "none") : undefined;
+  // The first window of a launch reopens with the size and place it was closed in (not in tests).
+  const restored =
+    !appTestMode && !windowStateRestored ? loadWindowState(configuredUserDataDir) : undefined;
+  windowStateRestored = true;
   const window = new BrowserWindow({
-    width: 1480,
-    height: 980,
+    ...(restored?.bounds ?? { width: 1480, height: 980 }),
     minWidth: 560,
     minHeight: 600,
-    transparent: enableTransparency,
-    vibrancy: process.platform === "darwin" && enableTransparency ? "under-window" : undefined,
-    titleBarStyle: "hiddenInset",
+    // Windows materials need no transparent window, and acrylic over one stops
+    // drawing the web contents.
+    transparent: process.platform === "darwin",
+    vibrancy: macVibrancyEnabled ? "under-window" : undefined,
+    visualEffectState: macVibrancyEnabled ? "followWindow" : undefined,
+    backgroundMaterial: windowsGlassMaterial,
+    titleBarStyle: process.platform === "win32" ? "hidden" : "hiddenInset",
+    titleBarOverlay: process.platform === "win32" ? windowsTitleBarOverlay() : undefined,
     autoHideMenuBar: process.platform !== "darwin",
-    backgroundColor: enableTransparency ? "#00000000" : currentWindowBackground(),
+    backgroundColor: nativeGlassEnabled ? "#00000000" : currentWindowBackground(),
     trafficLightPosition: { x: 18, y: 18 },
     show: false,
     icon: appIcon,
@@ -485,6 +725,29 @@ function createWindow(): BrowserWindow {
       backgroundThrottling: !backgroundTestMode,
     },
   });
+
+  if (process.platform === "win32") {
+    const restoreMaterial = () =>
+      setWindowTransparency(window, nativeWindowTransparencyEnabled());
+    window.webContents.on("did-finish-load", restoreMaterial);
+    window.on("maximize", restoreMaterial);
+    window.on("unmaximize", restoreMaterial);
+    window.on("restore", restoreMaterial);
+  }
+
+  if (!appTestMode) trackWindowState(window, configuredUserDataDir);
+  if (restored?.maximized)
+    window.once("show", () =>
+      queueMicrotask(() => {
+        if (!window.isDestroyed()) window.maximize();
+      }),
+    );
+  if (restored?.fullScreen)
+    window.once("show", () =>
+      queueMicrotask(() => {
+        if (!window.isDestroyed()) window.setFullScreen(true);
+      }),
+    );
 
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (!isInAppNavigationUrl(url)) {
@@ -545,13 +808,23 @@ function createWindow(): BrowserWindow {
         console.error("[main] Closing the window after its draft flush failed", error);
       });
   });
-  window.once("ready-to-show", () => {
-    if (!backgroundTestMode) {
-      window.show();
-    }
-  });
+  if (deferContent) {
+    // Windows only lets a fresh launch take the foreground until the user acts
+    // elsewhere, so show the empty frame now instead of after startup finishes.
+    window.show();
+    window.focus();
+  } else {
+    window.once("ready-to-show", () => {
+      if (!backgroundTestMode) {
+        window.show();
+        app.focus({ steal: true });
+        window.focus();
+      }
+    });
+  }
   window.webContents.on("before-input-event", (event, input) => {
-    if (input.type !== "keyDown") {
+    // A launch frame has no app content or window owner yet.
+    if (input.type !== "keyDown" || !window.webContents.getURL()) {
       return;
     }
 
@@ -639,6 +912,21 @@ function createWindow(): BrowserWindow {
     }
   });
 
+  if (!deferContent) {
+    loadAppRenderer(window);
+  }
+
+  window.once("closed", () => opaqueAppWindows.delete(window));
+  if (!nativeGlassEnabled) {
+    opaqueAppWindows.add(window);
+  }
+
+  return window;
+}
+
+function loadAppRenderer(window: BrowserWindow): void {
+  traceStartup("renderer load started");
+  window.webContents.once("did-finish-load", () => traceStartup("renderer loaded"));
   if (isDev) {
     void window.loadURL(process.env.ELECTRON_RENDERER_URL as string).catch((error: unknown) => {
       console.error("[main] loadURL failed", error);
@@ -651,17 +939,15 @@ function createWindow(): BrowserWindow {
       console.error("[main] loadURL failed", error);
     });
   }
-
-  if (!enableTransparency) {
-    opaqueAppWindows.add(window);
-    window.once("closed", () => opaqueAppWindows.delete(window));
-  }
-
-  return window;
 }
 
-function createAppWindow(sourceView?: DesktopAppViewState): BrowserWindow {
-  const window = createWindow();
+function createAppWindow(sourceView?: DesktopAppViewState, frame?: BrowserWindow): BrowserWindow {
+  const window = frame ?? createWindow();
+  if (frame) {
+    // The frame was built before saved settings loaded; apply them, then load content.
+    setWindowTransparency(frame, nativeWindowTransparencyEnabled());
+    loadAppRenderer(frame);
+  }
   const webContentsId = window.webContents.id;
   windowOwner.add(window, sourceView);
   themeManager.trackWindow(window);
@@ -751,9 +1037,34 @@ async function addPickedWorkspace(
 
 async function pickWorkspaceViaDialog(
   parentWindow?: BrowserWindow | null,
+  createNew = false,
 ): Promise<DesktopAppState> {
   const window = resolveDialogWindow(parentWindow);
-  const workspacePath = await pickWorkspacePathViaDialog(window);
+  let workspacePath: string | undefined;
+  if (createNew) {
+    const options = { title: "Create project folder", buttonLabel: "Create folder" };
+    const result = window
+      ? await dialog.showSaveDialog(window, options)
+      : await dialog.showSaveDialog(options);
+    if (!result.canceled && result.filePath) {
+      // Never replace an existing file/directory, or create unchosen parents.
+      try {
+        await mkdir(result.filePath);
+        workspacePath = result.filePath;
+      } catch {
+        const message = {
+          type: "error" as const,
+          title: "Pegasus",
+          message:
+            "Couldn't create this folder. Choose a new name in an existing folder, or use Open folder for an existing project.",
+        };
+        if (window) await dialog.showMessageBox(window, message);
+        else await dialog.showMessageBox(message);
+      }
+    }
+  } else {
+    workspacePath = await pickWorkspacePathViaDialog(window);
+  }
   if (!workspacePath) {
     return stateForWindow(window);
   }
@@ -769,11 +1080,11 @@ async function runManualUpdateCheck(): Promise<void> {
     const result = await checkForUpdate();
 
     if (result.status === "update-available") {
-      // The manual menu path always confirms with a dialog — a notification may
+      // The manual menu path always confirms with a dialog â€” a notification may
       // be silently suppressed if the OS permission is denied.
       const choice = await showDialog({
         type: "info",
-        title: "pi-gui",
+        title: "Pegasus",
         message: `Version ${result.latestVersion} is available.`,
         detail: `You have ${result.currentVersion}.`,
         buttons: ["Download", "Later"],
@@ -789,7 +1100,7 @@ async function runManualUpdateCheck(): Promise<void> {
     if (result.status === "up-to-date") {
       await showDialog({
         type: "info",
-        title: "pi-gui",
+        title: "Pegasus",
         message: `You're up to date on version ${result.currentVersion}.`,
         buttons: ["OK"],
       });
@@ -798,7 +1109,7 @@ async function runManualUpdateCheck(): Promise<void> {
 
     await showDialog({
       type: "warning",
-      title: "pi-gui",
+      title: "Pegasus",
       message: "Could not check for updates right now.",
       detail: result.message,
       buttons: ["OK"],
@@ -807,7 +1118,7 @@ async function runManualUpdateCheck(): Promise<void> {
     console.error("pi-gui: manual update check failed:", error);
     await showDialog({
       type: "warning",
-      title: "pi-gui",
+      title: "Pegasus",
       message: "Could not check for updates right now.",
       detail: error instanceof Error ? error.message : String(error),
       buttons: ["OK"],
@@ -828,7 +1139,7 @@ function installApplicationMenu(): void {
         { type: "separator" },
         {
           id: CHECK_FOR_UPDATES_MENU_ITEM_ID,
-          label: "Check for Updates…",
+          label: "Check for Updatesâ€¦",
           click: () => {
             void runManualUpdateCheck().catch((error: unknown) => {
               console.error("[main] runManualUpdateCheck failed", error);
@@ -867,7 +1178,7 @@ function installApplicationMenu(): void {
         { type: "separator" },
         {
           id: OPEN_FOLDER_MENU_ITEM_ID,
-          label: "Open Folder…",
+          label: "Open Folderâ€¦",
           accelerator: "Command+O",
           click: () => {
             void pickWorkspaceViaDialog(mainWindow).catch((error: unknown) => {
@@ -917,7 +1228,7 @@ if (augmentedPath.changed && !(appTestMode && process.env.PI_APP_TEST_EXACT_PATH
   process.env.PATH = augmentedPath.path;
 }
 
-app.setName("pi");
+app.setName("Pegasus");
 
 const configuredUserDataDir = process.env.PI_APP_USER_DATA_DIR?.trim() || app.getPath("userData");
 app.setPath("userData", configuredUserDataDir);
@@ -930,8 +1241,10 @@ if (!hasSingleInstanceLock) {
 }
 
 app.on("second-instance", () => {
-  const window = windowOwner.foreground();
+  // A repeat launch can arrive before the window owner exists.
+  const window = windowOwner?.foreground() ?? launchWindow;
   if (!window) {
+    if (windowOwner && windowOwner.size() === 0) createAppWindow();
     return;
   }
   if (window.isMinimized()) {
@@ -946,6 +1259,26 @@ app
   .then(async () => {
     if (!hasSingleInstanceLock) {
       return;
+    }
+    if (remoteDesktopClientMode) {
+      if (process.platform !== "darwin") {
+        throw new Error("Remote desktop client mode is supported only on macOS.");
+      }
+      const configPath = process.env.PI_REMOTE_DESKTOP_CLIENT_CONFIG?.trim();
+      if (!configPath) throw new Error("Remote desktop client configuration is unavailable.");
+      const config = await readPrivateRemoteDesktopConfig(
+        configPath,
+        process.platform,
+        parseRemoteDesktopClientConfig,
+      );
+      remoteDesktopClientPreferences = await loadRemoteDesktopClientPreferences(
+        configuredUserDataDir,
+      );
+      remoteDesktopClient = new RemoteDesktopHttpClient(config);
+    }
+    traceStartup("electron ready");
+    if (process.platform === "win32" && windowTestMode !== "background") {
+      launchWindow = createWindow({ deferContent: true });
     }
 
     // On macOS, packaged builds already render the dock icon from `icon.icns`
@@ -1041,7 +1374,9 @@ app
         windowOwner?.isSessionVisibleInAnotherWindow(sessionRef) ?? false,
       driverOptions,
       generateThreadTitleOverride: async (workspace, options) =>
-        generateThreadTitleOverride?.(workspace, options),
+        process.env.PI_APP_GENERATE_THREAD_TITLES === "0"
+          ? null
+          : generateThreadTitleOverride?.(workspace, options),
     });
     windowOwner = new WindowOwner(store, {
       onActiveWindowChanged: (window) => {
@@ -1050,8 +1385,112 @@ app
         notificationPermissionService?.trackWindow(window);
       },
     });
-    await store.initialize();
-    themeManager.setMode(store.snapshot().themeMode);
+    traceStartup("store initialization started");
+    if (!remoteDesktopClientMode) {
+      await store.initialize();
+      traceStartup("store initialized");
+    } else {
+      traceStartup("remote client skipped local store initialization");
+    }
+    if (!remoteDesktopClientMode && process.platform === "win32") {
+      const hostConfigPath = process.env.PI_REMOTE_DESKTOP_HOST_CONFIG?.trim();
+      if (hostConfigPath) {
+        remoteDesktopHostConfig = await readPrivateRemoteDesktopConfig(
+          hostConfigPath,
+          process.platform,
+          parseRemoteDesktopHostConfig,
+        );
+      }
+      if (remoteDesktopHostConfig?.macFolders) {
+        const macFolderAdapterStarted = performance.now();
+        macWorkspaceFolderAdapter = await loadMacWorkspaceFolderAdapter(
+          remoteDesktopHostConfig.macFolders,
+        );
+        traceStartupDuration("Mac folder adapter", macFolderAdapterStarted);
+      }
+
+      const createRootIds = new Set(
+        remoteDesktopHostConfig?.clients.flatMap((client) => client.folderRootWorkspaceIds ?? []) ?? [],
+      );
+      const allWorkspaceIds = new Set(store.getWorkspaceRecords().map((record) => record.id));
+      const localFolderService: WorkspaceFolderService = createWorkspaceFolderService({
+        windowsRoots: createWindowsWorkspaceFolderRoots(
+          store,
+          allWorkspaceIds,
+          createRootIds,
+        ),
+        ...(macWorkspaceFolderAdapter ? { mac: macWorkspaceFolderAdapter } : {}),
+        addWorkspacePath: (workspacePath) => store.addWorkspace(workspacePath),
+      });
+      registerWorkspaceFolderIpc(windowOwner, localFolderService.adapters);
+    }
+    const automationManifest = process.env.PI_APP_AUTOMATION_MANIFEST;
+    const automationDescriptor = process.env.PI_APP_AUTOMATION_DESCRIPTOR;
+    if (automationManifest && automationDescriptor) {
+      if (!path.isAbsolute(automationManifest) || !path.isAbsolute(automationDescriptor)) {
+        throw new Error("Automation setup paths must be absolute.");
+      }
+      automationIngress = await startAutomationIngress({
+        userDataDir: configuredUserDataDir,
+        config: {
+          loadRoutes: async () => {
+            const parsed: unknown = JSON.parse(await readFile(automationManifest, "utf8"));
+            if (!parsed || typeof parsed !== "object" || !("routes" in parsed)) {
+              throw new Error("Automation routes are unavailable.");
+            }
+            const routes = parsed.routes;
+            if (!routes || typeof routes !== "object" || Array.isArray(routes)) {
+              throw new Error("Automation routes are invalid.");
+            }
+            const result: Record<string, AutomationRoute> = {};
+            for (const [routeId, value] of Object.entries(routes as Record<string, unknown>)) {
+              if (
+                !/^\d+\/\d+$/.test(routeId) ||
+                !value ||
+                typeof value !== "object" ||
+                !("workspacePath" in value) ||
+                typeof value.workspacePath !== "string" ||
+                !path.isAbsolute(value.workspacePath)
+              ) {
+                throw new Error("Automation route binding is invalid.");
+              }
+              result[routeId] = {
+                workspacePath: value.workspacePath,
+                title:
+                  "title" in value && typeof value.title === "string" ? value.title : undefined,
+                allowThreads: "allowThreads" in value && value.allowThreads === true,
+              };
+            }
+            return result;
+          },
+        },
+        store: {
+          getState: () => store.getState(),
+          createSession: async (input) => {
+            const created = await store.createSession(input);
+            if (created.selectedWorkspaceId !== input.workspaceId || !created.selectedSessionId) {
+              throw new Error("Native thread creation did not return its reference.");
+            }
+            return { workspaceId: input.workspaceId, sessionId: created.selectedSessionId };
+          },
+          ensureSessionReady: (ref) => store.ensureSessionReady(ref),
+          submitComposer: (ref, text) => store.submitComposer(ref, text),
+          cancelCurrentRun: (ref) => store.cancelCurrentRun(ref),
+          subscribeToSessionEvents: (listener) => store.subscribeToSessionEvents(listener),
+        },
+      });
+      await writeFile(
+        automationDescriptor,
+        JSON.stringify({
+          origin: automationIngress.origin,
+          token: automationIngress.token,
+        }),
+        { mode: 0o600 },
+      );
+    }
+    themeManager.setMode(
+      remoteDesktopClientMode ? remoteDesktopClientPreferences.themeMode : store.snapshot().themeMode,
+    );
     integratedTerminalShell = (await store.getState()).integratedTerminalShell;
     nativeTheme.on("updated", refreshWindowBackgrounds);
     let windowBackgroundPresetId = store.snapshot().themePresetId;
@@ -1135,6 +1574,43 @@ app
     if (!isDev) {
       stopUpdateChecker = initUpdateChecker();
     }
+    if (!remoteDesktopClientMode && !isDev && !process.env.PI_APP_TEST_MODE) {
+      const piState = path.dirname(resolveAgentDir());
+      // Every provider's sign-in, hourly; one notification when one stops working or is about to.
+      signIns = startSignInMonitor(
+        {
+          stateDir: piState,
+          memoryFile: path.join(app.getPath("userData"), "sign-in-notices.json"),
+          claudeCommand: process.env.PI_CLAUDE_CODE_COMMAND,
+        },
+        (problem) => {
+          if (!Notification.isSupported()) return;
+          const notice = new Notification({
+            title:
+              problem.state === "expiring"
+                ? `${problem.name}: sign-in ends soon`
+                : `${problem.name}: signed out`,
+            body: problem.fix ?? "Sign in again to keep using it in Pi.",
+          });
+          notice.on("click", () => {
+            const window = windowOwner.foreground();
+            window?.show();
+            window?.focus();
+            void store.setActiveView("usage").catch(() => undefined);
+          });
+          notice.show();
+        },
+      );
+      // Plan limits hourly too, so "Limited until â€¦" shows everywhere without the Usage page open.
+      const refreshLimits = () =>
+        void readAccountLimits(path.join(piState, "claude")).catch(() => undefined);
+      const firstLimits = setTimeout(refreshLimits, 25_000);
+      const hourlyLimits = setInterval(refreshLimits, 60 * 60_000);
+      stopLimitRefresh = () => {
+        clearTimeout(firstLimits);
+        clearInterval(hourlyLimits);
+      };
+    }
 
     registerDesktopIpc({
       windows: windowOwner,
@@ -1169,7 +1645,7 @@ app
             : "pi desktop ready",
         theme: themeManager,
         openExternal: openExternalLink,
-        pickWorkspace: (window) => pickWorkspaceViaDialog(window),
+        pickWorkspace: (window, createNew) => pickWorkspaceViaDialog(window, createNew),
         createLoginCallbacks: (window) => createRuntimeLoginCallbacks(window),
         probeCustomProviderModels,
         notificationPermission: () => notificationPermissionService,
@@ -1190,12 +1666,12 @@ app
           }
         },
         setTransparency: (enabled) => {
-          if (process.platform !== "darwin") {
+          if (process.platform !== "darwin" && process.platform !== "win32") {
             return;
           }
           for (const window of windowOwner.allWindows()) {
             if (!window.isDestroyed()) {
-              window.setVibrancy(enabled ? "under-window" : null);
+              setWindowTransparency(window, enabled);
             }
           }
         },
@@ -1220,6 +1696,11 @@ app
           attachments.flatMap(validateComposerAttachmentPayload),
         listWorkspaceFiles,
         readWorkspaceFile,
+        getUsageReport: () => collectUsage(),
+        getAccountStates: () => readAccountStates(),
+        getAccountLimits: (cachedOnly) =>
+          readAccountLimits(path.join(path.dirname(resolveAgentDir()), "claude"), { cachedOnly }),
+        getSignIns: () => signIns?.current() ?? [],
         revealWorkspaceFile: async (workspacePath, filePath) => {
           const resolved = await resolveExistingWorkspacePath(workspacePath, filePath);
           shell.showItemInFolder(resolved);
@@ -1231,13 +1712,145 @@ app
       },
     });
 
-    createAppWindow();
+    if (remoteDesktopClient) {
+      ipcMain.handle(remoteClientIpc.invoke, async (event, payload: unknown) => {
+        const window = windowOwner.windowForSender(event.sender);
+        if (event.senderFrame !== event.sender.mainFrame || window.isDestroyed()) {
+          throw new Error("Remote desktop calls must come from the app's main frame.");
+        }
+        const { method, args } = remoteClientInvocationFromIpc(payload);
+        const result = await remoteDesktopClient!.invoke(method, args);
+        return isDesktopAppState(result)
+          ? { ...result, ...remoteDesktopClientPreferences }
+          : result;
+      });
+      ipcMain.handle(remoteClientIpc.getLocalPreferences, (event) => {
+        const window = windowOwner.windowForSender(event.sender);
+        if (event.senderFrame !== event.sender.mainFrame || window.isDestroyed()) {
+          throw new Error("Remote desktop calls must come from the app's main frame.");
+        }
+        return remoteDesktopClientPreferences;
+      });
+      ipcMain.handle(remoteClientIpc.setLocalPreferences, async (event, payload: unknown) => {
+        const window = windowOwner.windowForSender(event.sender);
+        if (event.senderFrame !== event.sender.mainFrame || window.isDestroyed()) {
+          throw new Error("Remote desktop calls must come from the app's main frame.");
+        }
+        const patch = validateRemoteDesktopClientPreferencesPatch(payload);
+        const next = { ...remoteDesktopClientPreferences, ...patch };
+        await persistRemoteDesktopClientPreferences(configuredUserDataDir, next);
+        remoteDesktopClientPreferences = next;
+        if (patch.themeMode !== undefined) {
+          themeManager.setMode(next.themeMode);
+          refreshWindowBackgrounds();
+        }
+        if (patch.themePresetId !== undefined) refreshWindowBackgrounds();
+        if (patch.enableTransparency !== undefined) {
+          for (const currentWindow of windowOwner.allWindows()) {
+            if (!currentWindow.isDestroyed()) {
+              setWindowTransparency(currentWindow, next.enableTransparency);
+            }
+          }
+        }
+        return remoteDesktopClientPreferences;
+      });
+      remoteDesktopClient.subscribe((event: RemoteDesktopEvent) => {
+        for (const window of windowOwner.allWindows()) {
+          if (window.isDestroyed() || window.webContents.isDestroyed()) continue;
+          if (event.type === "stateChanged") {
+            window.webContents.send(remoteClientIpc.stateChanged, {
+              ...event.state,
+              ...remoteDesktopClientPreferences,
+            });
+          } else {
+            window.webContents.send(remoteClientIpc.selectedTranscriptChanged, event.transcript);
+          }
+        }
+      });
+      remoteDesktopClient.startEvents();
+    }
+
+    if (remoteDesktopHostConfig) {
+      const remoteDesktopBrokerStarted = performance.now();
+      if (process.platform !== "win32") {
+        throw new Error("Remote desktop host mode is supported only on Windows.");
+      }
+      const hostConfig = remoteDesktopHostConfig;
+      const brokers = new Map<string, RemoteDesktopBroker>();
+      try {
+        for (const client of hostConfig.clients) {
+          const folderRootIds = new Set(client.folderRootWorkspaceIds ?? []);
+          const visibleRootIds = new Set([...client.workspaceIds, ...folderRootIds]);
+          const clientFolderService = createWorkspaceFolderService({
+            windowsRoots: createWindowsWorkspaceFolderRoots(
+              store,
+              visibleRootIds,
+              folderRootIds,
+            ),
+            ...(macWorkspaceFolderAdapter ? { mac: macWorkspaceFolderAdapter } : {}),
+            addWorkspacePath: (workspacePath) => store.addWorkspace(workspacePath),
+          });
+          const authorizedWorkspaceIds = new Set(client.workspaceIds);
+          const futureWorkspaceRootPaths = new Map<string, string>();
+          for (const rootId of folderRootIds) {
+            const rootPath = clientFolderService.windowsRootPaths.get(rootId);
+            if (!rootPath) throw new Error("A configured Windows folder root is unavailable.");
+            futureWorkspaceRootPaths.set(rootId, rootPath);
+            const containment = createRemoteWorkspaceFolders(new Map([[rootId, rootPath]]));
+            for (const record of store.getWorkspaceRecords()) {
+              try {
+                if (await containment.contains(rootId, record.path, true)) {
+                  authorizedWorkspaceIds.add(record.id);
+                }
+              } catch {
+                // Missing and non-canonical paths are not eligible descendants of a trusted root.
+              }
+            }
+          }
+          const pageUrl = process.env.ELECTRON_RENDERER_URL
+            ? new URL("remote-broker.html", `${process.env.ELECTRON_RENDERER_URL.replace(/\/$/u, "")}/`).href
+            : pathToFileURL(path.join(__dirname, "..", "renderer", "remote-broker.html")).href;
+          const broker = await RemoteDesktopBroker.create({
+            clientId: client.id,
+            workspaceIds: [...authorizedWorkspaceIds],
+            workspaceFolders: clientFolderService.adapters,
+            windowsFolderRootPaths: clientFolderService.windowsRootPaths,
+            futureWorkspaceRootPaths,
+            initialWorkspaceId: client.initialWorkspaceId,
+            initialSessionId: client.initialSessionId,
+            preloadPath: path.join(__dirname, "..", "preload", "remote-broker-preload.js"),
+            pageUrl,
+            windows: windowOwner,
+            sendText: ({ sessionRef, text }) => store.deliverRemoteInstruction(sessionRef, text),
+          });
+          brokers.set(client.id, broker);
+          remoteDesktopBrokers.add(broker);
+        }
+        remoteDesktopHost = await startRemoteDesktopHttpHost({ ...hostConfig, brokers });
+      } catch (error) {
+        for (const broker of brokers.values()) broker.close();
+        remoteDesktopBrokers.clear();
+        throw error;
+      }
+      traceStartupDuration(
+        `remote desktop broker setup (${remoteDesktopHostConfig.clients.length} clients)`,
+        remoteDesktopBrokerStarted,
+      );
+    }
+
+    // A launch frame closed during startup means the app is already quitting.
+    if (!launchWindow) {
+      createAppWindow();
+    } else if (!launchWindow.isDestroyed()) {
+      createAppWindow(undefined, launchWindow);
+    }
+    launchWindow = undefined;
     void notificationPermissionService.getCurrentStatus().catch((error: unknown) => {
       console.error("[main] getCurrentStatus failed", error);
     });
 
     app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) {
+      if ((windowOwner?.size() ?? BrowserWindow.getAllWindows().length) === 0) {
         createAppWindow();
         if (notificationPermissionService) {
           void notificationPermissionService.getCurrentStatus().catch((error: unknown) => {
@@ -1264,6 +1877,8 @@ app.on("window-all-closed", () => {
     notificationPermissionService = undefined;
     stopUpdateChecker?.();
     stopUpdateChecker = undefined;
+    signIns?.stop();
+    stopLimitRefresh?.();
     stopPruningTerminals?.();
     stopPruningTerminals = undefined;
     terminalService?.dispose();
@@ -1280,10 +1895,13 @@ app.on("before-quit", (event) => {
   notificationPermissionService = undefined;
   stopUpdateChecker?.();
   stopUpdateChecker = undefined;
+  signIns?.stop();
+  stopLimitRefresh?.();
   stopPruningTerminals?.();
   stopPruningTerminals = undefined;
   terminalService?.dispose();
   terminalService = undefined;
+  remoteDesktopClient?.close();
   if (quitFlush === "done" || !store) {
     return;
   }
@@ -1293,14 +1911,28 @@ app.on("before-quit", (event) => {
   if (quitFlush === "flushing") return;
   quitFlush = "flushing";
   const quittingStore = store;
+  const stopRemoteTransport = Promise.all([
+    remoteDesktopHost?.close(),
+    ...[...remoteDesktopBrokers].map(async (broker) => broker.close()),
+  ]).then(() => {
+    remoteDesktopHost = undefined;
+    remoteDesktopBrokers.clear();
+  });
   // Renderers send their debounced drafts first so the store flush below includes them.
   const flush = composerDraftFlusher
     .flush(windowOwner.allWindows())
-    .then(() => Promise.all([quittingStore.flushPersistence(), extensionViewOwner?.dispose()]))
+    .then(async () => {
+      await automationIngress?.close();
+      await stopRemoteTransport;
+      return Promise.all([
+        remoteDesktopClientMode ? Promise.resolve() : quittingStore.flushPersistence(),
+        extensionViewOwner?.dispose(),
+      ]);
+    })
     .catch((error: unknown) => {
       console.error("pi-gui: persistence flush failed during quit:", error);
     });
-  // Never let a hung flush block quit forever — quit after a bounded wait.
+  // Never let a hung flush block quit forever â€” quit after a bounded wait.
   const flushDeadline = new Promise<void>((resolve) => {
     setTimeout(() => {
       console.warn("pi-gui: persistence flush timed out during quit; quitting anyway.");
@@ -1497,7 +2129,7 @@ async function promptForText(
     maximizable: false,
     fullscreenable: false,
     autoHideMenuBar: process.platform !== "darwin",
-    title: "pi-gui",
+    title: "Pegasus",
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
   });
 

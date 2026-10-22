@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from "react";
 import { BUILTIN_TOOL_KINDS, type BuiltinToolKind } from "../../../contracts/workbench";
-import { DiffIcon, FileIcon, TerminalIcon } from "../../ui/icons";
+import { DiffIcon, FileIcon, SparkIcon, TerminalIcon } from "../../ui/icons";
 
 interface BuiltinToolDefinition {
   readonly label: string;
@@ -13,6 +13,11 @@ interface BuiltinToolDefinition {
 
 /** Presentation for every built-in tool; a missing kind fails the build. */
 export const BUILTIN_TOOLS = {
+  agents: {
+    label: "Agents",
+    description: "See every parallel agent and working thread",
+    Icon: SparkIcon,
+  },
   files: { label: "Files", description: "Browse files in this checkout", Icon: FileIcon },
   changes: {
     label: "Review",

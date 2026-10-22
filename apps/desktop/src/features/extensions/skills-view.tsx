@@ -3,11 +3,9 @@ import type { WorkspaceRecord } from "../../../contracts/desktop-state";
 import { titleCase } from "../../lib/string-utils";
 import { SkillIcon } from "../../ui/icons";
 import { SettingsGroup, SettingsRow } from "../settings/settings-utils";
-import { sourceScopeGroupLabel } from "./extension-display";
+import { SCOPE_GROUP_ORDER, sourceScopeGroupLabel } from "./extension-display";
 import { displayPath, ResourceDetail } from "./resource-detail";
 import { ResourceEmptyState, ResourceList, type ResourceListGroup } from "./resource-list";
-
-const GROUP_ORDER = ["Workspace", "User", "This session"];
 
 interface SkillsTabProps {
   readonly workspace: WorkspaceRecord;
@@ -39,7 +37,7 @@ export function SkillsTab({
         body={
           searching
             ? "Try another name, description or slash command."
-            : "Skills are discovered in this workspace and your user skill folders. Create one, or refresh after adding one."
+            : "Global skills load in every project; project skills come from this folder's .pi/skills. Create one, or refresh after adding one."
         }
       />
     ) : (
@@ -119,7 +117,7 @@ function groupSkills(
   skills: readonly RuntimeSkillRecord[],
   onToggleSkill: (filePath: string, enabled: boolean) => void,
 ): readonly ResourceListGroup[] {
-  return GROUP_ORDER.map((label) => ({
+  return SCOPE_GROUP_ORDER.map((label) => ({
     label,
     items: skills
       .filter((skill) => sourceScopeGroupLabel(skill.scope) === label)

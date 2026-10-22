@@ -1,4 +1,5 @@
 import {
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -13,7 +14,7 @@ import type {
   SessionTreeSnapshot,
 } from "@pi-gui/session-driver/types";
 import { trapDialogFocus } from "../../ui/dialog-focus";
-import { ChevronDownIcon, ChevronRightIcon } from "../../ui/icons";
+import { ChevronDownIcon, ChevronRightIcon, CloseIcon } from "../../ui/icons";
 
 interface TreeModalProps {
   readonly tree?: SessionTreeSnapshot;
@@ -137,13 +138,17 @@ export function TreeModal({
     };
   }, [loading, step, summaryMode, tree]);
 
+  const deferredSearch = useDeferredValue(search);
   const displayRows = useMemo(
-    () => (tree ? buildVisibleRows(tree.nodes, expandedIds, search, tree.leafId) : []),
-    [expandedIds, search, tree],
+    () => (tree ? buildVisibleRows(tree.nodes, expandedIds, deferredSearch, tree.leafId) : []),
+    [expandedIds, deferredSearch, tree],
   );
-  const selectedRow = displayRows.find((row) => row.node.id === selectedId);
+  const effectiveSelectedId = displayRows.some((row) => row.node.id === selectedId)
+    ? selectedId
+    : (displayRows[0]?.node.id ?? "");
+  const selectedRow = displayRows.find((row) => row.node.id === effectiveSelectedId);
   const currentLeafId = tree?.leafId ?? null;
-  const currentLeafSelected = selectedId !== "" && selectedId === currentLeafId;
+  const currentLeafSelected = effectiveSelectedId !== "" && effectiveSelectedId === currentLeafId;
   const searching = search.trim().length > 0;
 
   const cancelAutoScroll = () => {
@@ -151,16 +156,6 @@ export function TreeModal({
       setAutoScrollRequest(0);
     }
   };
-
-  useEffect(() => {
-    if (displayRows.length === 0) {
-      setSelectedId("");
-      return;
-    }
-    if (!displayRows.some((row) => row.node.id === selectedId)) {
-      setSelectedId(displayRows[0]?.node.id ?? "");
-    }
-  }, [displayRows, selectedId]);
 
   useLayoutEffect(() => {
     if (autoScrollRequest === 0 || step !== "select") {
@@ -220,20 +215,20 @@ export function TreeModal({
 
     const currentIndex = Math.max(
       0,
-      displayRows.findIndex((row) => row.node.id === selectedId),
+      displayRows.findIndex((row) => row.node.id === effectiveSelectedId),
     );
     if (event.key === "ArrowDown") {
       event.preventDefault();
       cancelAutoScroll();
       setSelectedId(
-        displayRows[Math.min(displayRows.length - 1, currentIndex + 1)]?.node.id ?? selectedId,
+        displayRows[Math.min(displayRows.length - 1, currentIndex + 1)]?.node.id ?? effectiveSelectedId,
       );
       return;
     }
     if (event.key === "ArrowUp") {
       event.preventDefault();
       cancelAutoScroll();
-      setSelectedId(displayRows[Math.max(0, currentIndex - 1)]?.node.id ?? selectedId);
+      setSelectedId(displayRows[Math.max(0, currentIndex - 1)]?.node.id ?? effectiveSelectedId);
       return;
     }
     if (
@@ -260,7 +255,7 @@ export function TreeModal({
     }
     if (event.key === "Enter") {
       event.preventDefault();
-      if (!currentLeafSelected && selectedId) {
+      if (!currentLeafSelected && effectiveSelectedId) {
         setStep("summary");
       }
     }
@@ -272,14 +267,14 @@ export function TreeModal({
   };
 
   const handleSubmit = () => {
-    if (!selectedId || submitting) {
+    if (!effectiveSelectedId || submitting) {
       return;
     }
     if (summaryMode === "custom" && customInstructions.trim().length === 0) {
       return;
     }
 
-    onNavigate(selectedId, {
+    onNavigate(effectiveSelectedId, {
       summarize: summaryMode !== "none",
       ...(summaryMode === "custom" ? { customInstructions: customInstructions.trim() } : {}),
     });
@@ -332,7 +327,7 @@ export function TreeModal({
               onClose();
             }}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
 
@@ -356,7 +351,9 @@ export function TreeModal({
                 aria-label="Search session tree"
                 className="tree-modal__search"
                 data-testid="tree-modal-search"
+                autoComplete="off"
                 placeholder="Search visible tree entries"
+                spellCheck={false}
                 ref={searchRef}
                 value={search}
                 onChange={(event) => {
@@ -378,7 +375,7 @@ export function TreeModal({
                 <div className="tree-modal__empty">No matching nodes.</div>
               ) : (
                 displayRows.map((row) => {
-                  const isSelected = row.node.id === selectedId;
+                  const isSelected = row.node.id === effectiveSelectedId;
                   const isCurrentLeaf = row.node.id === currentLeafId;
                   return (
                     <div
@@ -440,7 +437,7 @@ export function TreeModal({
                 </button>
                 <button
                   className="button button--primary"
-                  disabled={!selectedId || currentLeafSelected}
+                  disabled={!effectiveSelectedId || currentLeafSelected}
                   type="button"
                   onClick={() => setStep("summary")}
                 >
@@ -524,7 +521,7 @@ export function TreeModal({
                   data-tree-summary-confirm="true"
                   disabled={
                     submitting ||
-                    !selectedId ||
+                    !effectiveSelectedId ||
                     (summaryMode === "custom" && customInstructions.trim().length === 0)
                   }
                   type="button"

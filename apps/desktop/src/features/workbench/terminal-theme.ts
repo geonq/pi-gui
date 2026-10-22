@@ -35,7 +35,7 @@ export function terminalThemeFor(theme: ActiveTheme): ITheme {
   }
   return {
     ...ansi,
-    background: main,
+    background: "#00000000",
     foreground: token("--text"),
     cursor: ink,
     cursorAccent: main,

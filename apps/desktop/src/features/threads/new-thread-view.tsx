@@ -14,7 +14,7 @@ import type {
   WorkspaceRecord,
 } from "../../../contracts/desktop-state";
 import type { MentionOption } from "../conversation/hooks/use-mention-menu";
-import { ArrowUpIcon, PiLogoMark, PlusIcon } from "../../ui/icons";
+import { ArrowUpIcon, FolderIcon, PlusIcon, WorktreeIcon } from "../../ui/icons";
 import {
   MODEL_OPTIONS_EMPTY_TITLE,
   type ComposerSlashCommand,
@@ -30,9 +30,11 @@ import type {
 } from "../settings/model-onboarding";
 import { ModelSelector } from "../conversation/model-selector";
 import { ExtensionFlagsSelector } from "./extension-flags-selector";
+import { StateOrb } from "../../app/activity-indicator";
 
 interface NewThreadViewProps {
   readonly workspaces: readonly WorkspaceRecord[];
+  readonly onOpenFolder: () => void;
   readonly selectedWorkspaceId: string;
   readonly runtime?: RuntimeSnapshot;
   readonly environment: NewThreadEnvironment;
@@ -81,6 +83,7 @@ interface NewThreadViewProps {
 
 export function NewThreadView({
   workspaces,
+  onOpenFolder,
   selectedWorkspaceId,
   runtime,
   environment,
@@ -161,24 +164,28 @@ export function NewThreadView({
       <div className="new-thread">
         <div className="new-thread__hero">
           <div className="new-thread__logo" data-testid="new-thread-logo">
-            <PiLogoMark />
+            <StateOrb size={64} state="composing" />
           </div>
-          <div className="new-thread__eyebrow">New thread</div>
-          <h1 className="new-thread__title">Let&apos;s build</h1>
-          <label className="new-thread__workspace-picker">
-            <span className="sr-only">Workspace</span>
-            <select
-              className="new-thread__workspace"
-              value={workspace.id}
-              onChange={(event) => onSelectWorkspace(event.target.value)}
-            >
-              {workspaces.map((entry) => (
-                <option key={entry.id} value={entry.id}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
-          </label>
+          <h1 className="new-thread__title">Start a new chat.</h1>
+          <div className="new-thread__project-controls">
+            <label className="new-thread__workspace-picker">
+              <span className="sr-only">Workspace</span>
+              <select
+                className="new-thread__workspace"
+                value={workspace.id}
+                onChange={(event) => onSelectWorkspace(event.target.value)}
+              >
+                {workspaces.map((entry) => (
+                  <option key={entry.id} value={entry.id}>
+                    {entry.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button className="new-thread__open-folder" type="button" onClick={onOpenFolder}>
+              <FolderIcon /> Open folder…
+            </button>
+          </div>
         </div>
 
         <div className="new-thread__composer composer">
@@ -224,7 +231,7 @@ export function NewThreadView({
               textareaLabel="New thread prompt"
               textareaTestId="new-thread-composer"
               textareaClassName="new-thread__textarea"
-              textareaPlaceholder="Ask pi anything, use / for commands and skills"
+              textareaPlaceholder="Ask Pegasus anything, use / for commands and skillsâ€¦"
               footer={
                 <NewThreadComposerFooter
                   runtime={runtime}
@@ -292,23 +299,22 @@ function NewThreadComposerFooter({
       <div className="composer__footer">
         <div className="composer__footer-row">
           <div className="composer__hint new-thread__hint">
-            <div className="new-thread__environment-group">
-              <button
-                className={`new-thread__environment ${environment === "local" ? "new-thread__environment--active" : ""}`}
-                type="button"
-                onClick={() => onSelectEnvironment("local")}
+            {/* One quiet chip like the model chip; the themed native picker chooses. */}
+            <label className="new-thread__environment">
+              {environment === "local" ? <FolderIcon /> : <WorktreeIcon />}
+              <select
+                aria-label="Environment"
+                value={environment}
+                onChange={(event) =>
+                  onSelectEnvironment(event.currentTarget.value as NewThreadEnvironment)
+                }
               >
-                <span>Local</span>
-              </button>
-              <button
-                className={`new-thread__environment ${environment === "worktree" ? "new-thread__environment--active" : ""}`}
-                type="button"
-                onClick={() => onSelectEnvironment("worktree")}
-              >
-                <span>Worktree</span>
-              </button>
-            </div>
-            <span className="new-thread__hint-separator">·</span>
+                <option value="local">
+                  {window.piApp?.backend === "windows" ? "Windows" : "Local"}
+                </option>
+                <option value="worktree">Worktree</option>
+              </select>
+            </label>
             <ModelSelector
               runtime={runtime}
               provider={provider}

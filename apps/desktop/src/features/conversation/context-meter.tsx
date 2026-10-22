@@ -9,6 +9,7 @@ interface ContextMeterProps {
   readonly usage: SessionUsageSnapshot | undefined;
 }
 
+const USD = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const RING_RADIUS = 6;
 const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
@@ -114,7 +115,7 @@ export function ContextMeter({ usage }: ContextMeterProps) {
             />
             <Row
               label="Cost"
-              value={usage.subscription ? "Subscription" : `$${usage.totals.cost.toFixed(2)}`}
+              value={usage.subscription ? "Subscription" : USD.format(usage.totals.cost)}
             />
           </section>
         </div>

@@ -193,6 +193,19 @@ export interface DesktopAppStoreOptions {
   ) => Promise<string | null | undefined>;
 }
 
+function traceStartupDuration(stage: string, startedAt: number): void {
+  if (process.env.PI_APP_STARTUP_TRACE === "1") {
+    console.info(`[startup] ${stage}: ${Math.round(performance.now() - startedAt)}ms`);
+  }
+}
+
+function traceStartupPromise<T>(stage: string, operation: () => Promise<T>): Promise<T> {
+  if (process.env.PI_APP_STARTUP_TRACE !== "1") return operation();
+  const startedAt = performance.now();
+  console.info(`[startup] ${stage} started`);
+  return operation().finally(() => traceStartupDuration(stage, startedAt));
+}
+
 export class DesktopAppStore {
   private state = createEmptyDesktopAppState();
   private readonly listeners = new Set<StateListener>();
@@ -565,7 +578,7 @@ export class DesktopAppStore {
     });
   }
 
-  /* ── Lifecycle ──────────────────────────────────────────── */
+  /* â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   async initialize(): Promise<void> {
     if (!this.initPromise) {
@@ -860,7 +873,7 @@ export class DesktopAppStore {
     };
   }
 
-  /* ── Workspace methods (delegated) ─────────────────────── */
+  /* â”€â”€ Workspace methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   async addWorkspace(path: string): Promise<DesktopAppState> {
     return this.workspaceOwner.addWorkspace(path);
@@ -1064,7 +1077,7 @@ export class DesktopAppStore {
     return this.workspaceOwner.syncCurrentWorkspace();
   }
 
-  /* ── Worktree methods (delegated) ──────────────────────── */
+  /* â”€â”€ Worktree methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   async createWorktree(input: CreateWorktreeInput): Promise<DesktopAppState> {
     return this.workspaceOwner.createWorktree(input);
@@ -1078,7 +1091,7 @@ export class DesktopAppStore {
     return this.workspaceOwner.removeWorktree(input);
   }
 
-  /* ── Composer methods (delegated) ──────────────────────── */
+  /* â”€â”€ Composer methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   async updateComposerDraft(
     sessionRef: SessionRef | undefined,
@@ -1107,6 +1120,12 @@ export class DesktopAppStore {
     options?: { readonly deliverAs?: "steer" | "followUp" },
   ): Promise<DesktopAppState> {
     return this.conversationOwner.submitComposer(sessionRef, textInput, options);
+  }
+
+  /** Sends remote text without reading or consuming this host window's composer draft/attachments. */
+  async deliverRemoteInstruction(sessionRef: SessionRef, text: string): Promise<void> {
+    await this.initialize();
+    await this.conversationOwner.deliverBackgroundInstruction(sessionRef, text);
   }
 
   composerSubmitNeedsSenderView(sessionRef: SessionRef | undefined, textInput: string): boolean {
@@ -1203,7 +1222,7 @@ export class DesktopAppStore {
     };
   }
 
-  /* ── Session / thread methods (delegated) ───────────────── */
+  /* â”€â”€ Session / thread methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   async startThread(input: StartThreadInput): Promise<DesktopAppState> {
     return this.workspaceOwner.startThread(input);
@@ -1298,7 +1317,7 @@ export class DesktopAppStore {
     return result;
   }
 
-  /* ── View / UI state ───────────────────────────────────── */
+  /* â”€â”€ View / UI state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   async setActiveView(activeView: AppView): Promise<DesktopAppState> {
     await this.initialize();
@@ -1329,6 +1348,24 @@ export class DesktopAppStore {
     this.state = {
       ...this.state,
       sidebarCollapsed,
+      lastError: undefined,
+      revision: this.state.revision + 1,
+    };
+    await this.persistUiState();
+    return this.emit();
+  }
+
+  /** An empty description removes it. */
+  async setWorkspaceDescription(
+    workspaceId: string,
+    description: string,
+  ): Promise<DesktopAppState> {
+    await this.initialize();
+    const { [workspaceId]: _previous, ...others } = this.state.workspaceDescriptions;
+    const text = description.trim();
+    this.state = {
+      ...this.state,
+      workspaceDescriptions: text ? { ...others, [workspaceId]: text } : others,
       lastError: undefined,
       revision: this.state.revision + 1,
     };
@@ -1473,7 +1510,35 @@ export class DesktopAppStore {
     return this.refreshState({ clearLastError: true });
   }
 
-  /* ── Runtime / model / provider settings ───────────────── */
+  /* â”€â”€ Runtime / model / provider settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+
+  async loadWorkspaceRuntime(
+    workspaceId: string,
+    options: { readonly refresh?: boolean } = {},
+  ): Promise<DesktopAppState> {
+    await this.initialize();
+    const workspace = this.workspaceRefFromState(workspaceId);
+    if (!workspace) {
+      throw new Error("Workspace not found.");
+    }
+
+    if (options.refresh) {
+      this.runtimeByWorkspace.set(
+        workspaceId,
+        await this.driver.runtimeSupervisor.refreshRuntime(workspace),
+      );
+    } else {
+      await this.ensureRuntimeLoaded(workspaceId);
+    }
+
+    const runtimeByWorkspace = await this.serializeRuntimeStateForCurrentWorkspaces();
+    this.state = {
+      ...this.state,
+      runtimeByWorkspace,
+      lastError: undefined,
+    };
+    return this.emit();
+  }
 
   async refreshRuntime(workspaceId?: string): Promise<DesktopAppState> {
     await this.initialize();
@@ -1749,7 +1814,7 @@ export class DesktopAppStore {
     if (builtinName) {
       return this.setBuiltinExtensionEnabled(workspaceId, builtinName, enabled);
     }
-    // pi's own add-ons (`builtin:mcp` …) are switched in pi's global settings, so every
+    // pi's own add-ons (`builtin:mcp` â€¦) are switched in pi's global settings, so every
     // workspace's runtime and threads pick the change up.
     const global = filePath.startsWith("builtin:");
     return this.withRuntimeUpdate(
@@ -1820,7 +1885,7 @@ export class DesktopAppStore {
     return failed.length === 0;
   }
 
-  /* ── MCP servers (pi's mcp.json) and code mode ─────────── */
+  /* â”€â”€ MCP servers (pi's mcp.json) and code mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   async listMcpServers(workspaceId: string): Promise<McpServersSnapshot> {
     await this.initialize();
@@ -2020,14 +2085,17 @@ export class DesktopAppStore {
     });
   }
 
-  /* ── Internal application infrastructure ──────────────── */
+  /* â”€â”€ Internal application infrastructure â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
   private async initializeInternal(): Promise<void> {
     const startupDiagnostics: StartupDiagnostic[] = [];
     let persisted: LegacyPersistedUiState;
+    const persistedReadStarted = performance.now();
     try {
       persisted = await this.readUiState();
+      traceStartupDuration("persisted UI read", persistedReadStarted);
     } catch (error) {
+      traceStartupDuration("persisted UI read", persistedReadStarted);
       const message = error instanceof Error ? error.message : String(error);
       console.error("[app-store] persisted UI state is invalid; startup stopped", error);
       this.blockPersistence();
@@ -2063,8 +2131,10 @@ export class DesktopAppStore {
       this.emit();
       return;
     }
+    const attachmentValidationStarted = performance.now();
     try {
       const skippedSavedAttachments = await this.validatePersistedAttachments();
+      traceStartupDuration("persisted attachment validation", attachmentValidationStarted);
       if (skippedSavedAttachments > 0) {
         startupDiagnostics.push({
           scope: "application",
@@ -2072,6 +2142,7 @@ export class DesktopAppStore {
         });
       }
     } catch (error) {
+      traceStartupDuration("persisted attachment validation", attachmentValidationStarted);
       const message = error instanceof Error ? error.message : String(error);
       console.error("[app-store] saved attachment validation failed; startup stopped", error);
       this.blockPersistence();
@@ -2088,8 +2159,10 @@ export class DesktopAppStore {
       this.emit();
       return;
     }
+    const persistedMigrationStarted = performance.now();
     try {
       const skippedLegacyAttachments = await this.migrateLegacyPersistence(persisted);
+      traceStartupDuration("persisted UI migration", persistedMigrationStarted);
       if (skippedLegacyAttachments > 0) {
         startupDiagnostics.push({
           scope: "application",
@@ -2097,6 +2170,7 @@ export class DesktopAppStore {
         });
       }
     } catch (error) {
+      traceStartupDuration("persisted UI migration", persistedMigrationStarted);
       const message = error instanceof Error ? error.message : String(error);
       console.error("[app-store] legacy UI state migration failed; startup stopped", error);
       this.blockPersistence();
@@ -2148,31 +2222,28 @@ export class DesktopAppStore {
         workspacesToSync.set(ws.path, ws.displayName);
       }
 
-      const syncDiagnostics = await Promise.all(
-        [...workspacesToSync.entries()].map(([workspacePath, displayName]) =>
-          this.syncStartupWorkspace(workspacePath, displayName),
-        ),
+      const workspaceSyncStarted = performance.now();
+      const syncDiagnostics = await this.syncStartupWorkspaces(
+        [...workspacesToSync.entries()].map(([path, displayName]) => ({ path, displayName })),
       );
+      traceStartupDuration(`workspace sync (${workspacesToSync.size} workspaces)`, workspaceSyncStarted);
       startupDiagnostics.push(
         ...syncDiagnostics.filter((diagnostic): diagnostic is StartupDiagnostic =>
           Boolean(diagnostic),
         ),
       );
 
+      const initialRefreshStateStarted = performance.now();
       await this.refreshState({
         selectedWorkspaceId: persisted.selectedWorkspaceId,
         selectedSessionId: persisted.selectedSessionId,
         composerDraft: persisted.composerDraft,
         clearLastError: true,
-        refreshWorktrees: true,
+        refreshWorktrees: false,
         hydrateSelectedSession: false,
         markSelectedSessionViewed: false,
       });
-      // Startup GC of leaked pi/* worktrees and branches; self-contained and
-      // error-swallowing, so fire-and-forget without blocking initialization.
-      void this.workspaceOwner.reconcileWorktrees().catch((error: unknown) => {
-        console.error("[app-store] reconcileWorktrees failed", error);
-      });
+      traceStartupDuration("initial refreshState", initialRefreshStateStarted);
       const restoredSessionRef = this.selectedSessionRef();
       if (restoredSessionRef && persisted.selectedWorkspaceId && persisted.selectedSessionId) {
         this.restoredSelectedSessionKeysAwaitingSelection.add(sessionKey(restoredSessionRef));
@@ -2181,6 +2252,59 @@ export class DesktopAppStore {
       this.scheduleOrchestrationSupervision();
       this.scheduleScheduledTasks();
       this.publishStartupDiagnostics(startupDiagnostics);
+      // CLI providers can finish their metadata probe after the first usable snapshot.
+      const initialRuntime = this.runtimeByWorkspace.get(this.state.selectedWorkspaceId ?? "");
+      if (
+        initialRuntime?.providers.some(
+          ({ id }) => id === "antigravity" || id.startsWith("claude-code-account-"),
+        )
+      ) {
+        for (const delay of [5_000, 15_000]) {
+          const timer = setTimeout(() => {
+            const workspace = this.state.workspaces.find(
+              ({ id }) => id === this.state.selectedWorkspaceId,
+            );
+            if (!workspace) return;
+            const previous = this.runtimeByWorkspace.get(workspace.id);
+            if (!previous) return;
+            void this.driver.runtimeSupervisor
+              .getRuntimeSnapshot({
+                workspaceId: workspace.id,
+                path: workspace.path,
+                displayName: workspace.name,
+              })
+              .then(async (runtime) => {
+                if (this.runtimeByWorkspace.get(workspace.id) !== previous) return;
+                this.runtimeByWorkspace.set(workspace.id, runtime);
+                await this.refreshState({
+                  persistState: false,
+                  hydrateSelectedSession: false,
+                  markSelectedSessionViewed: false,
+                });
+              })
+              .catch((error: unknown) =>
+                console.warn("[app-store] CLI provider metadata refresh failed", error),
+              );
+          }, delay);
+          timer.unref();
+        }
+      }
+      setTimeout(() => {
+        void this.refreshState({
+          refreshWorktrees: true,
+          hydrateSelectedSession: false,
+          markSelectedSessionViewed: false,
+        })
+          .then(() => this.workspaceOwner.reconcileWorktrees())
+          .catch((error: unknown) => {
+            void this.withError(error).catch((reportError: unknown) => {
+              console.error(
+                "[app-store] failed to publish startup worktree refresh error",
+                reportError,
+              );
+            });
+          });
+      }, 0);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.error("[app-store] startup recovery failed", error);
@@ -2229,7 +2353,8 @@ export class DesktopAppStore {
       themeMode: persisted.themeMode ?? this.state.themeMode,
       themePresetId: persisted.themePresetId ?? this.state.themePresetId,
       sidebarCollapsed: persisted.sidebarCollapsed ?? this.state.sidebarCollapsed,
-      threadGrouping: persisted.threadGrouping ?? "time",
+      threadGrouping: persisted.threadGrouping ?? "workspace",
+      workspaceDescriptions: persisted.workspaceDescriptions ?? {},
       collapsedWorkspaceIds: persisted.collapsedWorkspaceIds ?? [],
       enableTransparency: persisted.enableTransparency ?? this.state.enableTransparency,
       orchestrationChildren: persisted.orchestrationChildren ?? [],
@@ -2279,28 +2404,41 @@ export class DesktopAppStore {
     }
   }
 
-  private async syncStartupWorkspace(
-    workspacePath: string,
-    displayName: string | undefined,
-  ): Promise<StartupDiagnostic | undefined> {
+  private async syncStartupWorkspaces(
+    workspaces: readonly { readonly path: string; readonly displayName?: string }[],
+  ): Promise<StartupDiagnostic[]> {
+    const checks = await Promise.all(
+      workspaces.map(async (workspace) => {
+        try {
+          const workspaceStat = await stat(workspace.path);
+          if (!workspaceStat.isDirectory()) throw new Error("Path is not a directory.");
+          return { workspace };
+        } catch (error) {
+          return {
+            workspace,
+            message: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }),
+    );
+    const available = checks.flatMap((check) => (check.message ? [] : [check.workspace]));
+    const failures = new Map<string, string>();
     try {
-      const workspaceStat = await stat(workspacePath);
-      if (!workspaceStat.isDirectory()) {
-        throw new Error("Path is not a directory.");
-      }
-      await this.driver.syncWorkspace(workspacePath, displayName);
-      return undefined;
+      const result = await this.driver.syncWorkspaces(available);
+      for (const failure of result.failures) failures.set(failure.path, failure.message);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(
-        `[app-store] workspace unavailable during startup: ${workspacePath}: ${message}`,
-      );
-      return {
-        scope: "workspace",
-        workspacePath,
-        message,
-      };
+      for (const workspace of available) failures.set(workspace.path, message);
     }
+
+    return checks.flatMap(({ workspace, message: statError }) => {
+      const message = statError ?? failures.get(workspace.path);
+      if (!message) return [];
+      console.warn(
+        `[app-store] workspace unavailable during startup: ${workspace.path}: ${message}`,
+      );
+      return [{ scope: "workspace" as const, workspacePath: workspace.path, message }];
+    });
   }
 
   private publishStartupDiagnostics(diagnostics: readonly StartupDiagnostic[]): void {
@@ -2365,16 +2503,26 @@ export class DesktopAppStore {
         workspaceId: this.state.selectedWorkspaceId,
         sessionId: this.state.selectedSessionId,
       };
-      const [workspacesSnapshot, sessionsSnapshot] = await Promise.all([
-        this.driver.listWorkspaces(),
-        this.driver.listSessions(),
-      ]);
+      const [workspacesSnapshot, sessionsSnapshot] = await traceStartupPromise(
+        "refresh catalog snapshots",
+        () => Promise.all([this.driver.listWorkspaces(), this.driver.listSessions()]),
+      );
       const worktreeEntries = options.refreshWorktrees
-        ? await this.workspaceOwner.syncAndListWorktrees(workspacesSnapshot.workspaces)
-        : (await this.catalogStore.worktrees.listWorktrees()).worktrees;
+        ? await traceStartupPromise("refresh workspace worktrees", () =>
+            this.workspaceOwner.syncAndListWorktrees(workspacesSnapshot.workspaces),
+          )
+        : (
+            await traceStartupPromise("read catalog worktrees", () =>
+              this.catalogStore.worktrees.listWorktrees(),
+            )
+          ).worktrees;
 
-      await this.pruneStaleSessionSubscriptions(sessionsSnapshot.sessions);
-      await this.ensureSubscriptionsForSessions(sessionsSnapshot.sessions);
+      await traceStartupPromise("prune stale session state", () =>
+        this.pruneStaleSessionSubscriptions(sessionsSnapshot.sessions),
+      );
+      await traceStartupPromise("ensure running session subscriptions", () =>
+        this.ensureSubscriptionsForSessions(sessionsSnapshot.sessions),
+      );
 
       const selectedWorkspaceId = resolveSelectedWorkspaceIdFromCatalog(
         options.selectedWorkspaceId ?? this.state.selectedWorkspaceId,
@@ -2428,25 +2576,7 @@ export class DesktopAppStore {
       if (selectedWorkspaceId && !this.runtimeByWorkspace.has(selectedWorkspaceId)) {
         await this.ensureRuntimeLoaded(selectedWorkspaceId, workspacesSnapshot.workspaces);
       }
-      const secondaryWorkspacesToLoad = workspacesSnapshot.workspaces
-        .filter((workspace) => workspace.workspaceId !== selectedWorkspaceId)
-        .filter((workspace) => !this.runtimeByWorkspace.has(workspace.workspaceId));
-      const secondaryRuntimeLoads = await Promise.allSettled(
-        secondaryWorkspacesToLoad.map((workspace) =>
-          this.ensureRuntimeLoaded(workspace.workspaceId, workspacesSnapshot.workspaces),
-        ),
-      );
-      secondaryRuntimeLoads.forEach((result, index) => {
-        if (result.status === "fulfilled") {
-          return;
-        }
-        const failedWorkspace = secondaryWorkspacesToLoad[index];
-        console.warn(
-          `[pi-gui] Failed to preload runtime for ${failedWorkspace?.path ?? "unknown workspace"}: ${
-            result.reason instanceof Error ? result.reason.message : String(result.reason)
-          }`,
-        );
-      });
+      // Inactive project runtimes load when selected; extension discovery must not block startup.
       for (const runtime of this.runtimeByWorkspace.values()) {
         pruneCompatibilityForRuntimeSnapshot(
           this.extensionCommandCompatibilityByWorkspace,
@@ -2539,11 +2669,16 @@ export class DesktopAppStore {
         ),
         modelSettingsScopeMode: this.state.modelSettingsScopeMode,
         globalModelSettings,
-        composerDraft: this.resolveComposerDraft(
-          selection.workspaceId,
-          selection.sessionId,
-          draftOptions.composerDraft,
-        ),
+        composerDraft:
+          (!selection.workspaceId || !selection.sessionId) &&
+          selection.workspaceId === this.state.selectedWorkspaceId &&
+          selection.sessionId === this.state.selectedSessionId
+            ? (draftOptions.composerDraft ?? this.state.composerDraft)
+            : this.resolveComposerDraft(
+                selection.workspaceId,
+                selection.sessionId,
+                draftOptions.composerDraft,
+              ),
         composerDraftSyncSource: composerDraftSync.source,
         composerDraftSyncNonce: composerDraftSync.nonce,
         composerAttachments: this.resolveComposerAttachments(
@@ -2686,11 +2821,11 @@ export class DesktopAppStore {
     this.publishSelectedTranscriptFor(sessionRef);
   }
 
-  /* ── CLI ↔ GUI reconcile (startup / workspace switch / window focus) ─────── */
+  /* â”€â”€ CLI â†” GUI reconcile (startup / workspace switch / window focus) â”€â”€â”€â”€â”€â”€â”€ */
 
   /**
    * Reconcile the active workspace against pi's on-disk state when the window
-   * gains focus (the Codex-style sync model — no live filesystem watcher). Runs
+   * gains focus (the Codex-style sync model â€” no live filesystem watcher). Runs
    * through a per-workspace serial queue so focus bursts never overlap or race.
    * A rejection is logged and swallowed so it can't wedge the queue.
    */
@@ -2886,11 +3021,13 @@ export class DesktopAppStore {
       return;
     }
 
-    const snapshot = await this.driver.runtimeSupervisor.getRuntimeSnapshot({
-      workspaceId: ws.workspaceId,
-      path: ws.path,
-      displayName: ws.displayName,
-    });
+    const snapshot = await traceStartupPromise("workspace runtime", () =>
+      this.driver.runtimeSupervisor.getRuntimeSnapshot({
+        workspaceId: ws.workspaceId,
+        path: ws.path,
+        displayName: ws.displayName,
+      }),
+    );
     this.runtimeByWorkspace.set(workspaceId, snapshot);
     // Seed the settings-file baseline so an external edit made before the first
     // focus is still detected as changed rather than swallowed by that first check.
@@ -2926,8 +3063,8 @@ export class DesktopAppStore {
    * synchronously but `handleSessionEvent` is async (it awaits refreshes,
    * persistence, listeners); firing each one with `void` let them interleave and
    * race the shared session state. A per-key FIFO queue runs them one at a time.
-   * The chained promise is error-recovering — mirroring the driver's
-   * `chainRecoveringEventQueue` shape — so a rejection is logged and swallowed
+   * The chained promise is error-recovering â€” mirroring the driver's
+   * `chainRecoveringEventQueue` shape â€” so a rejection is logged and swallowed
    * rather than leaving the tail rejected and freezing the queue for that session.
    */
   private enqueueSessionEvent(event: SessionDriverEvent, subscriptionKey: string): void {
@@ -3424,7 +3561,7 @@ export class DesktopAppStore {
         } else {
           // The compensating reload that would pull this unknown session into
           // state is skipped while a refresh is already unwinding, and
-          // applySessionEventState then silently no-ops for the missing session —
+          // applySessionEventState then silently no-ops for the missing session â€”
           // so the event (e.g. a rename) is dropped. Make that drop visible.
           console.warn(
             `[app-store] ${event.type} for unknown session ${key} skipped reload ` +
@@ -4003,6 +4140,10 @@ export class DesktopAppStore {
       themePresetId: this.state.themePresetId,
       sidebarCollapsed: this.state.sidebarCollapsed || undefined,
       threadGrouping: this.state.threadGrouping,
+      workspaceDescriptions:
+        Object.keys(this.state.workspaceDescriptions).length > 0
+          ? this.state.workspaceDescriptions
+          : undefined,
       collapsedWorkspaceIds:
         this.state.collapsedWorkspaceIds.length > 0 ? this.state.collapsedWorkspaceIds : undefined,
       enableTransparency: this.state.enableTransparency,
@@ -4111,7 +4252,7 @@ export class DesktopAppStore {
   emit(): DesktopAppState {
     // Revision must be monotonic across publishes: mutation sites bump it from
     // whatever state they captured, and long async builders (refreshState and
-    // friends) can capture before concurrent session events bump it further —
+    // friends) can capture before concurrent session events bump it further â€”
     // assigning a LOWER revision than one already pushed. The renderer drops
     // lower-revision snapshots, so a regression here freezes the UI until main
     // happens to climb back past the renderer's high-water mark. Stamp the
@@ -4145,7 +4286,7 @@ export class DesktopAppStore {
   handleWindowActivation(): void {
     // Reconcile the active workspace on focus so returning to the window always
     // reflects external CLI changes (new sessions, appended turns, edited
-    // settings) — the Codex-style sync model, with no live filesystem watcher.
+    // settings) â€” the Codex-style sync model, with no live filesystem watcher.
     const activeWorkspaceId = this.state.selectedWorkspaceId;
     if (activeWorkspaceId) {
       this.reconcileWorkspaceOnFocus(activeWorkspaceId);
@@ -4723,7 +4864,7 @@ export class DesktopAppStore {
   }
 }
 
-/* ── Module-private free functions ───────────────────────── */
+/* â”€â”€ Module-private free functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 function updateRecordValue<T>(
   record: Readonly<Record<string, T>>,
@@ -4774,7 +4915,7 @@ function applyModelSettingsSnapshot(
 /**
  * Convert an error into the message shown in `lastError`. A SessionLeasedError
  * means another live pi surface holds the session file, so binding a runtime is
- * refused to avoid forking the conversation — turn its raw internal string into
+ * refused to avoid forking the conversation â€” turn its raw internal string into
  * a user-readable explanation of who holds it and what to do.
  */
 function describeStoreError(error: unknown): string {
@@ -4815,20 +4956,23 @@ async function statMtimeMs(path: string): Promise<number | undefined> {
   }
 }
 
-/** Shows a path under the home directory as `~/…`, the way pi's docs and terminal name it. */
+/** Shows a path under the home directory as `~/â€¦`, the way pi's docs and terminal name it. */
 function withHomeAsTilde(path: string): string {
   const home = homedir();
   return path.startsWith(`${home}${sep}`) ? `~${path.slice(home.length)}` : path;
 }
 
-function resolveGlobalSettingsPath(): string {
+export function resolveAgentDir(): string {
   const override = process.env.PI_CODING_AGENT_DIR;
-  const agentDir = override
+  return override
     ? override.startsWith("~")
       ? join(homedir(), override.slice(1))
       : override
     : join(homedir(), ".pi", "agent");
-  return join(agentDir, "settings.json");
+}
+
+function resolveGlobalSettingsPath(): string {
+  return join(resolveAgentDir(), "settings.json");
 }
 
 async function readProjectModelSettingsFile(

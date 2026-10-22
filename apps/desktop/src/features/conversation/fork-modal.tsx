@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { NewThreadEnvironment } from "../../../contracts/desktop-state";
 import { trapDialogFocus } from "../../ui/dialog-focus";
+import { CloseIcon } from "../../ui/icons";
 
 interface ForkModalProps {
   readonly submitting: boolean;
@@ -71,7 +72,7 @@ export function ForkModal({
             type="button"
             onClick={onClose}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
 
@@ -94,32 +95,20 @@ export function ForkModal({
             </div>
           ) : null}
 
-          <div
-            className="new-thread__environment-group"
-            role="radiogroup"
-            aria-label="Fork environment"
-          >
-            <button
-              aria-pressed={environment === "local"}
-              className={`new-thread__environment ${environment === "local" ? "new-thread__environment--active" : ""}`}
-              data-testid="fork-environment-local"
-              type="button"
-              onClick={() => setEnvironment("local")}
+          <label className="new-thread__environment">
+            <select
+              aria-label="Fork environment"
+              value={environment}
+              onChange={(event) =>
+                setEnvironment(event.currentTarget.value as NewThreadEnvironment)
+              }
             >
-              <span>Same worktree</span>
-            </button>
-            <button
-              aria-pressed={environment === "worktree"}
-              className={`new-thread__environment ${environment === "worktree" ? "new-thread__environment--active" : ""}`}
-              data-testid="fork-environment-worktree"
-              disabled={!canUseWorktree}
-              title={canUseWorktree ? undefined : "This workspace can't create worktrees."}
-              type="button"
-              onClick={() => setEnvironment("worktree")}
-            >
-              <span>New worktree</span>
-            </button>
-          </div>
+              <option value="local">Same worktree</option>
+              <option disabled={!canUseWorktree} value="worktree">
+                {canUseWorktree ? "New worktree" : "New worktree (unavailable here)"}
+              </option>
+            </select>
+          </label>
 
           <div className="tree-modal__footer">
             <div className="tree-modal__hint">

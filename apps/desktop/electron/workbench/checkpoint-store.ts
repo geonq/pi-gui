@@ -1087,6 +1087,7 @@ function git(
         ...args,
       ],
       {
+        windowsHide: true,
         cwd,
         // Keep normal global/system exclude configuration, but never inherited Git repository overrides.
         env: isolatedGitEnvironment(extraEnv),

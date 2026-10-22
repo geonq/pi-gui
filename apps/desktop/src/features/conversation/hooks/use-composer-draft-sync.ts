@@ -3,7 +3,11 @@ import type { SessionRef } from "@pi-gui/session-driver/types";
 import type { ComposerDraftSyncSource, DesktopAppState } from "../../../../contracts/desktop-state";
 import type { PiDesktopApi } from "../../../../contracts/ipc";
 
-/** Persist/state/command restore saved or submitted text. They must not overwrite a newer local edit. */
+/**
+ * Persist/state/command restore saved or submitted text, and a selection that reaches this
+ * check re-selected the task already shown (a real switch re-hydrates by session key first).
+ * None of them may overwrite a newer local edit.
+ */
 export function shouldAdoptComposerSnapshot(
   source: ComposerDraftSyncSource | undefined,
   localEditPending: boolean,
@@ -11,7 +15,7 @@ export function shouldAdoptComposerSnapshot(
   if (!localEditPending) {
     return true;
   }
-  return source !== "persist" && source !== "state" && source !== "command";
+  return source !== "persist" && source !== "state" && source !== "command" && source !== "selection";
 }
 
 interface UseComposerDraftSyncParams {

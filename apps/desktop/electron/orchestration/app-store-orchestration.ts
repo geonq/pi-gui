@@ -1983,7 +1983,7 @@ async function gitOutputLines(
   args: readonly string[],
 ): Promise<readonly string[]> {
   try {
-    const { stdout } = await execFileAsync("git", args, { cwd: workspacePath });
+    const { stdout } = await execFileAsync("git", args, { cwd: workspacePath, windowsHide: true });
     return stdout
       .split("\n")
       .map((line) => line.trim())

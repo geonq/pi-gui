@@ -242,7 +242,7 @@ function renderEditorBody({
     return <div className="diff-panel__empty">Select a file from the explorer.</div>;
   }
   if (viewerLoading) {
-    return <div className="diff-panel__empty">Loading file...</div>;
+    return <div className="diff-panel__empty">Loading file…</div>;
   }
   if (viewerError) {
     return <div className="diff-panel__empty">{viewerError}</div>;

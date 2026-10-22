@@ -147,7 +147,7 @@ function executeGitCommand(
 ): Promise<GitCommandResult> {
   return new Promise((resolve) => {
     // Status must not take the index lock the user's own git commands need.
-    execFile("git", [...args], { ...options, env: isolatedGitEnvironment() }, (error, stdout) => {
+    execFile("git", [...args], { ...options, windowsHide: true, env: isolatedGitEnvironment() }, (error, stdout) => {
       resolve({
         error,
         stdout,

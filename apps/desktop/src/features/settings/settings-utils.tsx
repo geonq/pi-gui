@@ -117,8 +117,18 @@ export function ProviderRow({
         <div className="settings-row__title">{provider.name}</div>
         <div className="settings-row__description">{describeProviderStatus(provider)}</div>
       </div>
-      {actions.length > 0 ? (
+      {actions.length > 0 || provider.id === "antigravity" ? (
         <div className="settings-row__actions">
+          {provider.id === "antigravity" ? (
+            <details className="provider-sign-in-help">
+              <summary className="button button--ghost">Sign-in help</summary>
+              <p className="settings-row__description">
+                AGY uses its official CLI sign-in. Open <code>agy</code> on the Windows backend to
+                sign in or manage the account, then reopen Providers. The Mac app uses that same
+                connection. This does not require a separate Pi OAuth login.
+              </p>
+            </details>
+          ) : null}
           {actions.map((action) => (
             <button
               key={action.label}
@@ -137,6 +147,10 @@ export function ProviderRow({
 }
 
 function describeProviderStatus(provider: RuntimeSnapshot["providers"][number]): string {
+  if (provider.id === "antigravity")
+    return provider.hasAuth ? "Connected through AGY" : "Sign in through AGY";
+  if (provider.id.startsWith("claude-code-account-"))
+    return provider.hasAuth ? "Connected through Claude Code" : "Sign in through Claude Code";
   switch (provider.authSource) {
     case "oauth":
       return "OAuth · connected";
@@ -170,6 +184,7 @@ function resolveProviderActions(
   onLogoutProvider: (providerId: string) => void,
   onConfigureApiKey: (provider: RuntimeSnapshot["providers"][number]) => void,
 ): readonly ProviderAction[] {
+  if (provider.id === "antigravity") return [];
   if (provider.authSource === "oauth") {
     return [{ disabled: false, label: "Logout", onClick: () => onLogoutProvider(provider.id) }];
   }

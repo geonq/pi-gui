@@ -18,6 +18,7 @@ import type {
 import { hasFilesInDataTransfer } from "./composer-attachments";
 import { ExtensionDock, type ExtensionDockModel } from "../extensions/extension-session-ui";
 import {
+  CloseIcon,
   ExtensionIcon,
   FileIcon,
   ModelIcon,
@@ -203,7 +204,7 @@ export function ComposerSurface({
             type="button"
             onClick={onClearSlashCommand}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
       ) : null}
@@ -243,7 +244,7 @@ export function ComposerSurface({
                 type="button"
                 onClick={() => onRemoveAttachment(attachment.id)}
               >
-                ×
+                <CloseIcon />
               </button>
             </div>
           ))}
@@ -259,7 +260,11 @@ export function ComposerSurface({
         />
       ) : null}
       {lastError ? (
-        <div className="composer__error error-banner" data-testid="composer-error-banner">
+        <div
+          className="composer__error error-banner"
+          data-testid="composer-error-banner"
+          role="alert"
+        >
           {lastError}
         </div>
       ) : null}

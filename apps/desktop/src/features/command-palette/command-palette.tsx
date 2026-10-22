@@ -7,7 +7,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import { SearchIcon } from "../../ui/icons";
+import { CloseIcon, SearchIcon } from "../../ui/icons";
 
 export interface PaletteItem {
   readonly id: string;
@@ -194,6 +194,7 @@ export function CommandPalette<F extends string>({
             aria-label={placeholder}
             className="command-palette__input"
             data-testid="command-palette-input"
+            autoComplete="off"
             placeholder={placeholder}
             role="combobox"
             spellCheck={false}
@@ -207,7 +208,7 @@ export function CommandPalette<F extends string>({
             type="button"
             onClick={onClose}
           >
-            ×
+            <CloseIcon />
           </button>
         </div>
 

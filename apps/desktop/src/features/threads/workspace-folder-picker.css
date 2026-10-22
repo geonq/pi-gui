@@ -1,0 +1,243 @@
+.workspace-folder-picker {
+  width: min(700px, 100%);
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  gap: 14px;
+}
+
+.workspace-folder-picker__scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.workspace-folder-picker__scope .sidebar__grouping button {
+  min-width: 66px;
+  min-height: 28px;
+}
+
+.workspace-folder-picker__browser {
+  display: grid;
+  min-height: 0;
+  gap: 10px;
+}
+
+.workspace-folder-picker__root,
+.workspace-folder-picker__create label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted-soft);
+  font-size: 11px;
+  font-weight: var(--font-semibold);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.workspace-folder-picker__root select,
+.workspace-folder-picker__create input {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 13px;
+  text-transform: none;
+}
+
+.workspace-folder-picker__path {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  color: var(--muted-strong);
+  font-size: 12px;
+}
+
+.workspace-folder-picker__path > span {
+  flex: 0 0 auto;
+}
+
+.workspace-folder-picker__path > svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  color: var(--muted-soft);
+}
+
+.workspace-folder-picker__path code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font: inherit;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-folder-picker__up {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--muted-strong);
+  font: inherit;
+  cursor: pointer;
+}
+
+.workspace-folder-picker__up:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--surface-overlay-hover);
+  color: var(--text-strong);
+}
+
+.workspace-folder-picker__up svg {
+  width: 14px;
+  height: 14px;
+}
+
+.workspace-folder-picker__list {
+  min-height: 150px;
+  max-height: min(36vh, 360px);
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface-muted);
+}
+
+.workspace-folder-picker__folder {
+  display: grid;
+  width: 100%;
+  min-height: 36px;
+  grid-template-columns: 18px minmax(0, 1fr) 16px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workspace-folder-picker__folder:hover:not(:disabled),
+.workspace-folder-picker__folder:focus-visible {
+  border-color: var(--line);
+  background: var(--surface-overlay-hover);
+  color: var(--text-strong);
+}
+
+.workspace-folder-picker__folder svg {
+  width: 15px;
+  height: 15px;
+  color: var(--muted-strong);
+}
+
+.workspace-folder-picker__folder span {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-folder-picker__folder svg:last-child {
+  justify-self: end;
+  color: var(--muted-soft);
+}
+
+.workspace-folder-picker__create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.workspace-folder-picker__create-cancel,
+.workspace-folder-picker__create-submit,
+.workspace-folder-picker__new,
+.workspace-folder-picker__open {
+  min-height: 30px;
+  padding: 0 9px;
+  border-color: transparent;
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted-strong);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+}
+
+.workspace-folder-picker__create-cancel:hover:not(:disabled),
+.workspace-folder-picker__create-submit:hover:not(:disabled),
+.workspace-folder-picker__new:hover:not(:disabled),
+.workspace-folder-picker__open:hover:not(:disabled) {
+  border-color: var(--line);
+  background: var(--surface-overlay-hover);
+  color: var(--text-strong);
+}
+
+.workspace-folder-picker__create-cancel:disabled,
+.workspace-folder-picker__create-submit:disabled,
+.workspace-folder-picker__new:disabled,
+.workspace-folder-picker__open:disabled {
+  opacity: 0.45;
+}
+
+.workspace-folder-picker__new svg {
+  width: 14px;
+  height: 14px;
+}
+
+.workspace-folder-picker__muted {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: var(--leading-normal);
+}
+
+.workspace-folder-picker__notice {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: var(--leading-normal);
+}
+
+.workspace-folder-picker__footer {
+  align-items: center;
+}
+
+.workspace-folder-picker__footer > .workspace-folder-picker__muted {
+  max-width: 300px;
+}
+
+
+
+@media (max-width: 620px) {
+  .workspace-folder-picker__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-folder-picker__footer > .workspace-folder-picker__muted {
+    max-width: none;
+  }
+
+  .workspace-folder-picker__footer .tree-modal__actions {
+    justify-content: flex-end;
+  }
+}

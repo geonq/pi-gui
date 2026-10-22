@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { AppView, DesktopAppState, WorkspaceRecord } from "../../contracts/desktop-state";
 import { updateSnapshot } from "./desktop-app-state";
@@ -59,6 +59,11 @@ export function SecondarySurfaces({
   const [notificationPermissionStatus, setNotificationPermissionStatus] =
     useState<DesktopNotificationPermissionStatus>("unknown");
   const [notificationPermissionPending, setNotificationPermissionPending] = useState(false);
+  const [runtimeLoadState, setRuntimeLoadState] = useState<{
+    readonly workspaceId: string;
+    readonly status: "loading" | "error" | "ready";
+  } | null>(null);
+  const runtimeLoadGeneration = useRef(0);
 
   const settingsWorkspace = settingsWorkspaceId
     ? rootWorkspaceOptions.find((workspace) => workspace.id === settingsWorkspaceId)
@@ -69,19 +74,89 @@ export function SecondarySurfaces({
   const extensionsWorkspace = extensionsWorkspaceId
     ? rootWorkspaceOptions.find((workspace) => workspace.id === extensionsWorkspaceId)
     : undefined;
-  const settingsRuntime = settingsWorkspace
-    ? snapshot.runtimeByWorkspace[settingsWorkspace.id]
-    : undefined;
-  const settingsModelRuntime = getEffectiveModelRuntime(snapshot, settingsWorkspace);
+  const customizeTab = activeView === "settings" ? undefined : activeView;
+  const customizeWorkspace = customizeTab === "extensions" ? extensionsWorkspace : skillsWorkspace;
+  const providerWorkspace =
+    rootWorkspaceOptions.find((workspace) => workspace.id === snapshot.selectedWorkspaceId) ??
+    rootWorkspaceOptions[0];
+  const providerPageActive = activeView === "settings" && settingsSection === "providers";
   const skillsRuntime = skillsWorkspace
     ? snapshot.runtimeByWorkspace[skillsWorkspace.id]
     : undefined;
   const extensionsRuntime = extensionsWorkspace
     ? snapshot.runtimeByWorkspace[extensionsWorkspace.id]
     : undefined;
+  const providerModelRuntime = getEffectiveModelRuntime(snapshot, providerWorkspace);
+  const settingsRuntime = settingsWorkspace
+    ? snapshot.runtimeByWorkspace[settingsWorkspace.id]
+    : undefined;
+  const settingsModelRuntime = getEffectiveModelRuntime(snapshot, settingsWorkspace);
   const extensionsCommandCompatibility = extensionsWorkspace
     ? (snapshot.extensionCommandCompatibilityByWorkspace[extensionsWorkspace.id] ?? [])
     : [];
+
+  const runtimeWorkspaceId =
+    customizeTab === "skills"
+      ? skillsWorkspace?.id
+      : customizeTab === "extensions"
+        ? extensionsWorkspace?.id
+        : providerPageActive
+          ? providerWorkspace?.id
+          : undefined;
+  const runtimeWorkspaceLoaded = runtimeWorkspaceId
+    ? Boolean(snapshot.runtimeByWorkspace[runtimeWorkspaceId])
+    : false;
+  const runtimeLoadRequestWorkspaceId = providerPageActive
+    ? providerWorkspace?.id
+    : !runtimeWorkspaceLoaded
+      ? runtimeWorkspaceId
+      : undefined;
+  const runtimeLoadRequestRefresh = providerPageActive;
+  const currentRuntimeLoadState =
+    runtimeWorkspaceId && runtimeLoadState?.workspaceId === runtimeWorkspaceId
+      ? runtimeLoadState.status
+      : undefined;
+  const runtimeLoadStatus = providerPageActive
+    ? (currentRuntimeLoadState ?? (runtimeWorkspaceLoaded ? "ready" : "loading"))
+    : runtimeWorkspaceLoaded
+      ? "ready"
+      : (currentRuntimeLoadState ?? "loading");
+
+  const requestWorkspaceRuntime = useCallback(
+    (workspaceId: string, refresh = false) => {
+      const generation = ++runtimeLoadGeneration.current;
+      setRuntimeLoadState({ workspaceId, status: "loading" });
+      return updateSnapshot(setSnapshot, () =>
+        api.loadWorkspaceRuntime(workspaceId, refresh ? { refresh: true } : undefined),
+      ).then(
+        (state) => {
+          if (runtimeLoadGeneration.current === generation) {
+            setRuntimeLoadState({ workspaceId, status: "ready" });
+          }
+          return state;
+        },
+        (error: unknown) => {
+          if (runtimeLoadGeneration.current === generation) {
+            setRuntimeLoadState({ workspaceId, status: "error" });
+          }
+          throw error;
+        },
+      );
+    },
+    [api, setSnapshot],
+  );
+
+  useEffect(() => {
+    if (!runtimeLoadRequestWorkspaceId) return;
+    void requestWorkspaceRuntime(runtimeLoadRequestWorkspaceId, runtimeLoadRequestRefresh).catch(
+      (error: unknown) => {
+        console.error("[renderer] loadWorkspaceRuntime failed", error);
+      },
+    );
+    return () => {
+      runtimeLoadGeneration.current += 1;
+    };
+  }, [requestWorkspaceRuntime, runtimeLoadRequestRefresh, runtimeLoadRequestWorkspaceId]);
 
   useEffect(() => {
     const piApi = window.piApp;
@@ -167,22 +242,22 @@ export function SecondarySurfaces({
   };
 
   const handleLoginProvider = (providerId: string) => {
-    if (!settingsWorkspace) {
+    if (!providerWorkspace) {
       return;
     }
     void updateSnapshot(setSnapshot, () =>
-      api.loginProvider(settingsWorkspace.id, providerId),
+      api.loginProvider(providerWorkspace.id, providerId),
     ).catch((error: unknown) => {
       console.error("[renderer] loginProvider failed", error);
     });
   };
 
   const handleLogoutProvider = (providerId: string) => {
-    if (!settingsWorkspace) {
+    if (!providerWorkspace) {
       return;
     }
     void updateSnapshot(setSnapshot, () =>
-      api.logoutProvider(settingsWorkspace.id, providerId),
+      api.logoutProvider(providerWorkspace.id, providerId),
     ).catch((error: unknown) => {
       console.error("[renderer] logoutProvider failed", error);
     });
@@ -192,21 +267,21 @@ export function SecondarySurfaces({
     providerId: string,
     apiKey: string,
   ): Promise<string | undefined> => {
-    if (!settingsWorkspace) {
-      return "Select a workspace first.";
+    if (!providerWorkspace) {
+      return "Open a project to load shared provider settings.";
     }
     const state = await updateSnapshot(setSnapshot, () =>
-      api.setProviderApiKey(settingsWorkspace.id, providerId, apiKey),
+      api.setProviderApiKey(providerWorkspace.id, providerId, apiKey),
     );
     return state.lastError;
   };
 
   const handleRemoveProviderApiKey = async (providerId: string): Promise<string | undefined> => {
-    if (!settingsWorkspace) {
-      return "Select a workspace first.";
+    if (!providerWorkspace) {
+      return "Open a project to load shared provider settings.";
     }
     const state = await updateSnapshot(setSnapshot, () =>
-      api.logoutProvider(settingsWorkspace.id, providerId),
+      api.logoutProvider(providerWorkspace.id, providerId),
     );
     return state.lastError;
   };
@@ -214,21 +289,21 @@ export function SecondarySurfaces({
   const handleSaveCustomProvider = async (
     config: CustomProviderConfig,
   ): Promise<string | undefined> => {
-    if (!settingsWorkspace) {
-      return "Select a workspace first.";
+    if (!providerWorkspace) {
+      return "Open a project to load shared provider settings.";
     }
     const state = await updateSnapshot(setSnapshot, () =>
-      api.setCustomProvider(settingsWorkspace.id, config),
+      api.setCustomProvider(providerWorkspace.id, config),
     );
     return state.lastError;
   };
 
   const handleDeleteCustomProvider = async (providerId: string): Promise<string | undefined> => {
-    if (!settingsWorkspace) {
-      return "Select a workspace first.";
+    if (!providerWorkspace) {
+      return "Open a project to load shared provider settings.";
     }
     const state = await updateSnapshot(setSnapshot, () =>
-      api.deleteCustomProvider(settingsWorkspace.id, providerId),
+      api.deleteCustomProvider(providerWorkspace.id, providerId),
     );
     return state.lastError;
   };
@@ -361,8 +436,6 @@ export function SecondarySurfaces({
       });
   };
 
-  const customizeTab = activeView === "settings" ? undefined : activeView;
-  const customizeWorkspace = customizeTab === "extensions" ? extensionsWorkspace : skillsWorkspace;
   const workspacePicker = (
     value: WorkspaceRecord | undefined,
     onChange: (workspaceId: string) => void,
@@ -401,6 +474,7 @@ export function SecondarySurfaces({
         <CustomizePage
           commandCompatibility={extensionsCommandCompatibility}
           extensionsRuntime={extensionsRuntime}
+          runtimeLoadStatus={runtimeLoadStatus}
           skillsRuntime={skillsRuntime}
           tab={customizeTab}
           workspace={customizeWorkspace}
@@ -413,11 +487,9 @@ export function SecondarySurfaces({
           onOpenSkillFolder={handleOpenSkillFolder}
           onRefresh={() => {
             if (!customizeWorkspace) return;
-            void updateSnapshot(setSnapshot, () => api.refreshRuntime(customizeWorkspace.id)).catch(
-              (error: unknown) => {
-                console.error("[renderer] refreshRuntime failed", error);
-              },
-            );
+            void requestWorkspaceRuntime(customizeWorkspace.id, true).catch((error: unknown) => {
+              console.error("[renderer] loadWorkspaceRuntime refresh failed", error);
+            });
           }}
           onSelectTab={onSelectView}
           onToggleExtension={handleToggleExtension}
@@ -426,17 +498,34 @@ export function SecondarySurfaces({
         />
       ) : (
         <SettingsView
-          workspace={settingsWorkspace}
+          workspace={settingsSection === "providers" ? providerWorkspace : settingsWorkspace}
           runtime={
-            // Providers reads the default model to flag its provider, so it needs the same
-            // effective model settings as the Models page.
-            settingsSection === "models" || settingsSection === "providers"
-              ? settingsModelRuntime
-              : settingsRuntime
+            settingsSection === "providers"
+              ? providerModelRuntime
+              : settingsSection === "models"
+                ? settingsModelRuntime
+                : settingsRuntime
           }
           platform={api.platform}
+          runtimeLoadStatus={
+            settingsSection === "providers"
+              ? providerWorkspace
+                ? runtimeLoadStatus
+                : "unavailable"
+              : undefined
+          }
+          onRetryRuntime={
+            providerWorkspace
+              ? () => {
+                  void requestWorkspaceRuntime(providerWorkspace.id, true).catch(
+                    (error: unknown) => {
+                      console.error("[renderer] loadWorkspaceRuntime refresh failed", error);
+                    },
+                  );
+                }
+              : undefined
+          }
           headerAccessory={
-            settingsSection === "providers" ||
             settingsSection === "mcp" ||
             (settingsSection === "models" && snapshot.modelSettingsScopeMode === "per-repo")
               ? workspacePicker(settingsWorkspace, onSelectSettingsWorkspace)

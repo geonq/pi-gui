@@ -310,6 +310,8 @@ function AddMcpServerForm({
             className="settings-text-input"
             disabled={disabled}
             placeholder="https://example.com/mcp"
+            spellCheck={false}
+            type="url"
             value={url}
             onChange={(event) => setUrl(event.target.value)}
           />

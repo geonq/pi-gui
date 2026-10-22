@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 import { trapDialogFocus } from "../../ui/dialog-focus";
+import { CloseIcon } from "../../ui/icons";
 
 interface ImageAttachmentThumbProps {
   readonly src: string;
@@ -89,7 +90,7 @@ function ImageViewer({
         type="button"
         onClick={onClose}
       >
-        ×
+        <CloseIcon />
       </button>
     </div>,
     document.body,
