@@ -145,6 +145,8 @@ test("workspace runtime loading preserves project scope and never reloads sessio
     ]);
     expect(reloadCalls).toBe(0);
   } finally {
+    // Finish the store's debounced writes so they cannot race the cleanup below.
+    await store.flushPersistence();
     await rm(root, { recursive: true, force: true });
   }
 });

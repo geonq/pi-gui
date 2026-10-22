@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, realpath, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
@@ -6,7 +6,10 @@ import { createEmptyDesktopAppState } from "../../contracts/desktop-state";
 import { createWorkspaceFolderService } from "../../electron/remote/workspace-folder-service";
 
 test("Windows folder service registers only contained folders and returns their real app state", async () => {
-  const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "pi-workspace-folder-service-"));
+  // Folder paths resolve to their canonical form, and macOS temp dirs sit behind /var -> /private/var.
+  const temporaryRoot = await realpath(
+    await mkdtemp(path.join(os.tmpdir(), "pi-workspace-folder-service-")),
+  );
   const projectsRoot = path.join(temporaryRoot, "projects");
   await mkdir(projectsRoot);
   const registeredPaths: string[] = [];
