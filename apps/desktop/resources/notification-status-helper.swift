@@ -32,13 +32,34 @@ func mapAuthorizationStatus(_ value: UNAuthorizationStatus) -> String {
     }
 }
 
-func emit(_ output: HelperOutput) -> Never {
+func emit(_ status: String) -> Never {
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
-    let data = try! encoder.encode(output)
+    // Encoding one String field cannot fail; fall back to "unknown" rather than crash if it ever does.
+    let data = (try? encoder.encode(HelperOutput(status: status))) ?? Data(#"{"status":"unknown"}"#.utf8)
     FileHandle.standardOutput.write(data)
     FileHandle.standardOutput.write(Data([0x0A]))
     exit(EXIT_SUCCESS)
+}
+
+/// The system's answer, or "unknown" when it does not arrive within five seconds.
+func systemStatus(requesting: Bool) async -> String {
+    await withTaskGroup(of: String?.self) { group in
+        group.addTask {
+            let center = UNUserNotificationCenter.current()
+            if requesting {
+                _ = try? await center.requestAuthorization(options: [.alert, .badge, .sound])
+            }
+            return mapAuthorizationStatus(await center.notificationSettings().authorizationStatus)
+        }
+        group.addTask {
+            try? await Task.sleep(for: .seconds(5))
+            return nil
+        }
+        let first = await group.next() ?? nil
+        group.cancelAll()
+        return first ?? "unknown"
+    }
 }
 
 let arguments = CommandLine.arguments
@@ -51,40 +72,20 @@ if arguments.contains("--request") {
            !statusFilePath.isEmpty {
             try? "\(overrideStatus)\n".write(toFile: statusFilePath, atomically: true, encoding: .utf8)
         }
-        emit(HelperOutput(status: overrideStatus))
+        emit(overrideStatus)
     }
-
-    let semaphore = DispatchSemaphore(value: 0)
-    var resolvedOutput = HelperOutput(status: "unknown")
-    UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { _, _ in
-        UNUserNotificationCenter.current().getNotificationSettings { settings in
-            resolvedOutput = HelperOutput(status: mapAuthorizationStatus(settings.authorizationStatus))
-            semaphore.signal()
-        }
-    }
-
-    _ = semaphore.wait(timeout: .now() + .seconds(5))
-    emit(resolvedOutput)
+    emit(await systemStatus(requesting: true))
 }
 
 if let overrideStatus = normalizeStatus(environment[helperStatusEnv]) {
-    emit(HelperOutput(status: overrideStatus))
+    emit(overrideStatus)
 }
 
 if let statusFilePath = environment[helperStatusFileEnv],
    !statusFilePath.isEmpty,
    let fileContents = try? String(contentsOfFile: statusFilePath, encoding: .utf8),
    let fileStatus = normalizeStatus(fileContents.trimmingCharacters(in: .whitespacesAndNewlines)) {
-    emit(HelperOutput(status: fileStatus))
+    emit(fileStatus)
 }
 
-let semaphore = DispatchSemaphore(value: 0)
-var resolvedOutput = HelperOutput(status: "unknown")
-
-UNUserNotificationCenter.current().getNotificationSettings { settings in
-    resolvedOutput = HelperOutput(status: mapAuthorizationStatus(settings.authorizationStatus))
-    semaphore.signal()
-}
-
-_ = semaphore.wait(timeout: .now() + .seconds(5))
-emit(resolvedOutput)
+emit(await systemStatus(requesting: false))

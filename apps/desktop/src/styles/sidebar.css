@@ -1,5 +1,6 @@
 .shell {
   --sidebar-width: 236px;
+  /* Clears the macOS traffic lights; Windows has none on the left (polish.css). */
   --titlebar-toggle-left: 86px;
   --titlebar-toggle-size: 30px;
   --titlebar-toggle-main-gap: 16px;
@@ -41,18 +42,21 @@
   border-right: 1px solid var(--line);
 }
 
-.enable-transparency .sidebar {
-  backdrop-filter: var(--glass-blur) var(--glass-saturation);
-}
-
 .sidebar__top,
 .sidebar__section,
 .sidebar__footer {
   padding: 12px;
 }
 
+/* Window glass needs no page blur: a backdrop-filter above the bars also stops
+   Windows from honouring their drag regions. The top strip moves the window. */
 .sidebar__top {
   padding-top: var(--titlebar-inset-top);
+  -webkit-app-region: drag;
+}
+
+.sidebar__top button {
+  -webkit-app-region: no-drag;
 }
 
 .sidebar__nav {
@@ -80,6 +84,16 @@
   height: 15px;
 }
 
+.sidebar__nav-item:hover {
+  background: var(--overlay-subtle);
+  color: var(--text-strong);
+}
+
+.sidebar__new:hover:not(:disabled) {
+  background: var(--overlay-hover);
+  border-color: var(--border-heavy);
+}
+
 .sidebar__nav-item--active {
   background: var(--overlay-hover);
   border-color: transparent;
@@ -87,7 +101,6 @@
 }
 
 .sidebar__new {
-  -webkit-app-region: no-drag;
   width: 100%;
   min-height: var(--sidebar-first-control-height);
   padding: 7px 10px;
@@ -148,7 +161,7 @@
 }
 
 .shortcut-tooltip-wrap.thread-grouping:hover .shortcut-tooltip,
-.shortcut-tooltip-wrap.thread-grouping:focus-within .shortcut-tooltip {
+.shortcut-tooltip-wrap.thread-grouping:has(:focus-visible) .shortcut-tooltip {
   opacity: 1;
   transform: none;
 }
@@ -172,7 +185,8 @@
   background: var(--surface-muted);
 }
 
-.thread-grouping__option {
+/* Beats the later .workspace-menu__item (space-between), which pushed labels to the edge. */
+.workspace-menu__item.thread-grouping__option {
   justify-content: flex-start;
   gap: 8px;
 }
@@ -194,7 +208,7 @@
   border-radius: var(--radius-md);
   color: var(--muted-soft);
   font-size: 13px;
-  font-weight: 500;
+  font-weight: var(--font-medium);
   text-align: left;
 }
 
@@ -264,7 +278,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 10px;
   text-align: left;
-  color: var(--text);
+  color: var(--text-strong);
   border: 1px solid transparent;
 }
 
@@ -390,7 +404,7 @@
 
 .worktree-row__name {
   font-size: 13px;
-  font-weight: 560;
+  font-weight: var(--font-semibold);
   color: var(--text-strong);
 }
 
@@ -401,14 +415,14 @@
   white-space: nowrap;
   color: var(--muted-soft);
   font-size: 11px;
-  font-weight: 520;
+  font-weight: var(--font-medium);
 }
 
 .workspace-row__time,
 .session-row__time {
   color: var(--muted-soft);
   font-size: 11px;
-  font-weight: 500;
+  font-weight: var(--font-medium);
 }
 
 .workspace-row__actions {
@@ -424,29 +438,17 @@
   justify-items: end;
 }
 
-.workspace-row__action-button {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-lg);
+/* Size, centring and radius come from .icon-button. */
+.workspace-row__action-button,
+.workspace-row__menu-button {
   color: var(--muted-soft);
   background: transparent;
 }
 
-.workspace-row__action-button svg {
+.workspace-row__action-button svg,
+.workspace-row__menu-button svg {
   width: 14px;
   height: 14px;
-}
-
-.workspace-row__menu-button {
-  width: 28px;
-  height: 28px;
-  border-radius: var(--radius-lg);
-  font-size: 18px;
-  line-height: 1;
-  color: var(--muted-soft);
-  background: transparent;
 }
 
 .workspace-menu {
@@ -470,7 +472,8 @@
   justify-content: space-between;
   gap: 16px;
   padding: 9px 11px;
-  border-radius: var(--radius-lg);
+  /* Concentric with the 14px menu and its 6px padding. */
+  border-radius: var(--radius-md);
   text-align: left;
   font-size: 13px;
   white-space: nowrap;
@@ -512,7 +515,14 @@
   background: var(--surface);
   color: var(--text-strong);
   font-size: 14px;
-  font-weight: 520;
+  font-weight: var(--font-medium);
+}
+
+.workspace-rename__description {
+  resize: none;
+  font-size: 13px;
+  font-weight: var(--font-normal);
+  line-height: 1.4;
 }
 
 .workspace-rename__input:focus {
@@ -535,7 +545,7 @@
   background: var(--surface-muted);
   color: var(--muted-strong);
   font-size: 12px;
-  font-weight: 560;
+  font-weight: var(--font-semibold);
 }
 
 .workspace-rename__button--primary {
@@ -570,7 +580,7 @@
   align-items: center;
   color: var(--muted-subtle);
   font-size: 11px;
-  font-weight: 620;
+  font-weight: var(--font-semibold);
 }
 
 .pinned-thread-group__head {
@@ -581,7 +591,7 @@
   gap: 7px;
   color: var(--muted-subtle);
   font-size: 11px;
-  font-weight: 620;
+  font-weight: var(--font-semibold);
   text-transform: uppercase;
   letter-spacing: var(--tracking-wide);
 }
@@ -592,9 +602,9 @@
 }
 
 .session-row {
-  padding: 6px 8px;
+  padding: 3px 8px;
   border-radius: var(--radius-md);
-  min-height: 32px;
+  min-height: 40px;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 2px;
   position: relative;
@@ -681,8 +691,9 @@
 
 .session-row__body {
   min-width: 0;
+  min-height: 30px;
   display: grid;
-  gap: 1px;
+  grid-template-rows: 16px 14px;
 }
 
 .session-row__title-line {
@@ -694,6 +705,7 @@
 
 .session-row__title {
   font-size: 13px;
+  line-height: 16px;
   font-weight: var(--font-normal);
   color: var(--text-strong);
   min-width: 0;
@@ -701,6 +713,7 @@
 
 .session-row__context {
   font-size: 11px;
+  line-height: 14px;
   color: var(--muted-soft);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -724,7 +737,7 @@
   z-index: 1;
   display: flex;
   align-items: center;
-  gap: 1px;
+  gap: 2px;
 }
 
 .session-row:hover .session-row__trailing,
@@ -737,11 +750,19 @@
   padding-left: 18px;
 }
 
-.session-row__time,
-.session-row__action {
+.session-row__time {
   transition:
     opacity var(--motion-base) var(--ease-out),
     transform var(--motion-base) var(--ease-out);
+}
+
+.session-row__action {
+  transition:
+    opacity 180ms var(--ease-out),
+    transform 180ms var(--ease-out),
+    background 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    color 180ms var(--ease-out);
 }
 
 .session-row__time {
@@ -784,12 +805,11 @@
 }
 
 .session-row .session-row__action {
-  width: auto;
-  height: auto;
-  display: inline-flex;
-  align-items: center;
-  padding: 6px;
-  padding-right: 0;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
@@ -829,7 +849,7 @@
 }
 
 .session-row .session-row__tooltip-wrap:hover .session-row__tooltip,
-.session-row .session-row__tooltip-wrap:focus-within .session-row__tooltip {
+.session-row .session-row__tooltip-wrap:has(:focus-visible) .session-row__tooltip {
   transform: none;
 }
 
@@ -864,7 +884,7 @@
 
 .session-row__shortcut {
   font-size: 12px;
-  font-weight: 560;
+  font-weight: var(--font-semibold);
   color: var(--muted-strong);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -896,7 +916,7 @@
   border-radius: var(--radius-pill);
   color: var(--muted-soft);
   font-size: 11px;
-  font-weight: 620;
+  font-weight: var(--font-semibold);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -971,6 +991,7 @@
     left: 0;
     width: min(var(--sidebar-width), 84vw);
     z-index: 40;
+    border-right: 1px solid var(--line-strong);
     box-shadow: var(--shadow-xl);
   }
 }
@@ -982,7 +1003,7 @@
   top: 0;
   bottom: 0;
   right: 0;
-  width: 4px;
+  width: 8px;
   z-index: 30;
   cursor: col-resize;
   touch-action: none;
@@ -1004,7 +1025,34 @@
   pointer-events: none;
 }
 
-/* Transparency mode re-enables the sidebar backdrop blur in dark. */
-.enable-transparency.dark .sidebar {
-  backdrop-filter: var(--glass-blur) var(--glass-saturation);
+/* Folder-mode project controls; labels remain readable at the 200px sidebar minimum. */
+.sidebar__section .section__head {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+.sidebar__grouping {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.sidebar__grouping button {
+  padding: 4px 7px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+}
+.sidebar__grouping button[aria-pressed="true"] {
+  background: var(--overlay-hover);
+  color: var(--text-strong);
+}
+.sidebar__folder-actions {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 12px;
+}
+.sidebar__folder-actions button:disabled {
+  opacity: 0.45;
 }

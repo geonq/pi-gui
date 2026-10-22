@@ -60,14 +60,15 @@ export const themePresets: readonly ThemePreset[] = [
   {
     id: "default",
     name: "Default",
-    description: "The pi-gui palette.",
+    description: "Black and white with the owner's blue accent (#0253C4).",
     variants: {
+      // Neutral surfaces; the one hue is the owner's blue accent. Status hues stay for meaning only.
       light: {
-        seed: seed("#ffffff", "#282825", "#526795", "#2ea043", "#c45666", "#d97706"),
+        seed: seed("#fafafa", "#0a0a0a", "#0253c4", "#2f825a", "#b84e59", "#ac711c"),
         syntaxTheme: "github-light-default",
       },
       dark: {
-        seed: seed("#1d1d1c", "#eeeeea", "#9aaed8", "#40c977", "#e05467", "#d97706"),
+        seed: seed("#161616", "#f5f5f5", "#0253c4", "#40c977", "#e05467", "#d97706"),
         syntaxTheme: "github-dark-default",
       },
     },
@@ -223,11 +224,10 @@ export function deriveThemeTokens(seedValue: ThemeSeed, variant: ResolvedTheme):
 
   return {
     "--window": window,
-    "--window-glass": alpha(window, 0.6),
     "--sidebar": sidebar,
-    "--sidebar-glass": alpha(sidebar, 0.7),
+    "--sidebar-glass": alpha(sidebar, 0.6),
     "--main": main,
-    "--main-glass": alpha(main, 0.6),
+    "--main-glass": alpha(main, 0.5),
     "--surface": elevated,
     "--surface-glass": alpha(elevated, 0.8),
     "--surface-muted": surfaceMuted,

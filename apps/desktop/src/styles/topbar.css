@@ -16,6 +16,13 @@
   background: var(--main);
 }
 
+/* Windows draws minimize/maximize/close over the window's top-right corner
+   (titleBarOverlay in electron/main.ts); keep whichever bar sits there clear of them. */
+[data-platform="win32"] .main:not(.main--with-side-panel) .topbar,
+[data-platform="win32"] .workbench__tabbar {
+  padding-right: calc(138px + 8px);
+}
+
 .topbar__title {
   display: flex;
   align-items: center;
@@ -96,12 +103,12 @@
   box-shadow: var(--shadow-md);
   color: var(--muted-strong);
   font-size: 12px;
-  font-weight: 520;
+  font-weight: var(--font-medium);
   opacity: 0;
   pointer-events: none;
   transition:
-    opacity 120ms ease,
-    transform 120ms ease;
+    opacity 120ms var(--ease-out),
+    transform 120ms var(--ease-out);
 }
 
 .shortcut-tooltip kbd {
@@ -113,15 +120,21 @@
   color: var(--muted-strong);
   font-family: var(--font-ui);
   font-size: 11px;
-  font-weight: 650;
+  font-weight: var(--font-bold);
   line-height: 1.2;
   text-align: center;
 }
 
-.shortcut-tooltip-wrap:hover .shortcut-tooltip,
-.shortcut-tooltip-wrap:focus-within .shortcut-tooltip {
+.shortcut-tooltip-wrap:has(:focus-visible) .shortcut-tooltip {
   opacity: 1;
   transform: translateX(-50%);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .shortcut-tooltip-wrap:hover .shortcut-tooltip {
+    opacity: 1;
+    transform: translateX(-50%);
+  }
 }
 
 .topbar__tooltip {
@@ -130,9 +143,14 @@
   transform: translateY(-2px);
 }
 
-.topbar__tooltip-wrap:hover .topbar__tooltip,
-.topbar__tooltip-wrap:focus-within .topbar__tooltip {
+.topbar__tooltip-wrap:has(:focus-visible) .topbar__tooltip {
   transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .topbar__tooltip-wrap:hover .topbar__tooltip {
+    transform: none;
+  }
 }
 
 .sidebar-toggle {
@@ -149,6 +167,22 @@
   border-radius: var(--radius-lg);
   color: var(--muted-soft);
   background: var(--surface-overlay-muted);
+}
+
+/* The toggle sits near the window's left edge, so its tooltip opens rightwards. */
+.sidebar-toggle__tooltip {
+  left: 0;
+  transform: translateY(-2px);
+}
+
+.sidebar-toggle:has(:focus-visible) .sidebar-toggle__tooltip {
+  transform: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sidebar-toggle:hover .sidebar-toggle__tooltip {
+    transform: none;
+  }
 }
 
 .shell--sidebar-collapsed .topbar {

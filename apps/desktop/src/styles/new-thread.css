@@ -14,27 +14,30 @@
 .new-thread__hero {
   display: grid;
   justify-items: center;
-  gap: 8px;
+  gap: 10px;
   text-align: center;
 }
 
 .new-thread__logo {
-  width: 44px;
-  height: 44px;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
   display: grid;
   place-items: center;
+  box-shadow: none;
 }
 
-.new-thread__logo svg {
-  width: 44px;
-  height: 44px;
-  display: block;
+.new-thread__logo .new-thread__mark {
+  width: 26px;
+  height: 26px;
 }
 
 .new-thread__eyebrow {
   color: var(--muted-soft);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: var(--font-bold);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -43,12 +46,19 @@
   margin: 0;
   color: var(--text-strong);
   font-size: 30px;
-  font-weight: 640;
-  letter-spacing: -0.03em;
+  font-weight: var(--font-semibold);
+  letter-spacing: -0.035em;
 }
 
 .new-thread__title {
   margin: 0;
+}
+
+.new-thread__subtitle {
+  margin: -2px 0 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .new-thread__workspace-picker {
@@ -79,25 +89,35 @@
   width: 100%;
 }
 
-.new-thread__environment-group {
-  display: inline-flex;
-  gap: 8px;
-}
-
+/* Ghost chip matching the model chip: icon plus a borderless themed select. */
 .new-thread__environment {
-  padding: 7px 11px;
-  border-radius: var(--radius-pill);
-  border: 1px solid var(--line);
-  background: var(--surface-muted);
+  min-height: 32px;
+  padding: 0 6px 0 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: var(--radius-composer-inner);
   color: var(--muted-strong);
-  font-size: 13px;
-  font-weight: 560;
+  cursor: pointer;
 }
 
-.new-thread__environment--active {
-  border-color: var(--line-strong);
-  background: var(--accent-tint-bg);
+.new-thread__environment:hover {
+  background: var(--overlay-hover);
   color: var(--text-strong);
+}
+
+.new-thread__environment svg {
+  width: 14px;
+  height: 14px;
+}
+
+.new-thread__environment select {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  font-weight: var(--font-medium);
 }
 
 .new-thread__textarea {
@@ -120,8 +140,4 @@
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-}
-
-.new-thread__hint-separator {
-  color: var(--muted-soft);
 }

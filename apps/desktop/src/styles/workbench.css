@@ -69,7 +69,7 @@
   flex: none;
   min-width: 14px;
   color: var(--muted-strong);
-  font-weight: 560;
+  font-weight: var(--font-semibold);
   font-variant-numeric: tabular-nums;
 }
 
@@ -209,11 +209,12 @@
 }
 
 .workbench__resize-handle {
+  -webkit-app-region: no-drag;
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 6px;
+  width: 8px;
   z-index: 30;
   cursor: col-resize;
   touch-action: none;
@@ -233,4 +234,87 @@
 
 .main:has(.workbench__resize-handle[data-resizing="true"]) iframe {
   pointer-events: none;
+}
+
+/* Agents tool: one row per parallel agent or busy thread. */
+.agents-panel {
+  min-height: 0;
+  padding: 10px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.agents-panel__summary {
+  margin: 0 8px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agents-panel__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.agents-panel__row {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 8px;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+
+.agents-panel__row:hover {
+  background: var(--overlay-hover);
+}
+
+.agents-panel__text {
+  display: grid;
+  min-width: 0;
+}
+
+.agents-panel__title {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: var(--font-medium);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.agents-panel__detail,
+.agents-panel__status {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.agents-panel__dot {
+  width: 8px;
+  height: 8px;
+  justify-self: center;
+  border-radius: var(--radius-pill);
+  background: var(--status-neutral);
+}
+
+.agents-panel__dot--failed {
+  background: var(--status-error);
+}
+
+.agents-panel__dot--complete {
+  background: var(--status-success);
+}
+
+.workbench__solo-title {
+  flex: 1;
+  padding: 0 8px;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: var(--font-medium);
 }

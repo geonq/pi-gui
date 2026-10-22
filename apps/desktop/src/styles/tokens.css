@@ -43,7 +43,11 @@
   --radius-2xl: 14px;
   --radius-3xl: 16px;
   --radius-4xl: 18px;
-  --radius-composer: 12px;
+  --radius-composer: 18px;
+  /* Concentric corners (SwiftUI ConcentricRectangle): a nested shape's radius is
+     its container's radius minus the inset between them. */
+  --composer-inset: 12px;
+  --radius-composer-inner: calc(var(--radius-composer) - var(--composer-inset));
   --radius-panel: 12px;
   --radius-pill: 999px;
   --radius-round: 50%;
@@ -74,7 +78,7 @@
   --motion-fast: 0.12s;
   --motion-base: 0.15s;
   --motion-slow: 0.24s;
-  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   /* ---- Borders — alpha mixes of the foreground color (auto-flip) --------- */

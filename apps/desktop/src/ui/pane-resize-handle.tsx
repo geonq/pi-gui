@@ -75,7 +75,7 @@ export function PaneResizeHandle({
       onPointerDown={(event) => {
         if (event.button !== 0) return;
         event.preventDefault();
-        event.currentTarget.focus();
+        if (document.activeElement === event.currentTarget) event.currentTarget.blur();
         event.currentTarget.setPointerCapture(event.pointerId);
         drag.current = { pointerId: event.pointerId, x: event.clientX, width: currentWidth() };
         setResizing(true);
@@ -87,7 +87,14 @@ export function PaneResizeHandle({
       }}
       onPointerUp={(event) => {
         if (drag.current?.pointerId !== event.pointerId) return;
-        event.currentTarget.releasePointerCapture(event.pointerId);
+        drag.current = null;
+        setResizing(false);
+        if (event.currentTarget.hasPointerCapture(event.pointerId))
+          event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        setResizing(false);
       }}
       onLostPointerCapture={() => {
         drag.current = null;

@@ -44,23 +44,22 @@ test("every preset keeps text readable in both variants", () => {
   }
 });
 
-test("the Default seed reproduces the hand-tuned Default palette", () => {
+test("the Default palette is black and white: neutral greys, ink as the primary", () => {
   const light = themeTokensFor("default", "light");
-  expect(light["--main"]).toBe("#ffffff");
-  expect(light["--surface"]).toBe("#ffffff");
-  expect(light["--text-strong"]).toBe("#282825");
-  expect(light["--button-primary-bg"]).toBe("#282825");
+  expect(light["--main"]).toBe("#fafafa");
+  expect(light["--text-strong"]).toBe("#0a0a0a");
+  expect(light["--button-primary-bg"]).toBe("#0a0a0a");
   const dark = themeTokensFor("default", "dark");
-  expect(dark["--main"]).toBe("#1d1d1c");
-  expect(dark["--text-strong"]).toBe("#eeeeea");
-  // Former hand-typed values, within a few steps per channel (the old lines
-  // carried a slight warm cast that a straight ink blend does not).
-  expectClose(light["--sidebar"]!, "#f6f6f4");
-  expectClose(light["--line"]!, "#e4e4df");
-  expectClose(light["--text"]!, "#41413d");
-  expectClose(dark["--sidebar"]!, "#181818");
-  expectClose(dark["--surface"]!, "#222221");
-  expectClose(dark["--line"]!, "#343432");
+  expect(dark["--main"]).toBe("#161616");
+  expect(dark["--text-strong"]).toBe("#f5f5f5");
+  // Every surface and line is a pure grey: hierarchy comes from lightness only.
+  const neutral = (hex: string) =>
+    hex.slice(1, 3) === hex.slice(3, 5) && hex.slice(3, 5) === hex.slice(5, 7);
+  for (const tokens of [light, dark]) {
+    for (const name of ["--sidebar", "--surface", "--line", "--text", "--muted"] as const) {
+      expect(neutral(tokens[name]!), name).toBe(true);
+    }
+  }
 });
 
 test("presets derive every token, so no preset can inherit another's greys", () => {

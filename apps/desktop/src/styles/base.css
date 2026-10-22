@@ -1,8 +1,15 @@
 :root {
   /* Colours are derived from the active theme's seed (contracts/theme.ts) and
      written by features/theme/active-theme.ts. Only non-colour tokens live here. */
+  /* SF Pro everywhere: system font on macOS, the installed family on Windows.
+     ui-sans-serif must not lead, since Chromium maps it to Segoe UI on Windows. */
   --font-ui:
-    ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "SF Pro",
+    "Segoe UI Variable Text", "Segoe UI", sans-serif;
+  /* Titles of 20px and up use the Display cut; macOS picks it automatically. */
+  --font-display:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro", "Segoe UI Variable Display",
+    "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Consolas", monospace;
   --border: var(--line);
   --ink: var(--text);
@@ -14,17 +21,10 @@
 }
 
 .enable-transparency {
-  --window: transparent !important;
-  --sidebar: transparent !important;
-  --main: transparent !important;
   --surface: var(--surface-glass) !important;
   --surface-muted: var(--surface-muted-glass) !important;
   --line: var(--line-glass) !important;
   --line-strong: var(--line-strong-glass) !important;
-}
-
-.enable-transparency body {
-  backdrop-filter: var(--glass-blur) var(--glass-saturation);
 }
 
 * {
@@ -60,7 +60,8 @@ button {
   cursor: pointer;
 }
 
-svg {
+/* Icon default; chart SVGs size themselves. */
+:where(svg:not(.usage-view *)) {
   width: 16px;
   height: 16px;
 }
@@ -88,11 +89,31 @@ svg {
 
 .loading-card h1,
 .session-header h1,
-.empty-panel h1 {
+.empty-panel h1,
+.new-thread__hero h1,
+.settings-view .view-header__title,
+.extension-dialog__title,
+.tree-modal__title,
+.subscription-accounts__title {
+  font-family: var(--font-display);
+}
+
+.loading-card h1,
+.session-header h1 {
   margin: 0;
   font-size: clamp(34px, 3vw, 50px);
   letter-spacing: -0.04em;
   line-height: 0.98;
+}
+
+.empty-panel h1 {
+  margin: 0;
+  max-width: 24ch;
+  font-size: clamp(32px, 2.5vw, 36px);
+  font-weight: var(--font-semibold);
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  text-wrap: balance;
 }
 
 .loading-card p,
@@ -135,14 +156,15 @@ svg {
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 36px;
-  padding: 0 13px;
-  border-radius: var(--radius-lg);
+  min-height: 30px;
+  padding: 0 9px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   border: 1px solid transparent;
   color: var(--text-strong);
-  font-size: var(--text-base);
-  font-weight: var(--font-semibold);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+  line-height: 16px;
   transition:
     background var(--motion-base) var(--ease-out),
     border-color var(--motion-base) var(--ease-out),
@@ -151,9 +173,9 @@ svg {
 }
 
 .button--primary {
-  background: var(--button-primary-bg);
-  border-color: var(--button-primary-border);
-  color: var(--button-primary-ink);
+  background: var(--surface-overlay);
+  border-color: var(--line);
+  color: var(--text-strong);
 }
 
 .button--ghost {
@@ -172,21 +194,21 @@ svg {
 }
 
 .button--primary:hover:not(:disabled) {
-  background: var(--button-primary-hover-bg);
-  border-color: var(--button-primary-hover-border);
+  background: var(--surface-overlay-hover);
+  border-color: var(--surface-overlay-border);
 }
 
 .button--primary:disabled {
-  opacity: 1;
-  background: var(--button-primary-disabled-bg);
-  border-color: var(--button-primary-disabled-border);
-  color: var(--button-primary-disabled-ink);
+  opacity: 0.45;
 }
 
 .button--cta-icon {
-  width: 64px;
-  min-width: 64px;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
   padding: 0;
+  border-radius: var(--radius-pill);
   display: inline-grid;
   place-items: center;
 }
@@ -256,16 +278,11 @@ svg {
   background-color: var(--scrollbar-thumb-hover);
 }
 
-/* Tokenized focus ring for interactive elements. */
-button:focus-visible,
-a:focus-visible,
-[role="button"]:focus-visible,
-[tabindex]:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
+/* One focus ring for every interactive element. An outline is not clipped by
+   rounded overflow the way a box-shadow ring is, and never stacks with one. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring-border);
+  outline-offset: 2px;
 }
 
 /* Respect users who prefer reduced motion. */
