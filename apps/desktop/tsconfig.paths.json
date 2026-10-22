@@ -2,6 +2,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
+      "@/*": ["src/vendor/bklit/*"],
       "@pi-gui/pi-sdk-driver": ["../../packages/pi-sdk-driver/src/index.ts"],
       "@pi-gui/pi-sdk-driver/custom-provider-types": [
         "../../packages/pi-sdk-driver/src/custom-provider-types.ts"

@@ -4,6 +4,13 @@
   "version": "1.0.1",
   "license": "MIT",
   "packageManager": "pnpm@10.25.0",
+  "pnpm": {
+    "overrides": {
+      "basic-ftp@<6.2.1": "6.2.1",
+      "ip-address@<10.7.1": "10.7.1",
+      "ws@>=8 <8.21.3": "8.21.3"
+    }
+  },
   "scripts": {
     "dev": "pnpm --filter @pi-gui/desktop dev",
     "build": "pnpm --filter @pi-gui/desktop run build && pnpm --filter @pi-gui/website run build",

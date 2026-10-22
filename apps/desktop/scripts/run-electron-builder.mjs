@@ -35,6 +35,7 @@ function createPackagingEnv() {
 function spawnElectronBuilder(electronBuilderArgs) {
   const pnpmBinary = process.platform === "win32" ? "pnpm.cmd" : "pnpm";
   const result = spawnSync(pnpmBinary, ["exec", "electron-builder", ...electronBuilderArgs], {
+    windowsHide: true,
     cwd: desktopDir,
     encoding: "utf8",
     stdio: ["inherit", "pipe", "pipe"],

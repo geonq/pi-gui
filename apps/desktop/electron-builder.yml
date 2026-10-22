@@ -1,7 +1,7 @@
 appId: com.pi-gui.desktop
-productName: pi-gui
+productName: Pegasus
 copyright: Copyright 2026 Matthew Lam
-electronVersion: 37.10.3
+electronVersion: 43.7.11
 
 directories:
   output: release
@@ -37,6 +37,8 @@ asarUnpack:
 artifactName: ${productName}-${version}-${arch}.${ext}
 
 mac:
+  icon: resources/icon.icns
+  executableName: Pegasus
   category: public.app-category.developer-tools
   hardenedRuntime: true
   entitlements: resources/entitlements.mac.plist
@@ -54,7 +56,7 @@ mac:
 
 linux:
   category: Development
-  executableName: pi-gui
+  executableName: Pegasus
   maintainer: Matthew Lam <minghinmatthew.lam@gmail.com>
   vendor: pi-gui
   synopsis: Codex-style desktop app for the pi coding agent
@@ -86,7 +88,8 @@ deb:
     - libgbm1
 
 win:
-  executableName: pi-gui
+  icon: resources/icon.ico
+  executableName: Pegasus
   # Keep icon/version metadata editing; signing is optional without credentials.
   signAndEditExecutable: true
   target:
@@ -98,6 +101,13 @@ win:
         - x64
 
 nsis:
+  oneClick: false
+  perMachine: false
+  allowElevation: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: false
+  createStartMenuShortcut: false
+  runAfterFinish: false
   artifactName: ${productName}-${version}-${arch}-setup.${ext}
 
 portable:

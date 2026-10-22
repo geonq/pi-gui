@@ -25,6 +25,8 @@ export default [
     ignores: [
       "**/node_modules/**",
       "examples/desktop-extensions/*/dist/**",
+      // Third-party chart sources kept byte-for-byte (see their README).
+      "apps/desktop/src/vendor/**",
       // Generated output lives at repository/workspace roots, never anywhere
       // named "release" or "build" inside product source.
       ...["", "apps/*/", "packages/*/", "video/"].flatMap((root) =>

@@ -2,6 +2,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "electron-vite";
 import react from "@vitejs/plugin-react";
+import tailwindcss from "@tailwindcss/vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -9,6 +10,15 @@ const projectRoot = __dirname;
 const pathsProject = path.resolve(projectRoot, "tsconfig.paths.json");
 const devPort = Number(process.env.PI_APP_DEV_PORT ?? "5173");
 export default defineConfig(({ command }) => {
+  if (command === "build" && !process.stdout.isTTY) {
+    const stdout = process.stdout;
+    for (const method of ["clearLine", "cursorTo", "moveCursor"]) {
+      if (typeof stdout[method] !== "function") {
+        stdout[method] = () => stdout;
+      }
+    }
+  }
+
   const cleanOutputs = command === "build";
 
   return {
@@ -30,9 +40,15 @@ export default defineConfig(({ command }) => {
       build: {
         outDir: "out/preload",
         emptyOutDir: cleanOutputs,
+        isolatedEntries: true,
+        externalizeDeps: false,
         rollupOptions: {
           input: {
             preload: path.resolve(projectRoot, "electron/preload.ts"),
+            "remote-broker-preload": path.resolve(
+              projectRoot,
+              "electron/remote/remote-broker-preload.ts",
+            ),
           },
         },
       },
@@ -40,7 +56,7 @@ export default defineConfig(({ command }) => {
     renderer: {
       root: projectRoot,
       base: "./",
-      plugins: [react(), tsconfigPaths({ projects: [pathsProject] })],
+      plugins: [react(), tailwindcss(), tsconfigPaths({ projects: [pathsProject] })],
       server: {
         port: devPort,
         strictPort: true,
@@ -49,7 +65,10 @@ export default defineConfig(({ command }) => {
         outDir: "out/renderer",
         emptyOutDir: true,
         rollupOptions: {
-          input: path.resolve(projectRoot, "index.html"),
+          input: {
+            index: path.resolve(projectRoot, "index.html"),
+            "remote-broker": path.resolve(projectRoot, "remote-broker.html"),
+          },
         },
       },
     },
