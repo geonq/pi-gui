@@ -103,7 +103,7 @@ jobs:
         run: >-
           pnpm --filter @pi-gui/desktop run build &&
           pnpm --dir apps/desktop exec electron-builder --mac --dir --arm64 --publish never
-          -c.mac.identity=null -c.mac.notarize=false
+          -c.mac.identity=null -c.mac.notarize=false -c.npmRebuild=false
 
       - name: Verify packaged runtime dependencies
         run: pnpm --dir apps/desktop run verify:packaged-runtime-deps

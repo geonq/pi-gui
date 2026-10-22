@@ -8,6 +8,7 @@ overrides:
   basic-ftp@<6.2.1: 6.2.1
   ip-address@<10.7.1: 10.7.1
   ws@>=8 <8.21.3: 8.21.3
+  node-abi: 4.36.0
 
 patchedDependencies:
   app-builder-lib@26.8.1:
@@ -4279,8 +4280,8 @@ packages:
       sass:
         optional: true
 
-  node-abi@4.28.0:
-    resolution: {integrity: sha512-Qfp5XZL1cJDOabOT8H5gnqMTmM4NjvYzHp4I/Kt/Sl76OVkOBBHRFlPspGV0hYvMoqQsypFjT/Yp7Km0beXW9g==}
+  node-abi@4.36.0:
+    resolution: {integrity: sha512-zrvE1Qy5ElbZVqmJFSiNfwzNZzUCepasgp/4dw0Z0fsn40LJkAk9FA9oMh2SKMeNFRRe/3IfeOKvWwWr8u4SmQ==}
     engines: {node: '>=22.12.0'}
 
   node-addon-api@1.7.2:
@@ -6084,7 +6085,7 @@ snapshots:
       detect-libc: 2.1.2
       got: 11.8.6
       graceful-fs: 4.2.11
-      node-abi: 4.28.0
+      node-abi: 4.36.0
       node-api-version: 0.2.1
       node-gyp: 11.5.0
       ora: 5.4.1
@@ -9746,7 +9747,7 @@ snapshots:
       - '@babel/core'
       - babel-plugin-macros
 
-  node-abi@4.28.0:
+  node-abi@4.36.0:
     dependencies:
       semver: 7.8.5
 

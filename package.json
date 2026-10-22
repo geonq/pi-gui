@@ -8,7 +8,8 @@
     "overrides": {
       "basic-ftp@<6.2.1": "6.2.1",
       "ip-address@<10.7.1": "10.7.1",
-      "ws@>=8 <8.21.3": "8.21.3"
+      "ws@>=8 <8.21.3": "8.21.3",
+      "node-abi": "4.36.0"
     }
   },
   "scripts": {
@@ -20,7 +21,7 @@
     "typecheck": "pnpm check:workspaces && pnpm build:shared && pnpm -r --if-present typecheck && pnpm typecheck:extension-examples",
     "package:win": "pnpm --filter @pi-gui/desktop run package:win",
     "package:win:dir": "pnpm --filter @pi-gui/desktop run package:win:dir",
-    "lint": "pnpm build:shared && eslint . --max-warnings 0",
+    "lint": "pnpm build:shared && node --max-old-space-size=8192 node_modules/eslint/bin/eslint.js . --max-warnings 0",
     "test": "pnpm build:shared && pnpm -r --if-present test",
     "e2e": "pnpm --filter @pi-gui/desktop run test:e2e:core",
     "test:homebrew-tap": "node scripts/test-update-homebrew-tap.mjs",
