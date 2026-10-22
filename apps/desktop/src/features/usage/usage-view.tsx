@@ -250,7 +250,8 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
         <div>
           <h1 className="view-header__title">Usage</h1>
           <p className="view-header__body">
-            Tokens per account and model across saved Pi sessions and imported CLI history where available.
+            Tokens per account and model across saved Pi sessions and imported CLI history where
+            available.
           </p>
         </div>
         <div className="view-header__actions">
@@ -294,7 +295,8 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
       ) : null}
       {history?.status === "unavailable" ? (
         <p className="usage-view__note" role="status" data-testid="usage-history-status">
-          Historical CLI usage could not be read or failed validation. Showing saved Pi-session usage only.
+          Historical CLI usage could not be read or failed validation. Showing saved Pi-session
+          usage only.
         </p>
       ) : null}
       {history?.status === "available" ? (
@@ -303,17 +305,11 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
             ? history.safeEventCount
               ? "Imported Codex and Claude history. Importing remaining files…"
               : "Importing Codex and Claude history…"
-            : history.tokenCoveragePartial
-              ? "Historical usage inventory is complete; token coverage is partial."
-              : "Imported Codex and Claude history."}
+            : "Imported Codex and Claude history."}
         </p>
       ) : null}
       {history?.status === "available" && history.tokenCoveragePartial ? (
-        <p
-          className="usage-view__note"
-          role="status"
-          data-testid="usage-history-token-coverage"
-        >
+        <p className="usage-view__note" role="status" data-testid="usage-history-token-coverage">
           Token coverage is partial.{" "}
           {history.normalizationNote ??
             "Some Codex history is excluded from token totals because its source is ambiguous."}
@@ -360,8 +356,20 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
             <Stat label="Output, all time" value={compact.format(view.output)} />
             <Stat label="Cache reads, all time" value={compact.format(view.cacheRead)} />
             <Stat
-              label={view.cost === null ? "Cost unavailable" : view.cost > 0 ? "Provider-reported cost, all time" : "Threads read"}
-              value={view.cost === null ? "Unavailable" : view.cost > 0 ? usd.format(view.cost) : compact.format(report.sessions)}
+              label={
+                view.cost === null
+                  ? "Cost unavailable"
+                  : view.cost > 0
+                    ? "Provider-reported cost, all time"
+                    : "Threads read"
+              }
+              value={
+                view.cost === null
+                  ? "Unavailable"
+                  : view.cost > 0
+                    ? usd.format(view.cost)
+                    : compact.format(report.sessions)
+              }
             />
           </section>
 
@@ -416,7 +424,11 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
                   {view.share.map((entry, index) => (
                     <Ring index={index} key={entry.key} />
                   ))}
-                  <RingCenter defaultLabel="tokens" />
+                  {/* Compact, so billions fit inside the innermost ring. */}
+                  <RingCenter
+                    defaultLabel="tokens"
+                    formatOptions={{ notation: "compact", maximumFractionDigits: 1 }}
+                  />
                 </RingChart>
                 <ul className="usage-list">
                   {view.share.map((entry, index) => (
@@ -445,12 +457,32 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
             <section className="usage-card" data-testid="usage-potential-overlap">
               <h3>{potentialOverlap.label}</h3>
               <p className="usage-view__note">
-                {compact.format(totalTokens(potentialOverlap.totals))} recorded tokens across {compact.format(potentialOverlap.sessions)} sessions. Kept separate from combined totals because these events may overlap native Pi usage. Some cache metrics were not recorded; cost is unavailable.
+                {compact.format(totalTokens(potentialOverlap.totals))} recorded tokens across{" "}
+                {compact.format(potentialOverlap.sessions)} sessions. Kept separate from combined
+                totals because these events may overlap native Pi usage. Some cache metrics were not
+                recorded; cost is unavailable.
               </p>
-              <div className="usage-view__split">
-                <Breakdown title="Models" rows={rankBreakdowns(potentialOverlap.models, 6)} />
-                <Breakdown title="Historical workspaces" rows={rankBreakdowns(potentialOverlap.workspaces, 6)} />
-                <Breakdown title="Historical threads" rows={rankBreakdowns(potentialOverlap.threads, 8)} />
+              {/* Lists sit inside this card, so they drop their own card chrome; empty ones are left out. */}
+              <div className="usage-view__split usage-view__split--bare">
+                {potentialOverlap.models.some((model) => model.label !== "unknown") ? (
+                  <Breakdown
+                    bare
+                    title="Models"
+                    rows={rankBreakdowns(potentialOverlap.models, 6)}
+                  />
+                ) : null}
+                {potentialOverlap.workspaces.length ? (
+                  <Breakdown
+                    bare
+                    title="Historical workspaces"
+                    rows={rankBreakdowns(potentialOverlap.workspaces, 6)}
+                  />
+                ) : null}
+                <Breakdown
+                  bare
+                  title="Largest sessions"
+                  rows={rankBreakdowns(potentialOverlap.threads, 8)}
+                />
               </div>
             </section>
           ) : null}
@@ -472,22 +504,41 @@ function Stat({ label, value }: { readonly label: string; readonly value: string
   );
 }
 
+/**
+ * Imported CLI sessions carry no title (prompts stay private), only a generic source label,
+ * so they read by model and size instead of eight identical "… CLI history" rows.
+ */
+function breakdownLabel(row: UsageBreakdown): string {
+  if (!row.provider?.startsWith("history-")) {
+    // Some imported folder names arrive URL-encoded ("LifeOS%20Design").
+    try {
+      return decodeURIComponent(row.label);
+    } catch {
+      return row.label;
+    }
+  }
+  const model = !row.detail || /unknown/i.test(row.detail) ? "Unknown model" : row.detail;
+  return `${model} · ${compact.format(row.replies)} replies`;
+}
+
 function Breakdown({
   title,
   rows,
+  bare = false,
 }: {
   readonly title: string;
   readonly rows: readonly { readonly row: UsageBreakdown; readonly amount: number }[];
+  readonly bare?: boolean;
 }) {
   const max = Math.max(1, ...rows.map((entry) => entry.amount));
   return (
-    <section className="usage-card">
+    <section className={bare ? "usage-breakdown" : "usage-card"}>
       <h3>{title}</h3>
       {rows.length === 0 ? <p className="usage-card__empty">Nothing recorded yet.</p> : null}
       <ul className="usage-list">
         {rows.map(({ row, amount }) => (
-          <li key={row.key} title={row.detail}>
-            <span className="usage-list__label">{row.label}</span>
+          <li key={row.key} title={row.label}>
+            <span className="usage-list__label">{breakdownLabel(row)}</span>
             <span className="usage-list__value">{compact.format(amount)}</span>
             <span className="usage-list__bar" style={{ width: `${(amount / max) * 100}%` }} />
           </li>

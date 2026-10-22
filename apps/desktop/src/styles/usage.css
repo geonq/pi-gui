@@ -60,8 +60,9 @@
   font-size: 12px;
 }
 
+/* Block margins only: the inline auto margins centre notes in the column like everything else. */
 .usage-view__note {
-  margin: 0;
+  margin-block: 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -116,6 +117,10 @@
   margin: 0 0 10px;
 }
 
+.usage-card > .usage-view__note {
+  line-height: 1.5;
+}
+
 .usage-card__empty {
   margin: 0;
   color: var(--muted-soft);
@@ -133,8 +138,27 @@
   margin: 0;
   padding: 0;
   display: grid;
+  /* One shrinkable column: long labels ellipsize instead of widening the card. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   list-style: none;
+}
+
+/* Lists nested in a card (historical overlap) keep the card's padding, not their own chrome. */
+.usage-view__split--bare {
+  margin-top: 14px;
+  gap: 24px;
+}
+
+.usage-breakdown {
+  min-width: 0;
+}
+
+.usage-breakdown h3 {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: var(--font-medium);
 }
 
 .usage-list li {
