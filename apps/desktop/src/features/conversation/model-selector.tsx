@@ -158,9 +158,10 @@ export function ModelSelector({
           </button>
           {open === "model" ? (
             <div
-              className={`model-selector__dropdown ${dropdownPlacement === "below" ? "model-selector__dropdown--below" : ""}`}
+              className={`model-selector__dropdown model-selector__dropdown--filtered ${dropdownPlacement === "below" ? "model-selector__dropdown--below" : ""}`}
               onWheel={(event) => event.stopPropagation()}
             >
+              {/* The filter stays outside the scrolling list, so it needs no backdrop of its own. */}
               <div className="model-selector__filter">
                 <input
                   aria-label="Filter models"
@@ -173,51 +174,53 @@ export function ModelSelector({
                   autoFocus
                 />
               </div>
-              {groupedModels.map((group) => (
-                <div key={group.provider}>
-                  <div className="model-selector__group-title">
-                    <ProviderIcon providerId={group.provider} />
-                    {accountHeading(
-                      group.provider,
-                      group.items[0]?.label.split(" · ").slice(0, -1).join(" · ") ?? "",
-                    )}
-                    <ProviderStatusBadge status={statuses.get(group.provider)} />
+              <div className="model-selector__list">
+                {groupedModels.map((group) => (
+                  <div key={group.provider}>
+                    <div className="model-selector__group-title">
+                      <ProviderIcon providerId={group.provider} />
+                      {accountHeading(
+                        group.provider,
+                        group.items[0]?.label.split(" · ").slice(0, -1).join(" · ") ?? "",
+                      )}
+                      <ProviderStatusBadge status={statuses.get(group.provider)} />
+                    </div>
+                    {group.items.map((option) => {
+                      const isActive = option.providerId === provider && option.modelId === modelId;
+                      return (
+                        <button
+                          aria-label={option.label.split(" · ").at(-1)}
+                          aria-pressed={isActive}
+                          className={`model-selector__item${isActive ? " model-selector__item--active" : ""}`}
+                          key={`${option.providerId}:${option.modelId}`}
+                          type="button"
+                          onClick={() => {
+                            if (!isActive) {
+                              onSetModel(option.providerId, option.modelId);
+                            }
+                            closeDropdown();
+                          }}
+                        >
+                          <span className="model-selector__item-label">{modelName(option)}</span>
+                          {isActive ? (
+                            <span className="model-selector__item-meta">active</span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
                   </div>
-                  {group.items.map((option) => {
-                    const isActive = option.providerId === provider && option.modelId === modelId;
-                    return (
-                      <button
-                        aria-label={option.label.split(" · ").at(-1)}
-                        aria-pressed={isActive}
-                        className={`model-selector__item${isActive ? " model-selector__item--active" : ""}`}
-                        key={`${option.providerId}:${option.modelId}`}
-                        type="button"
-                        onClick={() => {
-                          if (!isActive) {
-                            onSetModel(option.providerId, option.modelId);
-                          }
-                          closeDropdown();
-                        }}
-                      >
-                        <span className="model-selector__item-label">{modelName(option)}</span>
-                        {isActive ? (
-                          <span className="model-selector__item-meta">active</span>
-                        ) : null}
-                      </button>
-                    );
-                  })}
-                </div>
-              ))}
-              {groupedModels.length === 0 ? (
-                <>
-                  <div className="model-selector__group-title">
-                    {noMatchingModels ? "No matching models" : emptyModelTitle}
-                  </div>
-                  {noMatchingModels ? (
-                    <div className="model-selector__empty">Try a different filter.</div>
-                  ) : null}
-                </>
-              ) : null}
+                ))}
+                {groupedModels.length === 0 ? (
+                  <>
+                    <div className="model-selector__group-title">
+                      {noMatchingModels ? "No matching models" : emptyModelTitle}
+                    </div>
+                    {noMatchingModels ? (
+                      <div className="model-selector__empty">Try a different filter.</div>
+                    ) : null}
+                  </>
+                ) : null}
+              </div>
             </div>
           ) : null}
         </span>

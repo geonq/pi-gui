@@ -89,21 +89,30 @@
   flex-direction: column;
 }
 
+/* With a filter, only the list scrolls; the filter sits on the dropdown's own surface. */
+.model-selector__dropdown--filtered {
+  overflow: hidden;
+}
+
+.model-selector__list {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .model-selector__filter {
-  padding: 4px 8px 8px;
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  z-index: 1;
+  flex: none;
+  padding: 4px 4px 6px;
 }
 
 .model-selector__filter-input {
   width: 100%;
   box-sizing: border-box;
-  padding: 6px 10px;
-  border-radius: var(--radius-sm);
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
   border: 1px solid var(--line);
-  background: var(--surface-muted);
+  background: var(--overlay-hover);
   color: var(--text);
   font-size: 13px;
   outline: none;
