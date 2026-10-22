@@ -114,7 +114,8 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
   const [report, setReport] = useState<UsageReport | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [period, setPeriod] = useState<PeriodId>("30");
+  // Opens on the full history; shorter periods are one click away.
+  const [period, setPeriod] = useState<PeriodId>("all");
   const [account, setAccount] = useState<string>(ALL);
   const {
     error: limitsError,
