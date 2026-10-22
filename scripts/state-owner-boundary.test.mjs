@@ -31,6 +31,8 @@ const durableStateOwners = [
       "apps/desktop/electron/persistence/app-store-persistence.ts",
       "apps/desktop/electron/persistence/attachment-store.ts",
       "apps/desktop/electron/scheduled-tasks/scheduled-task-store.ts",
+      // Owns the Mac remote client's local display preferences file.
+      "apps/desktop/electron/remote/remote-desktop-client-preferences.ts",
       reviewedStore,
       checkpointStore,
     ],

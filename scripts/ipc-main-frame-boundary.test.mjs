@@ -17,6 +17,11 @@ const rawIpcAllowlist = new Map([
       "resolve the sender window but do not gate on the frame; subframes receive no preload. " +
       "Migrating them is a separate change; the channels below must not regress to raw handlers.",
   ],
+  [
+    `${electronDir}/remote/remote-desktop-broker.ts`,
+    "receives one-way send() messages from the hidden broker window it creates itself; " +
+      "mainFrameHandler covers invoke only, so the sender is checked with isMainFrameSender.",
+  ],
 ]);
 
 // Channels whose handlers must reject anything other than the owned window's main frame.

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
+import { isMainFrameSender } from "../ipc/main-frame-ipc";
 import type { DesktopAppViewState } from "../../contracts/desktop-state";
 import type { DesktopAppState } from "../../contracts/desktop-state";
 import type {
@@ -371,8 +372,7 @@ export class RemoteDesktopBroker {
   private isBrokerMainFrame(event: IpcMainEvent): boolean {
     return (
       !this.disposed &&
-      event.sender === this.window.webContents &&
-      event.senderFrame === event.sender.mainFrame &&
+      isMainFrameSender(event, this.window.webContents) &&
       this.options.windows.isPassiveRemoteSender(event.sender)
     );
   }

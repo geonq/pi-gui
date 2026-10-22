@@ -1,9 +1,9 @@
-import { ipcMain, type IpcMainInvokeEvent } from "electron";
 import type {
   WorkspaceFolderAdapters,
   WorkspaceFolderDevice,
 } from "../../contracts/workspace-folders";
 import { desktopIpc } from "../../contracts/ipc";
+import { mainFrameArgsHandler } from "../ipc/main-frame-ipc";
 import type { WindowOwner } from "../windows/window-owner";
 import { expectOptionalWorkspaceFolderListingPath } from "./workspace-folder-ipc-validation";
 
@@ -11,26 +11,21 @@ export function registerWorkspaceFolderIpc(
   windows: WindowOwner,
   adapters: WorkspaceFolderAdapters,
 ): void {
-  ipcMain.handle(desktopIpc.listWorkspaceFolderRoots, (event, rawDevice: unknown) => {
-    assertMainFrame(windows, event);
+  const handle = mainFrameArgsHandler(windows);
+  handle(desktopIpc.listWorkspaceFolderRoots, (_request, rawDevice) => {
     const adapter = getAdapter(adapters, rawDevice);
     return adapter?.listRoots() ?? [];
   });
-  ipcMain.handle(
-    desktopIpc.listWorkspaceFolders,
-    (event, rawDevice: unknown, rawRootId: unknown, rawRelativePath: unknown) => {
-      assertMainFrame(windows, event);
-      const adapter = requireAdapter(adapters, rawDevice);
-      return adapter.list(
-        expectString(rawRootId, "rootId"),
-        expectOptionalWorkspaceFolderListingPath(rawRelativePath),
-      );
-    },
-  );
-  ipcMain.handle(
+  handle(desktopIpc.listWorkspaceFolders, (_request, rawDevice, rawRootId, rawRelativePath) => {
+    const adapter = requireAdapter(adapters, rawDevice);
+    return adapter.list(
+      expectString(rawRootId, "rootId"),
+      expectOptionalWorkspaceFolderListingPath(rawRelativePath),
+    );
+  });
+  handle(
     desktopIpc.openWorkspaceFolder,
-    async (event, rawDevice: unknown, rawRootId: unknown, rawRelativePath: unknown) => {
-      const window = assertMainFrame(windows, event);
+    async ({ window }, rawDevice, rawRootId, rawRelativePath) => {
       const adapter = requireAdapter(adapters, rawDevice);
       const rootId = expectString(rawRootId, "rootId");
       const relativePath = expectRelativePath(rawRelativePath);
@@ -47,16 +42,9 @@ export function registerWorkspaceFolderIpc(
       return result;
     },
   );
-  ipcMain.handle(
+  handle(
     desktopIpc.createWorkspaceFolder,
-    async (
-      event,
-      rawDevice: unknown,
-      rawRootId: unknown,
-      rawParentRelativePath: unknown,
-      rawName: unknown,
-    ) => {
-      const window = assertMainFrame(windows, event);
+    async ({ window }, rawDevice, rawRootId, rawParentRelativePath, rawName) => {
       const adapter = requireAdapter(adapters, rawDevice);
       const rootId = expectString(rawRootId, "rootId");
       const parentRelativePath = expectRelativePath(rawParentRelativePath);
@@ -74,14 +62,6 @@ export function registerWorkspaceFolderIpc(
       return result;
     },
   );
-}
-
-function assertMainFrame(windows: WindowOwner, event: IpcMainInvokeEvent) {
-  const window = windows.windowForSender(event.sender);
-  if (event.senderFrame !== event.sender.mainFrame || window.isDestroyed()) {
-    throw new Error("Folder browser calls must come from the app's main frame.");
-  }
-  return window;
 }
 
 function getAdapter(adapters: WorkspaceFolderAdapters, value: unknown) {

@@ -3,7 +3,6 @@ import {
   BrowserWindow,
   clipboard,
   dialog,
-  ipcMain,
   Menu,
   nativeImage,
   nativeTheme,
@@ -46,6 +45,7 @@ import {
 import { performExtensionViewHostAction } from "./extensions/extension-view-actions";
 import { extensionFrameDocument } from "./extensions/extension-frame-document";
 import { ReviewOwner } from "./workbench/review-owner";
+import { mainFrameHandler } from "./ipc/main-frame-ipc";
 import { registerDesktopIpc } from "./ipc/register-desktop-ipc";
 import {
   createOrchestrationRuntimeExtension,
@@ -1730,47 +1730,44 @@ app
     });
 
     if (remoteDesktopClient) {
-      ipcMain.handle(remoteClientIpc.invoke, async (event, payload: unknown) => {
-        const window = windowOwner.windowForSender(event.sender);
-        if (event.senderFrame !== event.sender.mainFrame || window.isDestroyed()) {
-          throw new Error("Remote desktop calls must come from the app's main frame.");
-        }
-        const { method, args } = remoteClientInvocationFromIpc(payload);
-        const result = await remoteDesktopClient!.invoke(method, args);
-        return isDesktopAppState(result)
-          ? { ...result, ...remoteDesktopClientPreferences }
-          : result;
-      });
-      ipcMain.handle(remoteClientIpc.getLocalPreferences, (event) => {
-        const window = windowOwner.windowForSender(event.sender);
-        if (event.senderFrame !== event.sender.mainFrame || window.isDestroyed()) {
-          throw new Error("Remote desktop calls must come from the app's main frame.");
-        }
-        return remoteDesktopClientPreferences;
-      });
-      ipcMain.handle(remoteClientIpc.setLocalPreferences, async (event, payload: unknown) => {
-        const window = windowOwner.windowForSender(event.sender);
-        if (event.senderFrame !== event.sender.mainFrame || window.isDestroyed()) {
-          throw new Error("Remote desktop calls must come from the app's main frame.");
-        }
-        const patch = validateRemoteDesktopClientPreferencesPatch(payload);
-        const next = { ...remoteDesktopClientPreferences, ...patch };
-        await persistRemoteDesktopClientPreferences(configuredUserDataDir, next);
-        remoteDesktopClientPreferences = next;
-        if (patch.themeMode !== undefined) {
-          themeManager.setMode(next.themeMode);
-          refreshWindowBackgrounds();
-        }
-        if (patch.themePresetId !== undefined) refreshWindowBackgrounds();
-        if (patch.enableTransparency !== undefined) {
-          for (const currentWindow of windowOwner.allWindows()) {
-            if (!currentWindow.isDestroyed()) {
-              setWindowTransparency(currentWindow, next.enableTransparency);
+      const handleMainFrame = mainFrameHandler(windowOwner);
+      handleMainFrame(
+        remoteClientIpc.invoke,
+        remoteClientInvocationFromIpc,
+        async ({ method, args }) => {
+          const result = await remoteDesktopClient!.invoke(method, args);
+          return isDesktopAppState(result)
+            ? { ...result, ...remoteDesktopClientPreferences }
+            : result;
+        },
+      );
+      handleMainFrame(
+        remoteClientIpc.getLocalPreferences,
+        () => undefined,
+        () => remoteDesktopClientPreferences,
+      );
+      handleMainFrame(
+        remoteClientIpc.setLocalPreferences,
+        validateRemoteDesktopClientPreferencesPatch,
+        async (patch) => {
+          const next = { ...remoteDesktopClientPreferences, ...patch };
+          await persistRemoteDesktopClientPreferences(configuredUserDataDir, next);
+          remoteDesktopClientPreferences = next;
+          if (patch.themeMode !== undefined) {
+            themeManager.setMode(next.themeMode);
+            refreshWindowBackgrounds();
+          }
+          if (patch.themePresetId !== undefined) refreshWindowBackgrounds();
+          if (patch.enableTransparency !== undefined) {
+            for (const currentWindow of windowOwner.allWindows()) {
+              if (!currentWindow.isDestroyed()) {
+                setWindowTransparency(currentWindow, next.enableTransparency);
+              }
             }
           }
-        }
-        return remoteDesktopClientPreferences;
-      });
+          return remoteDesktopClientPreferences;
+        },
+      );
       remoteDesktopClient.subscribe((event: RemoteDesktopEvent) => {
         for (const window of windowOwner.allWindows()) {
           if (window.isDestroyed() || window.webContents.isDestroyed()) continue;

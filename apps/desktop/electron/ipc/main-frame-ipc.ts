@@ -1,4 +1,10 @@
-import { ipcMain, type BrowserWindow, type IpcMainInvokeEvent, type WebContents } from "electron";
+import {
+  ipcMain,
+  type BrowserWindow,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+  type WebContents,
+} from "electron";
 import type { WindowOwner } from "../windows/window-owner";
 
 export interface MainFrameRequest {
@@ -22,12 +28,41 @@ export type MainFrameHandler = <Input, Result>(
 export function mainFrameHandler(windows: Pick<WindowOwner, "windowForSender">): MainFrameHandler {
   return (channel, decode, handler) => {
     ipcMain.handle(channel, (event, raw: unknown) => {
-      const window = windows.windowForSender(event.sender);
-      const contents = window.webContents;
-      if (!event.senderFrame || event.senderFrame !== contents.mainFrame) {
-        throw new Error(`${channel} must originate from the window's main frame.`);
-      }
-      return handler(decode(raw), { event, window, contents });
+      const request = mainFrameRequest(windows, channel, event);
+      return handler(decode(raw), request);
     });
   };
+}
+
+/**
+ * The same main-frame gate for channels whose preload passes several positional
+ * arguments; each handler validates its own raw arguments after the check.
+ */
+export function mainFrameArgsHandler(windows: Pick<WindowOwner, "windowForSender">) {
+  return <Result>(
+    channel: string,
+    handler: (request: MainFrameRequest, ...raw: unknown[]) => Result,
+  ): void => {
+    ipcMain.handle(channel, (event, ...raw: unknown[]) =>
+      handler(mainFrameRequest(windows, channel, event), ...raw),
+    );
+  };
+}
+
+/** For one-way `send` messages from a window the caller created and owns. */
+export function isMainFrameSender(event: IpcMainEvent, contents: WebContents): boolean {
+  return event.sender === contents && event.senderFrame === contents.mainFrame;
+}
+
+function mainFrameRequest(
+  windows: Pick<WindowOwner, "windowForSender">,
+  channel: string,
+  event: IpcMainInvokeEvent,
+): MainFrameRequest {
+  const window = windows.windowForSender(event.sender);
+  const contents = window.isDestroyed() ? undefined : window.webContents;
+  if (!contents || !event.senderFrame || event.senderFrame !== contents.mainFrame) {
+    throw new Error(`${channel} must originate from the window's main frame.`);
+  }
+  return { event, window, contents };
 }
