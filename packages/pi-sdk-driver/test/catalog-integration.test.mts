@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -144,7 +144,9 @@ await test("desktop and driver catalog owners preserve each other's records", as
 });
 
 await test("startup sync batches successful workspaces and leaves failures untouched", async () => {
-  await withTempDir(async (dir) => {
+  await withTempDir(async (tempDir) => {
+    // The supervisor canonicalizes workspace paths; macOS temp dirs sit behind /var -> /private/var.
+    const dir = await realpath(tempDir);
     const catalogFilePath = join(dir, "catalogs.json");
     const store = new JsonCatalogStore({ catalogFilePath });
     const existingPath = join(dir, "existing");
