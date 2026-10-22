@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { RuntimeSupervisor } from "../dist/runtime-supervisor.js";
+import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 
 const EXTENSION_PROVIDER = "ext-test-provider";
 const EXTENSION_MODEL = "ext-test-model";
@@ -153,6 +154,45 @@ await test("runtime snapshot includes providers registered by extensions", async
     snapshot.providers.some((provider) => provider.id === EXTENSION_PROVIDER),
     "extension-registered provider should appear in the provider list",
   );
+});
+
+await test("awaits provider registration refresh, then refreshes cached snapshots", async () => {
+  const { agentDir, workspacePath } = await createAgentDir();
+  const supervisor = createSupervisor(agentDir);
+  const originalRefresh = ModelRuntime.prototype.refresh;
+  const originalGetAvailable = ModelRuntime.prototype.getAvailable;
+  let refreshCalls = 0;
+  let getAvailableCalls = 0;
+  ModelRuntime.prototype.refresh = function (options) {
+    refreshCalls += 1;
+    return originalRefresh.call(this, options);
+  };
+  ModelRuntime.prototype.getAvailable = function (providerId, options) {
+    getAvailableCalls += 1;
+    return originalGetAvailable.call(this, providerId, options);
+  };
+  try {
+    const workspace = { workspaceId: "workspace-1", path: workspacePath };
+    const first = await supervisor.getRuntimeSnapshot(workspace);
+    assert.equal(
+      refreshCalls,
+      2,
+      "SDK provider registration starts a refresh; the fresh context awaits one more for settled availability",
+    );
+    assert.equal(getAvailableCalls, 0, "snapshot building reads the refreshed availability snapshot");
+    assert.ok(
+      first.models.some((model) => model.providerId === JSON_PROVIDER && model.available),
+      "the freshly built snapshot retains available models",
+    );
+
+    const second = await supervisor.getRuntimeSnapshot(workspace);
+    assert.equal(refreshCalls, 3, "an existing context is explicitly refreshed on the next snapshot");
+    assert.equal(getAvailableCalls, 0);
+    assert.ok(second.models.some((model) => model.providerId === JSON_PROVIDER && model.available));
+  } finally {
+    ModelRuntime.prototype.refresh = originalRefresh;
+    ModelRuntime.prototype.getAvailable = originalGetAvailable;
+  }
 });
 
 await test("disabling an extension drops the providers it registered", async () => {

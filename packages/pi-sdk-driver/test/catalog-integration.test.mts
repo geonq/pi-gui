@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { SessionSupervisor } from "../dist/index.js";
 import { JsonCatalogStore } from "@pi-gui/catalogs/node";
 import type {
@@ -63,6 +64,10 @@ function withBlockingWorkspaceUpserts(store: SessionFileCatalogStorage): {
         store.setSessionFile(sessionRef, sessionFile),
       deleteSessionFile: (sessionRef: SessionRef): Promise<void> =>
         store.deleteSessionFile(sessionRef),
+      replaceWorkspaceSyncBatch: (
+        newWorkspaces: readonly WorkspaceCatalogEntry[],
+        replacements,
+      ) => store.replaceWorkspaceSyncBatch(newWorkspaces, replacements),
       replaceWorkspaceSessions: async (
         workspaceId: WorkspaceId,
         entries: readonly SessionCatalogEntry[],
@@ -137,6 +142,87 @@ await test("desktop and driver catalog owners preserve each other's records", as
       persisted.worktrees.map((entry) => entry.worktreeId),
       [join(dir, "worktree")],
     );
+  });
+});
+
+await test("startup sync batches successful workspaces and leaves failures untouched", async () => {
+  await withTempDir(async (dir) => {
+    const catalogFilePath = join(dir, "catalogs.json");
+    const store = new JsonCatalogStore({ catalogFilePath });
+    const existingPath = join(dir, "existing");
+    const newPath = join(dir, "new");
+    const failedPath = join(dir, "failed");
+    await Promise.all([mkdir(existingPath), mkdir(newPath), mkdir(failedPath)]);
+    const existingId = await new SessionSupervisor({ catalogStorage: store }).registerWorkspace(
+      existingPath,
+      "Existing",
+    );
+    const failedId = await new SessionSupervisor({ catalogStorage: store }).registerWorkspace(
+      failedPath,
+      "Failed",
+    );
+    const lastOpenedAt = "2026-05-01T00:00:00.000Z";
+    const failedSession: SessionCatalogEntry = {
+      sessionRef: { workspaceId: failedId.workspaceId, sessionId: "preserved" },
+      workspaceId: failedId.workspaceId,
+      title: "Preserve failed workspace session",
+      updatedAt: timestamp,
+      status: "idle",
+    };
+    await Promise.all([
+      store.workspaces.upsertWorkspace({
+        ...(await store.workspaces.getWorkspace(existingId.workspaceId))!,
+        lastOpenedAt,
+      }),
+      store.sessions.upsertSession(failedSession),
+    ]);
+
+    let batchCalls = 0;
+    let perWorkspaceCalls = 0;
+    const catalog: SessionFileCatalogStorage = {
+      workspaces: store.workspaces,
+      sessions: store.sessions,
+      worktrees: store.worktrees,
+      getSessionFile: (sessionRef) => store.getSessionFile(sessionRef),
+      setSessionFile: (sessionRef, path) => store.setSessionFile(sessionRef, path),
+      deleteSessionFile: (sessionRef) => store.deleteSessionFile(sessionRef),
+      replaceWorkspaceSyncBatch: (newWorkspaces, replacements) => {
+        batchCalls += 1;
+        return store.replaceWorkspaceSyncBatch(newWorkspaces, replacements);
+      },
+      replaceWorkspaceSessions: (workspaceId, entries, sessionFiles) => {
+        perWorkspaceCalls += 1;
+        return store.replaceWorkspaceSessions(workspaceId, entries, sessionFiles);
+      },
+    };
+    const supervisor = new SessionSupervisor({ catalogStorage: catalog });
+    const originalList = SessionManager.list;
+    SessionManager.list = async (path) => {
+      if (path === failedPath) throw new Error("fixture scan failure");
+      return [];
+    };
+    try {
+      const result = await supervisor.syncWorkspaces([
+        { path: existingPath },
+        { path: newPath },
+        { path: failedPath },
+      ]);
+
+      assert.deepEqual(result.failures, [{ path: failedPath, message: "fixture scan failure" }]);
+      assert.equal(batchCalls, 1);
+      assert.equal(perWorkspaceCalls, 0);
+      assert.equal(
+        (await store.workspaces.getWorkspace(existingId.workspaceId))?.lastOpenedAt,
+        lastOpenedAt,
+      );
+      assert.ok(await store.workspaces.getWorkspace(newPath));
+      assert.equal(
+        (await store.sessions.getSession(failedSession.sessionRef))?.title,
+        failedSession.title,
+      );
+    } finally {
+      SessionManager.list = originalList;
+    }
   });
 });
 

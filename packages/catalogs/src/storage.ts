@@ -39,9 +39,21 @@ export interface SessionFileCatalogStorage extends CatalogStorage {
   getSessionFile(sessionRef: SessionRef): Promise<string | undefined>;
   setSessionFile(sessionRef: SessionRef, sessionFile: string): Promise<void>;
   deleteSessionFile(sessionRef: SessionRef): Promise<void>;
+  replaceWorkspaceSyncBatch(
+    newWorkspaces: readonly WorkspaceCatalogEntry[],
+    replacements: readonly WorkspaceSessionSyncReplacement[],
+  ): Promise<readonly SessionRef[]>;
   replaceWorkspaceSessions(
     workspaceId: WorkspaceId,
     entries: readonly SessionCatalogEntry[],
     sessionFiles: Readonly<Record<string, string>>,
   ): Promise<void>;
+}
+
+export interface WorkspaceSessionSyncReplacement {
+  readonly workspaceId: WorkspaceId;
+  readonly entries: readonly SessionCatalogEntry[];
+  readonly sessionFiles: Readonly<Record<string, string>>;
+  readonly baselineEntries: readonly SessionCatalogEntry[];
+  readonly baselineSessionFiles: Readonly<Record<string, string>>;
 }

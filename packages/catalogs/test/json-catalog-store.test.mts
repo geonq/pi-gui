@@ -315,3 +315,98 @@ await test("session writes that change nothing leave the catalog file alone", as
     assert.equal(await reopened.getSessionFile(session.sessionRef), "/session.jsonl");
   });
 });
+
+await test("startup batch sync preserves concurrent and untargeted catalog records", async () => {
+  await withTempDir(async (dir) => {
+    const catalogFilePath = join(dir, "catalogs.json");
+    const store = new JsonCatalogStore({ catalogFilePath });
+    const concurrentWriter = new JsonCatalogStore({ catalogFilePath });
+    const workspace = (workspaceId: string, lastOpenedAt: string) => ({
+      workspaceId,
+      path: join(dir, workspaceId),
+      displayName: workspaceId,
+      lastOpenedAt,
+      sortOrder: workspaceId === "target" ? 0 : 1,
+    });
+    const session = (workspaceId: string, sessionId: string, title: string) => ({
+      sessionRef: { workspaceId, sessionId },
+      workspaceId,
+      title,
+      updatedAt: timestamp,
+      status: "idle" as const,
+    });
+    const target = workspace("target", "2026-06-01T00:00:00.000Z");
+    const unrelated = workspace("unrelated", timestamp);
+    const failed = workspace("failed", timestamp);
+    const original = session("target", "kept", "original");
+    const removed = session("target", "removed", "removed");
+    const unrelatedSession = session("unrelated", "unrelated-session", "unrelated");
+    const failedSession = session("failed", "failed-session", "failed");
+    await Promise.all([
+      store.workspaces.upsertWorkspace(target),
+      store.workspaces.upsertWorkspace(unrelated),
+      store.workspaces.upsertWorkspace(failed),
+      store.sessions.upsertSession(original),
+      store.sessions.upsertSession(removed),
+      store.sessions.upsertSession(unrelatedSession),
+      store.sessions.upsertSession(failedSession),
+      store.setSessionFile(original.sessionRef, "/old/session.jsonl"),
+    ]);
+
+    const baselineSessions = (await store.sessions.listSessions("target")).sessions;
+    const baselineFiles = Object.fromEntries(
+      await Promise.all(
+        baselineSessions.map(async (entry) => [
+          `${entry.workspaceId}:${entry.sessionRef.sessionId}`,
+          (await store.getSessionFile(entry.sessionRef)) ?? "",
+        ] as const),
+      ),
+    );
+    await Promise.all([
+      concurrentWriter.sessions.upsertSession({ ...original, title: "concurrent title" }),
+      concurrentWriter.sessions.upsertSession(session("target", "concurrent", "concurrent")),
+      concurrentWriter.setSessionFile(original.sessionRef, "/concurrent/session.jsonl"),
+    ]);
+
+    const removedRefs = await store.replaceWorkspaceSyncBatch(
+      [
+        { ...target, lastOpenedAt: "2099-01-01T00:00:00.000Z" },
+        { ...workspace("new", timestamp), sortOrder: 99 },
+      ],
+      [
+        {
+          workspaceId: "target",
+          baselineEntries: baselineSessions,
+          baselineSessionFiles: baselineFiles,
+          entries: [
+            { ...original, title: "stale scan", sessionFilePath: "/new/session.jsonl" },
+            { ...session("target", "discovered", "discovered"), sessionFilePath: "/found.jsonl" },
+          ],
+          sessionFiles: {
+            "target:kept": "/new/session.jsonl",
+            "target:discovered": "/found.jsonl",
+          },
+        },
+      ],
+    );
+
+    assert.deepEqual(removedRefs, [removed.sessionRef]);
+    const workspaces = (await store.workspaces.listWorkspaces()).workspaces;
+    assert.equal(workspaces.find((entry) => entry.workspaceId === "target")?.lastOpenedAt, target.lastOpenedAt);
+    assert.ok(workspaces.some((entry) => entry.workspaceId === "new"));
+    const catalogSessions = (await store.sessions.listSessions()).sessions
+      .map(({ sessionRef, title }) => [sessionRef.workspaceId, sessionRef.sessionId, title])
+      .sort(([leftWorkspace, leftSession], [rightWorkspace, rightSession]) =>
+        `${leftWorkspace}:${leftSession}`.localeCompare(`${rightWorkspace}:${rightSession}`),
+      );
+    assert.deepEqual(catalogSessions, [
+      ["failed", "failed-session", "failed"],
+      ["target", "concurrent", "concurrent"],
+      ["target", "discovered", "discovered"],
+      ["target", "kept", "concurrent title"],
+      ["unrelated", "unrelated-session", "unrelated"],
+    ]);
+    assert.equal(await store.getSessionFile(original.sessionRef), "/concurrent/session.jsonl");
+    assert.equal(await store.getSessionFile({ workspaceId: "target", sessionId: "discovered" }), "/found.jsonl");
+  });
+});

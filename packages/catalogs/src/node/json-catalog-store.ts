@@ -22,6 +22,7 @@ import type {
   WorktreeCatalogEntry,
   WorktreeCatalogSnapshot,
   WorktreeId,
+  WorkspaceSessionSyncReplacement,
 } from "../index.js";
 import { sessionKey } from "@pi-gui/session-driver";
 
@@ -236,6 +237,139 @@ export class JsonCatalogStore implements SessionFileCatalogStorage {
     });
   }
 
+  async replaceWorkspaceSyncBatch(
+    newWorkspaces: readonly WorkspaceCatalogEntry[],
+    replacements: readonly WorkspaceSessionSyncReplacement[],
+  ): Promise<readonly SessionRef[]> {
+    let removedSessionRefs: SessionRef[] = [];
+    await this.mutateState((state) => {
+      const nextWorkspaces = [...state.workspaces];
+      for (const workspace of newWorkspaces) {
+        if (nextWorkspaces.some((entry) => entry.workspaceId === workspace.workspaceId)) continue;
+        nextWorkspaces.push({ ...cloneWorkspaceEntry(workspace), sortOrder: nextWorkspaces.length });
+      }
+
+      const nextEntriesByWorkspace = new Map<WorkspaceId, SessionCatalogEntry[]>();
+      const removed = new Map<string, SessionRef>();
+      for (const replacement of replacements) {
+        const baselineByKey = new Map(
+          replacement.baselineEntries.map((entry) => [sessionKey(entry.sessionRef), entry]),
+        );
+        const stagedByKey = new Map(
+          replacement.entries.map((entry) => [sessionKey(entry.sessionRef), entry]),
+        );
+        const currentByKey = new Map(
+          state.sessions
+            .filter((entry) => entry.workspaceId === replacement.workspaceId)
+            .map((entry) => [sessionKey(entry.sessionRef), entry]),
+        );
+        const finalByKey = new Map<string, SessionCatalogEntry>();
+        const keys = new Set([
+          ...baselineByKey.keys(),
+          ...stagedByKey.keys(),
+          ...currentByKey.keys(),
+        ]);
+
+        for (const key of keys) {
+          const baseline = baselineByKey.get(key);
+          const current = currentByKey.get(key);
+          const staged = stagedByKey.get(key);
+          const baselinePath =
+            replacement.baselineSessionFiles[key] || baseline?.sessionFilePath;
+          const currentPath = state.sessionFiles[key] || current?.sessionFilePath;
+          const changedSinceScan =
+            Boolean(current) &&
+            (Boolean(baseline) && !areSessionEntriesEqual(current!, baseline!) ||
+              currentPath !== baselinePath);
+          if (baseline) {
+            if (!current) continue;
+            if (changedSinceScan) {
+              finalByKey.set(key, current);
+            } else if (staged) {
+              finalByKey.set(key, staged);
+            }
+          } else if (current ?? staged) {
+            finalByKey.set(key, current ?? staged!);
+          }
+        }
+
+        const orderedEntries: SessionCatalogEntry[] = [];
+        const seen = new Set<string>();
+        for (const entry of [...replacement.entries, ...currentByKey.values()]) {
+          const key = sessionKey(entry.sessionRef);
+          const finalEntry = finalByKey.get(key);
+          if (finalEntry && !seen.has(key)) {
+            orderedEntries.push(finalEntry);
+            seen.add(key);
+          }
+        }
+        nextEntriesByWorkspace.set(replacement.workspaceId, orderedEntries);
+        for (const entry of [...replacement.baselineEntries, ...currentByKey.values()]) {
+          const key = sessionKey(entry.sessionRef);
+          if (!finalByKey.has(key)) removed.set(key, entry.sessionRef);
+        }
+      }
+
+      const nextSessions: SessionCatalogEntry[] = [];
+      const insertedWorkspaces = new Set<WorkspaceId>();
+      for (const entry of state.sessions) {
+        const replacementEntries = nextEntriesByWorkspace.get(entry.workspaceId);
+        if (!replacementEntries) {
+          nextSessions.push(entry);
+        } else if (!insertedWorkspaces.has(entry.workspaceId)) {
+          nextSessions.push(...replacementEntries);
+          insertedWorkspaces.add(entry.workspaceId);
+        }
+      }
+      for (const [workspaceId, entries] of nextEntriesByWorkspace) {
+        if (!insertedWorkspaces.has(workspaceId)) nextSessions.push(...entries);
+      }
+
+      const nextSessionFiles = { ...state.sessionFiles };
+      for (const replacement of replacements) {
+        const prefix = `${replacement.workspaceId}:`;
+        for (const key of Object.keys(nextSessionFiles)) {
+          if (key.startsWith(prefix)) delete nextSessionFiles[key];
+        }
+        const baselineByKey = new Map(
+          replacement.baselineEntries.map((entry) => [sessionKey(entry.sessionRef), entry]),
+        );
+        const currentByKey = new Map(
+          state.sessions
+            .filter((entry) => entry.workspaceId === replacement.workspaceId)
+            .map((entry) => [sessionKey(entry.sessionRef), entry]),
+        );
+        for (const entry of nextEntriesByWorkspace.get(replacement.workspaceId) ?? []) {
+          const key = sessionKey(entry.sessionRef);
+          const baseline = baselineByKey.get(key);
+          const current = currentByKey.get(key);
+          const baselinePath =
+            replacement.baselineSessionFiles[key] || baseline?.sessionFilePath;
+          const currentPath = state.sessionFiles[key] || current?.sessionFilePath;
+          const changedSinceScan =
+            current &&
+            (!baseline ||
+              !areSessionEntriesEqual(current, baseline) ||
+              currentPath !== baselinePath);
+          const filePath = changedSinceScan
+            ? currentPath
+            : replacement.sessionFiles[key] ?? state.sessionFiles[key] ?? entry.sessionFilePath;
+          if (filePath) nextSessionFiles[key] = filePath;
+        }
+      }
+
+      const workspacesChanged = !areWorkspaceListsEqual(state.workspaces, nextWorkspaces);
+      const sessionsChanged = !areSessionListsEqual(state.sessions, nextSessions);
+      const sessionFilesChanged = !areStringRecordsEqual(state.sessionFiles, nextSessionFiles);
+      removedSessionRefs = [...removed.values()];
+      if (!workspacesChanged && !sessionsChanged && !sessionFilesChanged) return false;
+      state.workspaces = nextWorkspaces;
+      state.sessions = nextSessions;
+      state.sessionFiles = nextSessionFiles;
+    });
+    return removedSessionRefs;
+  }
+
   private async getState(): Promise<CatalogFileState> {
     const generation = this.coordinator.generation;
     if (this.state && this.stateGeneration === generation) {
@@ -363,6 +497,52 @@ function areWorktreeListsEqual(
 
   const sortedRight = [...right].sort(compareWorktreeEntries);
   return left.every((entry, index) => areWorktreeEntriesEqual(entry, sortedRight[index]));
+}
+
+function areWorkspaceListsEqual(
+  left: readonly WorkspaceCatalogEntry[],
+  right: readonly WorkspaceCatalogEntry[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((entry, index) => areWorkspaceEntriesEqual(entry, right[index]))
+  );
+}
+
+function areWorkspaceEntriesEqual(
+  left: WorkspaceCatalogEntry,
+  right: WorkspaceCatalogEntry | undefined,
+): boolean {
+  return Boolean(
+    right &&
+      left.workspaceId === right.workspaceId &&
+      left.path === right.path &&
+      left.displayName === right.displayName &&
+      left.lastOpenedAt === right.lastOpenedAt &&
+      left.sortOrder === right.sortOrder &&
+      left.pinned === right.pinned,
+  );
+}
+
+function areSessionListsEqual(
+  left: readonly SessionCatalogEntry[],
+  right: readonly SessionCatalogEntry[],
+): boolean {
+  return (
+    left.length === right.length &&
+    left.every((entry, index) => areSessionEntriesEqual(entry, right[index]!))
+  );
+}
+
+function areStringRecordsEqual(
+  left: Readonly<Record<string, string>>,
+  right: Readonly<Record<string, string>>,
+): boolean {
+  const leftKeys = Object.keys(left);
+  return (
+    leftKeys.length === Object.keys(right).length &&
+    leftKeys.every((key) => left[key] === right[key])
+  );
 }
 
 function areSessionEntriesEqual(left: SessionCatalogEntry, right: SessionCatalogEntry): boolean {

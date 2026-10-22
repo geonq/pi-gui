@@ -191,6 +191,12 @@ export interface SessionUpdatedEvent extends SessionEventBase {
   readonly snapshot: SessionSnapshot;
 }
 
+/** Display-only progress from a provider that executes its own tools. Never a tool request. */
+export interface AssistantActivityEvent extends SessionEventBase {
+  readonly type: "assistantActivity";
+  readonly toolName: string;
+}
+
 export interface AssistantDeltaEvent extends SessionEventBase {
   readonly type: "assistantDelta";
   readonly text: string;
@@ -369,6 +375,7 @@ export type SessionDriverEvent =
   | SessionOpenedEvent
   | SessionUpdatedEvent
   | AssistantDeltaEvent
+  | AssistantActivityEvent
   | AssistantMessageEndedEvent
   | AssistantMessagePersistedEvent
   | TranscriptItemAppendedEvent

@@ -1,4 +1,7 @@
 import { readFile } from "node:fs/promises";
+import { providerAccountLabel } from "./provider-account-label.js";
+import { currentDesktopModels } from "./current-model-catalog.js";
+import { getSupportedThinkingLevels } from "@earendil-works/pi-ai";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import {
   CredentialSynchronizationError,
@@ -96,6 +99,24 @@ type StoredCredentialType = Awaited<ReturnType<ModelRuntime["listCredentials"]>>
 type LoginAuthType = Parameters<ModelRuntime["login"]>[1];
 type LoginInteraction = Parameters<ModelRuntime["login"]>[2];
 
+function startStartupTrace(stage: string): number | undefined {
+  if (process.env.PI_APP_STARTUP_TRACE !== "1") return undefined;
+  console.info(`[startup] ${stage} started`);
+  return performance.now();
+}
+
+function traceStartupDuration(stage: string, startedAt: number | undefined): void {
+  if (startedAt !== undefined) {
+    console.info(`[startup] ${stage}: ${Math.round(performance.now() - startedAt)}ms`);
+  }
+}
+
+function traceStartupPromise<T>(stage: string, operation: () => Promise<T>): Promise<T> {
+  const startedAt = startStartupTrace(stage);
+  if (startedAt === undefined) return operation();
+  return operation().finally(() => traceStartupDuration(stage, startedAt));
+}
+
 interface RuntimeContext {
   readonly workspace: WorkspaceRef;
   readonly settingsManager: SettingsManager;
@@ -143,8 +164,13 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
   }
 
   async getRuntimeSnapshot(workspace: WorkspaceRef): Promise<RuntimeSnapshot> {
-    const context = await this.ensureContext(workspace);
-    return this.buildSnapshot(context);
+    const refreshRuntime = this.contexts.has(workspace.workspaceId);
+    const context = await traceStartupPromise("runtime context load", () =>
+      this.ensureContext(workspace),
+    );
+    return traceStartupPromise("runtime snapshot build", () =>
+      this.buildSnapshot(context, refreshRuntime),
+    );
   }
 
   async refreshRuntime(workspace: WorkspaceRef): Promise<RuntimeSnapshot> {
@@ -535,16 +561,19 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
       return existing;
     }
 
+    const contextSetupStarted = startStartupTrace("runtime context setup");
     let settingsManager = SettingsManager.create(workspace.path, this.agentDir);
     let packageManager = this.createPackageManager(workspace.path, settingsManager);
     let resourceLoader = new DefaultResourceLoader({
       cwd: workspace.path,
       agentDir: this.agentDir,
+      noContextFiles: process.env.PI_APP_CONTEXT_FILES === "extension-only",
       settingsManager,
       extensionFactories: this.inventoryExtensionFactories(),
     });
+    traceStartupDuration("runtime context setup", contextSetupStarted);
     try {
-      await resourceLoader.reload();
+      await traceStartupPromise("resource loader reload", () => resourceLoader.reload());
     } catch (error) {
       if (!isGlobalNpmLookupError(error)) {
         throw error;
@@ -566,13 +595,16 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
       resourceLoader = new DefaultResourceLoader({
         cwd: workspace.path,
         agentDir: this.agentDir,
+        noContextFiles: process.env.PI_APP_CONTEXT_FILES === "extension-only",
         settingsManager,
         extensionFactories: this.inventoryExtensionFactories(),
       });
-      await resourceLoader.reload();
+      await traceStartupPromise("resource loader reload fallback", () => resourceLoader.reload());
     }
 
-    const applied = await this.applyExtensionProviders(resourceLoader);
+    const applied = await traceStartupPromise("extension provider application", () =>
+      this.applyExtensionProviders(resourceLoader),
+    );
     const context: RuntimeContext = {
       workspace,
       settingsManager,
@@ -660,11 +692,13 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
     readonly accepted: ExtensionProviderRegistration[];
     readonly acceptedNative: ExtensionNativeProviderRegistration[];
   }> {
-    const runtime = await ModelRuntime.create({
-      authPath: this.authPath,
-      modelsPath: this.modelsJsonPath,
-      refreshOnCreate: false,
-    });
+    const runtime = await traceStartupPromise("model runtime create", () =>
+      ModelRuntime.create({
+        authPath: this.authPath,
+        modelsPath: this.modelsJsonPath,
+        refreshOnCreate: false,
+      }),
+    );
     const accepted: ExtensionProviderRegistration[] = [];
     for (const registration of registrations) {
       const { name, config, extensionPath } = registration;
@@ -695,19 +729,35 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
         );
       }
     }
-    await runtime.refresh({ allowNetwork: false });
+    await traceStartupPromise("model runtime refresh", () =>
+      runtime.refresh({ allowNetwork: false }),
+    );
     return { runtime, accepted, acceptedNative };
   }
 
-  private async buildSnapshot(context: RuntimeContext): Promise<RuntimeSnapshot> {
-    await context.modelRuntime.refresh({ allowNetwork: false });
+  private async buildSnapshot(
+    context: RuntimeContext,
+    refreshRuntime = true,
+  ): Promise<RuntimeSnapshot> {
+    if (refreshRuntime) {
+      await traceStartupPromise("snapshot model runtime refresh", () =>
+        context.modelRuntime.refresh({ allowNetwork: false }),
+      );
+    }
     const resolvedPaths = await this.resolveRuntimePaths(context);
-    const [skills, extensions, providers, models] = await Promise.all([
-      this.buildSkillRecords(context, resolvedPaths.skills),
-      this.buildExtensionRecords(context, resolvedPaths.extensions),
-      this.buildProviderRecords(context),
-      this.buildModelRecords(context),
+    const [skills, extensions, models] = await Promise.all([
+      traceStartupPromise("build skill records", () =>
+        this.buildSkillRecords(context, resolvedPaths.skills),
+      ),
+      traceStartupPromise("build extension records", () =>
+        this.buildExtensionRecords(context, resolvedPaths.extensions),
+      ),
+      traceStartupPromise("build model records", () => this.buildModelRecords(context)),
     ]);
+    // Model discovery settles external CLI authentication before publishing provider status.
+    const providers = await traceStartupPromise("build snapshot provider records", () =>
+      this.buildProviderRecords(context),
+    );
 
     const defaultProvider = context.settingsManager.getDefaultProvider();
     const defaultModelId = context.settingsManager.getDefaultModel();
@@ -732,7 +782,9 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
 
   private async resolveRuntimePaths(context: RuntimeContext): Promise<ResolvedPaths> {
     try {
-      return await context.packageManager.resolve();
+      return await traceStartupPromise("resolve package resource paths", () =>
+        context.packageManager.resolve(),
+      );
     } catch (error) {
       if (!isGlobalNpmLookupError(error)) {
         throw error;
@@ -755,7 +807,9 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
         context.workspace.path,
         fallbackSettingsManager,
       );
-      return fallbackPackageManager.resolve();
+      return traceStartupPromise("resolve fallback package paths", () =>
+        fallbackPackageManager.resolve(),
+      );
     }
   }
 
@@ -763,7 +817,17 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
     context: RuntimeContext,
   ): Promise<readonly RuntimeProviderRecord[]> {
     const runtime = context.modelRuntime;
-    const credentials = await runtime.listCredentials();
+    const credentials = await traceStartupPromise("list runtime credentials", () =>
+      runtime.listCredentials(),
+    );
+    const [accountSettings, accountAuth] = await traceStartupPromise(
+      "read provider account metadata",
+      () =>
+        Promise.all([
+          readJsonRecord(join(this.agentDir, "settings.json")),
+          readJsonRecord(join(this.agentDir, "auth.json")),
+        ]),
+    );
     const credentialByProvider = new Map(
       credentials.map((credential) => [credential.providerId, credential.type] as const),
     );
@@ -787,9 +851,15 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
         const apiKeySetupSupported = providerSupportsDesktopApiKeySetup(providerId);
         const providerAuthStatus = runtime.getProviderAuthStatus(providerId);
         const hasAuth = providerAuthStatus.configured || storedType !== undefined;
+        const baseName = oauthProvider?.name ?? runtime.getProvider(providerId)?.name ?? providerId;
+        const accountName = providerAccountLabel(
+          providerId,
+          accountSettings.desktopAccountLabels,
+          accountAuth,
+        );
         return {
           id: providerId,
-          name: oauthProvider?.name ?? runtime.getProvider(providerId)?.name ?? providerId,
+          name: accountName ? `${baseName} · ${accountName}` : baseName,
           hasAuth,
           authType: storedType ?? "none",
           authSource: inferProviderAuthSource(storedType, providerAuthStatus, apiKeySetupSupported),
@@ -802,14 +872,17 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
   private async buildModelRecords(context: RuntimeContext): Promise<readonly RuntimeModelRecord[]> {
     const runtime = context.modelRuntime;
     const availableKeys = new Set(
-      (await runtime.getAvailable()).map((model) => `${model.provider}:${model.id}`),
+      runtime.getAvailableSnapshot().map((model) => `${model.provider}:${model.id}`),
     );
     const providers = new Map(
-      (await this.buildProviderRecords(context)).map((provider) => [provider.id, provider]),
+      (
+        await traceStartupPromise("model record provider metadata", () =>
+          this.buildProviderRecords(context),
+        )
+      ).map((provider) => [provider.id, provider]),
     );
 
-    return runtime
-      .getModels()
+    return currentDesktopModels(runtime.getModels())
       .map<RuntimeModelRecord>((model) => {
         const provider = providers.get(model.provider);
         return {
@@ -820,6 +893,7 @@ export class RuntimeSupervisor implements RuntimeResourceDriver {
           available: availableKeys.has(`${model.provider}:${model.id}`),
           authType: provider?.authType ?? "none",
           reasoning: Boolean(model.reasoning),
+          thinkingLevels: getSupportedThinkingLevels(model),
           supportsImages: model.input.includes("image"),
         };
       })

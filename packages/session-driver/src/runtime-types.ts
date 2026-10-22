@@ -32,6 +32,8 @@ export interface RuntimeModelRecord {
   readonly available: boolean;
   readonly authType: RuntimeAuthType;
   readonly reasoning: boolean;
+  /** Effort levels this model accepts, as pi reports them ("off" alone means no effort control). */
+  readonly thinkingLevels: readonly string[];
   readonly supportsImages: boolean;
 }
 

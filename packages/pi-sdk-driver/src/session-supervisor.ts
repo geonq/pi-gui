@@ -17,6 +17,11 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { SessionCatalogSnapshot, WorkspaceCatalogSnapshot } from "@pi-gui/catalogs";
 import type {
+  SessionCatalogEntry,
+  WorkspaceCatalogEntry,
+  WorkspaceSessionSyncReplacement,
+} from "@pi-gui/catalogs";
+import type {
   NavigateSessionTreeOptions,
   NavigateSessionTreeResult,
   SessionMessageDeliveryMode,
@@ -194,6 +199,20 @@ export interface SyncWorkspaceResult {
   readonly sessions: SessionCatalogSnapshot["sessions"];
 }
 
+export interface SyncWorkspaceInput {
+  readonly path: string;
+  readonly displayName?: string;
+}
+
+export interface SyncWorkspaceFailure {
+  readonly path: string;
+  readonly message: string;
+}
+
+export interface SyncWorkspacesResult {
+  readonly failures: readonly SyncWorkspaceFailure[];
+}
+
 interface ManagedSessionRecord {
   ref: SessionRef;
   workspace: WorkspaceRef;
@@ -353,6 +372,7 @@ export class SessionSupervisor {
         ? { extensionFlagValues: new Map(Object.entries(extensionFlagValues)) }
         : {}),
       resourceLoaderOptions: {
+        noContextFiles: process.env.PI_APP_CONTEXT_FILES === "extension-only",
         extensionFactories: [
           ...this.piAddons,
           ...this.builtinExtensions,
@@ -452,6 +472,177 @@ export class SessionSupervisor {
     });
   }
 
+  async syncWorkspaces(workspaces: readonly SyncWorkspaceInput[]): Promise<SyncWorkspacesResult> {
+    const failures: SyncWorkspaceFailure[] = [];
+    const canonicalized = await Promise.all(
+      workspaces.map(async (workspace) => {
+        try {
+          return {
+            sourcePath: workspace.path,
+            workspace: await createCanonicalWorkspaceRef(workspace.path, workspace.displayName),
+          };
+        } catch (error) {
+          failures.push({
+            path: workspace.path,
+            message: error instanceof Error ? error.message : String(error),
+          });
+          return undefined;
+        }
+      }),
+    );
+    const byId = new Map(
+      canonicalized
+        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+        .map((entry) => [entry.workspace.workspaceId, entry]),
+    );
+    const targets = [...byId.values()];
+    if (targets.length === 0) return { failures };
+
+    await this.runWorkspaceMutations(
+      targets.map(({ workspace }) => workspace.workspaceId),
+      async () => {
+        const [workspaceSnapshot, sessionSnapshot] = await Promise.all([
+          this.catalogs.workspaces.listWorkspaces(),
+          this.catalogs.sessions.listSessions(),
+        ]);
+        const workspacesById = new Map(
+          workspaceSnapshot.workspaces.map((workspace) => [workspace.workspaceId, workspace]),
+        );
+        const sessionsByWorkspace = new Map<WorkspaceId, SessionCatalogEntry[]>();
+        for (const session of sessionSnapshot.sessions) {
+          const entries = sessionsByWorkspace.get(session.workspaceId) ?? [];
+          entries.push(session);
+          sessionsByWorkspace.set(session.workspaceId, entries);
+        }
+
+        const targetIds = new Set(targets.map(({ workspace }) => workspace.workspaceId));
+        const baselineSessionFiles: Record<string, string> = {};
+        await Promise.all(
+          sessionSnapshot.sessions
+            .filter((session) => targetIds.has(session.workspaceId))
+            .map(async (session) => {
+            const key = sessionKey(session.sessionRef);
+            const filePath =
+              session.sessionFilePath ?? (await this.catalogs.getSessionFile(session.sessionRef));
+            if (filePath) baselineSessionFiles[key] = filePath;
+          }),
+        );
+
+        const scanned = await Promise.all(
+          targets.map(async ({ sourcePath, workspace }) => {
+            try {
+              const infos = await SessionManager.list(workspace.path);
+              const existingSessions = sessionsByWorkspace.get(workspace.workspaceId) ?? [];
+              const existingByKey = new Map(
+                existingSessions.map((session) => [sessionKey(session.sessionRef), session]),
+              );
+              const entries = infos.map((info) =>
+                this.sessionEntryFromInfo(
+                  workspace,
+                  info,
+                  this.records.get(
+                    sessionKey({ workspaceId: workspace.workspaceId, sessionId: info.id }),
+                  ),
+                  existingByKey.get(
+                    sessionKey({ workspaceId: workspace.workspaceId, sessionId: info.id }),
+                  ),
+                ),
+              );
+              const discoveredKeys = new Set(entries.map((entry) => sessionKey(entry.sessionRef)));
+              const preserved = (
+                await Promise.all(
+                  existingSessions.map(async (session) => {
+                    const key = sessionKey(session.sessionRef);
+                    if (discoveredKeys.has(key)) return undefined;
+                    const sessionFilePath =
+                      baselineSessionFiles[key] ?? session.sessionFilePath;
+                    if (!sessionFilePath) return undefined;
+                    try {
+                      await access(sessionFilePath);
+                    } catch (error) {
+                      if (isMissingFileError(error)) return undefined;
+                    }
+                    const record = this.records.get(key);
+                    const runtimeSnapshot =
+                      record && record.session && !record.closed ? buildSnapshot(record) : undefined;
+                    return {
+                      ...session,
+                      sessionFilePath,
+                      status: runtimeSnapshot?.status ?? ("idle" as const),
+                    };
+                  }),
+                )
+              ).filter((entry): entry is NonNullable<typeof entry> => Boolean(entry));
+              const mergedEntries = [...entries, ...preserved];
+              const sessionFiles = Object.fromEntries<string>([
+                ...entries.map((entry, index): [string, string] => [
+                  sessionKey(entry.sessionRef),
+                  infos[index]?.path ?? "",
+                ]),
+                ...preserved.map((entry): [string, string] => [
+                  sessionKey(entry.sessionRef),
+                  entry.sessionFilePath ?? "",
+                ]),
+              ]);
+              const workspaceSessions = sessionsByWorkspace.get(workspace.workspaceId) ?? [];
+              const workspaceBaselineFiles = Object.fromEntries(
+                workspaceSessions.flatMap((session) => {
+                  const key = sessionKey(session.sessionRef);
+                  const filePath = baselineSessionFiles[key];
+                  return filePath ? [[key, filePath]] : [];
+                }),
+              );
+              return {
+                sourcePath,
+                workspace,
+                replacement: {
+                  workspaceId: workspace.workspaceId,
+                  entries: mergedEntries,
+                  sessionFiles,
+                  baselineEntries: workspaceSessions,
+                  baselineSessionFiles: workspaceBaselineFiles,
+                } satisfies WorkspaceSessionSyncReplacement,
+              };
+            } catch (error) {
+              failures.push({
+                path: sourcePath,
+                message: error instanceof Error ? error.message : String(error),
+              });
+              return undefined;
+            }
+          }),
+        );
+        const successful = scanned.filter(
+          (entry): entry is NonNullable<typeof entry> => Boolean(entry),
+        );
+        if (successful.length === 0) return;
+
+        const newWorkspaces: WorkspaceCatalogEntry[] = successful.flatMap(
+          ({ workspace }, index) => {
+            if (workspacesById.has(workspace.workspaceId)) return [];
+            return [
+              {
+                workspaceId: workspace.workspaceId,
+                path: workspace.path,
+                displayName: workspace.displayName ?? deriveWorkspaceTitle(workspace),
+                lastOpenedAt: nowIso(),
+                sortOrder: workspaceSnapshot.workspaces.length + index,
+                pinned: false,
+              },
+            ];
+          },
+        );
+        const removedSessionRefs = await this.catalogs.replaceWorkspaceSyncBatch(
+          newWorkspaces,
+          successful.map(({ replacement }) => replacement),
+        );
+        await this.disposeRemovedSessionRecords(removedSessionRefs);
+      },
+    );
+
+    return { failures };
+  }
+
   private async syncWorkspaceNow(workspace: WorkspaceRef): Promise<SyncWorkspaceResult> {
     const infos = await SessionManager.list(workspace.path);
     const existingSessions = (await this.catalogs.sessions.listSessions(workspace.workspaceId))
@@ -527,17 +718,7 @@ export class SessionSupervisor {
         continue;
       }
 
-      await this.catalogs.sessions.deleteSession(session.sessionRef);
-      const record = this.records.get(key);
-      if (!record) {
-        continue;
-      }
-
-      record.unsubscribeAgent?.();
-      record.unsubscribeAgent = undefined;
-      record.listeners.clear();
-      await this.disposeRecordRuntimeSafely(record);
-      this.records.delete(key);
+      await this.disposeRemovedSessionRecords([session.sessionRef]);
     }
 
     return {
@@ -2645,6 +2826,19 @@ export class SessionSupervisor {
         this.updatePreviewFromMessage(record, event.message);
         if (
           event.message.role === "assistant" &&
+          event.assistantMessageEvent.type === "thinking_delta"
+        ) {
+          // Optional display metadata from the agy bridge, separate from executable tool calls.
+          const activity = (event.assistantMessageEvent as { toolActivity?: unknown }).toolActivity;
+          if (typeof activity === "string" && /^[a-zA-Z0-9_.:/-]{1,120}$/.test(activity)) {
+            return toDriverEvents(
+              { type: "assistantActivity", sessionRef: record.ref, timestamp, toolName: activity },
+              record,
+            );
+          }
+        }
+        if (
+          event.message.role === "assistant" &&
           event.assistantMessageEvent.type === "text_delta"
         ) {
           return toDriverEvents(
@@ -3014,6 +3208,30 @@ export class SessionSupervisor {
       if (this.workspaceMutationQueues.get(workspaceId) === settled) {
         this.workspaceMutationQueues.delete(workspaceId);
       }
+    }
+  }
+
+  private runWorkspaceMutations<T>(
+    workspaceIds: readonly WorkspaceId[],
+    mutation: () => Promise<T>,
+  ): Promise<T> {
+    const ids = [...new Set(workspaceIds)].sort();
+    const run = (index: number): Promise<T> =>
+      index >= ids.length
+        ? mutation()
+        : this.runWorkspaceMutation(ids[index]!, () => run(index + 1));
+    return run(0);
+  }
+
+  private async disposeRemovedSessionRecords(sessionRefs: readonly SessionRef[]): Promise<void> {
+    for (const sessionRef of sessionRefs) {
+      const record = this.records.get(sessionKey(sessionRef));
+      if (!record) continue;
+      record.unsubscribeAgent?.();
+      record.unsubscribeAgent = undefined;
+      record.listeners.clear();
+      await this.disposeRecordRuntimeSafely(record);
+      this.records.delete(sessionKey(sessionRef));
     }
   }
 
