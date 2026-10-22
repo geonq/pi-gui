@@ -2,10 +2,10 @@
   "name": "@pi-gui/desktop",
   "private": true,
   "version": "1.0.1",
-  "author": "Matthew Lam",
+  "author": "geonq",
   "license": "MIT",
-  "description": "Codex-style desktop shell for pi",
-  "homepage": "https://github.com/minghinmatthewlam/pi-gui",
+  "description": "Pegasus, geonq's desktop app for coding agents, built on pi",
+  "homepage": "https://github.com/geonq/pi-gui",
   "main": "out/main/main.js",
   "scripts": {
     "build:deps": "pnpm --dir ../.. --filter @pi-gui/session-driver --filter @pi-gui/pi-sdk-driver --filter @pi-gui/extension-ui --filter @pi-gui/catalogs run build",

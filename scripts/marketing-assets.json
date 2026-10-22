@@ -7,10 +7,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "/media/hero.mp4"
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/hero.mp4"
         }
       ]
     },
@@ -27,12 +23,7 @@
     {
       "path": "apps/website/public/media/hero.gif",
       "producer": "marketing:media",
-      "consumers": [
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/hero.gif"
-        }
-      ]
+      "consumers": []
     },
     {
       "path": "apps/website/public/media/hero-poster.webp",
@@ -51,10 +42,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "shot: \"threads\""
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/threads.webp"
         }
       ]
     },
@@ -65,10 +52,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "shot: \"review\""
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/review-light.webp"
         }
       ]
     },
@@ -79,10 +62,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "shot: \"review\""
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/review-dark.webp"
         }
       ]
     },
@@ -93,10 +72,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "shot: \"terminal\""
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/terminal-light.webp"
         }
       ]
     },
@@ -107,10 +82,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "shot: \"terminal\""
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/terminal-dark.webp"
         }
       ]
     },
@@ -121,10 +92,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "shot: \"palette\""
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/palette-light.webp"
         }
       ]
     },
@@ -135,10 +102,6 @@
         {
           "path": "apps/website/app/page.tsx",
           "reference": "shot: \"palette\""
-        },
-        {
-          "path": "README.md",
-          "reference": "./apps/website/public/media/palette-dark.webp"
         }
       ]
     },

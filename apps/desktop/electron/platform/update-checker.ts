@@ -4,9 +4,9 @@ import { app, net, Notification, shell } from "electron";
 
 // told about stable releases.
 
-const RELEASES_URL = "https://api.github.com/repos/minghinmatthewlam/pi-gui/releases/latest";
+const RELEASES_URL = "https://api.github.com/repos/geonq/pi-gui/releases/latest";
 
-const RELEASES_PAGE = "https://github.com/minghinmatthewlam/pi-gui/releases";
+const RELEASES_PAGE = "https://github.com/geonq/pi-gui/releases";
 
 const CHECK_INTERVAL_MS = 4 * 60 * 60 * 1000; // 4 hours
 
