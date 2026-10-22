@@ -1,8 +1,7 @@
 name: Desktop Core Trend
 
+# On demand only until the inherited suite targets the Pegasus shell; a nightly run would fail every day.
 on:
-  schedule:
-    - cron: "17 9 * * *"
   workflow_dispatch:
 
 permissions:

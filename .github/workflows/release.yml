@@ -1,9 +1,10 @@
 name: Release
 
+# pi-gui's signed and notarized release pipeline, kept for reference. It needs the upstream
+# signing secrets, so it runs only by hand; Pegasus builds are packaged locally and attached
+# to GitHub releases.
 on:
-  push:
-    tags:
-      - "v[0-9]*"
+  workflow_dispatch:
 
 permissions:
   contents: read

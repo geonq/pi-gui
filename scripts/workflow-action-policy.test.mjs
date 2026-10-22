@@ -115,7 +115,6 @@ jobs:
         with:
           name: out
       - uses: softprops/action-gh-release@v3
-      - uses: anthropics/claude-code-action@v1
 `);
   await assert.rejects(
     () => assertWorkflowActionPolicy(root),
@@ -143,7 +142,6 @@ jobs:
         with:
           name: out
       - uses: softprops/action-gh-release@v3
-      - uses: anthropics/claude-code-action@v1
   preflight:
     runs-on: ubuntu-latest
     steps:

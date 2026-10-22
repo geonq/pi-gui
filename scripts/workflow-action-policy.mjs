@@ -11,7 +11,6 @@ const ACTION_POLICY = Object.freeze({
   "actions/upload-artifact": "v7",
   "actions/download-artifact": "v8",
   "softprops/action-gh-release": "v3",
-  "anthropics/claude-code-action": "v1",
 });
 
 const MAJOR_REF = /^v\d+$/;

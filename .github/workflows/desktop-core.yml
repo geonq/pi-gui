@@ -1,0 +1,90 @@
+name: Desktop Core
+
+# The end-to-end suite inherited from pi-gui still targets the old pi-gui screens. It runs on
+# demand while it is moved over to the Pegasus shell, so it does not gate every push.
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-core-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop-core:
+    name: desktop-core
+    if: ${{ always() }}
+    needs: desktop-core-shards
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Require every Core shard to succeed
+        env:
+          CI_NEEDS: ${{ toJSON(needs) }}
+        run: node scripts/check-ci-results.mjs --core-shards
+
+  desktop-core-shards:
+    name: Desktop Core (${{ matrix.shard }}/4)
+    # PRs run Core on Linux, which doesn't queue behind the account's few macOS slots.
+    # Pushes to main keep macOS coverage.
+    runs-on: ${{ github.event_name == 'pull_request' && 'ubuntu-latest' || 'macos-latest' }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Desktop Core (macOS)
+        if: ${{ runner.os == 'macOS' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/apps/desktop/test-results/core-report.json
+        run: pnpm --filter @pi-gui/desktop run test:e2e:ci:mac --shard=${{ matrix.shard }}/4 --reporter=line,json
+
+      - name: Install Linux display dependencies
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb openbox libnotify4
+          # The runner pipes crashes to systemd-coredump with an unlimited size, ignoring
+          # ulimit. A test that crashes a renderer then stalls quit while its multi-terabyte
+          # sparse address space is streamed out, so write plain core files, which ulimit -c 0 blocks.
+          sudo sysctl -w kernel.core_pattern=core
+
+      - name: Desktop Core (Linux)
+        if: ${{ runner.os == 'Linux' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/apps/desktop/test-results/core-report.json
+          PI_APP_TEST_WORKERS: "2"
+        # Openbox answers X11 maximize requests, which some window specs depend on.
+        run: >-
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24"
+          sh -c 'openbox >/dev/null 2>&1 & exec "$@"' sh
+          pnpm --filter @pi-gui/desktop run test:e2e:core --shard=${{ matrix.shard }}/4 --reporter=line,json
+
+      - name: Summarize Core timing
+        if: ${{ !cancelled() }}
+        run: node .github/scripts/summarize-playwright-trend.mjs apps/desktop/test-results/core-report.json apps/desktop/test-results/core-summary.json
+
+      - name: Upload Core results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: desktop-core-test-results-${{ matrix.shard }}
+          path: apps/desktop/test-results/
+          retention-days: 7
+          if-no-files-found: error

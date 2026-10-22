@@ -3,8 +3,8 @@ import { pathToFileURL } from "node:url";
 export const requiredJobs = [
   "typecheck",
   "website-build",
-  "desktop-core",
   "desktop-package-linux",
+  "desktop-package-mac",
   "desktop-package-windows",
 ];
 

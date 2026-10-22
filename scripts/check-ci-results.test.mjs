@@ -63,7 +63,7 @@ test("workflow aggregate covers every job and cannot ignore unsuccessful checks"
   const sorted = (values) => [...values].sort();
   assert.deepEqual(
     sorted(Object.keys(workflow.jobs).filter((job) => job !== "ci-required")),
-    sorted([...requiredJobs, ...coreShardJobs]),
+    sorted(requiredJobs),
   );
   assert.deepEqual(sorted(gate.needs), sorted(requiredJobs));
   assert.equal(gate.name, "CI required");
@@ -156,7 +156,7 @@ function assertCoreShards(workflow) {
 
 test("all Core shards are required and retain independent reports", () => {
   const workflow = parse(
-    readFileSync(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8"),
+    readFileSync(new URL("../.github/workflows/desktop-core.yml", import.meta.url), "utf8"),
   );
   assertCoreShards(workflow);
   for (const mutate of [
