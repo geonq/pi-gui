@@ -1838,7 +1838,7 @@ export async function openNewThread(window: Page): Promise<void> {
   // The primary button leads the sidebar; a fresh thread's row can share its name.
   const button = window
     .locator(".sidebar")
-    .getByRole("button", { name: "New thread", exact: true })
+    .getByRole("button", { name: "New chat", exact: true })
     .first();
   await expect(button).toBeVisible({ timeout: 15_000 });
   await expect(button).toBeEnabled({ timeout: 15_000 });
