@@ -1,0 +1,546 @@
+/* Top-level Usage view: one centred column like the other views. */
+.usage-view {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding-bottom: 32px;
+}
+
+.usage-view > * {
+  width: min(1040px, 100%);
+  margin-inline: auto;
+}
+
+.usage-accounts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.usage-account {
+  min-height: 32px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: var(--font-medium);
+}
+
+.usage-account svg,
+.usage-limits__name svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.usage-account:hover {
+  background: var(--overlay-hover);
+  color: var(--text-strong);
+}
+
+.usage-account[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-tint-bg);
+  color: var(--text-strong);
+}
+
+.usage-account__value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-view__period select {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+}
+
+.usage-view__note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.usage-view__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.usage-view__split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.usage-stat,
+.usage-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-2xl);
+  background: var(--surface);
+}
+
+.usage-stat {
+  display: grid;
+  gap: 2px;
+  padding: 14px 16px;
+}
+
+.usage-stat__value {
+  color: var(--text-strong);
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.usage-stat__label,
+.usage-card h3 {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: var(--font-medium);
+}
+
+.usage-card {
+  min-width: 0;
+  padding: 14px 16px 16px;
+}
+
+.usage-card h3 {
+  margin: 0 0 10px;
+}
+
+.usage-card__empty {
+  margin: 0;
+  color: var(--muted-soft);
+  font-size: 12.5px;
+}
+
+.usage-card--ring {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+}
+
+.usage-list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  list-style: none;
+}
+
+.usage-list li {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  font-size: 13px;
+}
+
+.usage-list svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.usage-list__swatch {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: var(--radius-pill);
+}
+
+.usage-list__label {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  color: var(--text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.usage-list__value {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Relative magnitude under each row, in the accent. */
+.usage-list__bar {
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+/* Glass mode: cards are liquid glass like the other controls. */
+.enable-transparency :is(.usage-stat, .usage-card) {
+  border-color: var(--liquid-rim);
+  background: var(--liquid-fill);
+  box-shadow:
+    inset 0 1px 0 var(--liquid-highlight),
+    inset 0 -1px 0 var(--liquid-shade);
+}
+
+/* Plan limits: one row per window, the bar fills with what is used. */
+.usage-limits {
+  display: grid;
+  gap: 14px;
+}
+
+.usage-limits__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 18px;
+}
+
+.usage-limits h3 {
+  margin: 0;
+}
+
+.usage-limits__refreshing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+}
+
+.usage-limits__refreshing::before {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #0253c4;
+  content: "";
+  animation: usage-limits-pulse 1.2s ease-in-out infinite;
+}
+
+.usage-limits__empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.usage-limits__skeleton {
+  display: grid;
+  gap: 12px;
+  padding-block: 2px;
+}
+
+.usage-limits__skeleton-name,
+.usage-limits__skeleton-row > span {
+  display: block;
+  border-radius: 999px;
+  background: linear-gradient(
+    100deg,
+    var(--overlay-hover) 35%,
+    color-mix(in srgb, var(--text-strong) 10%, transparent) 50%,
+    var(--overlay-hover) 65%
+  );
+  background-size: 220% 100%;
+  animation: usage-limits-shimmer 1.4s ease-in-out infinite;
+}
+
+.usage-limits__skeleton-name {
+  width: 128px;
+  height: 12px;
+}
+
+.usage-limits__skeleton-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) 78px;
+  align-items: center;
+  gap: 12px;
+}
+
+.usage-limits__skeleton-label {
+  width: 72px;
+  height: 10px;
+}
+
+.usage-limits__skeleton-bar {
+  height: 6px;
+}
+
+.usage-limits__skeleton-value {
+  width: 72px;
+  height: 10px;
+  justify-self: end;
+}
+
+.usage-limits__account {
+  display: grid;
+  gap: 8px;
+  animation: usage-limits-reveal 220ms ease-out both;
+}
+
+.usage-limits__name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-strong);
+  font-weight: var(--font-semibold);
+}
+
+.usage-limits__note {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.usage-limits__window {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) minmax(170px, auto);
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+
+.usage-limits__label {
+  color: var(--muted);
+}
+
+.usage-limits__bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--overlay-hover);
+  overflow: hidden;
+}
+
+.usage-limits__bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0253c4;
+  transition:
+    width 240ms ease-out,
+    background-color 240ms ease-out;
+}
+
+.usage-limits__value {
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@keyframes usage-limits-shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@keyframes usage-limits-pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes usage-limits-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .usage-limits__skeleton-name,
+  .usage-limits__skeleton-row > span,
+  .usage-limits__refreshing::before,
+  .usage-limits__account {
+    animation: none;
+  }
+
+  .usage-limits__bar > span {
+    transition: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .usage-limits__window {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .usage-limits__bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
+/* Token heatmap: a year of days as dots, like a profile activity chart. */
+.usage-heatmap {
+  display: grid;
+  gap: 14px;
+}
+
+.usage-heatmap__stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+}
+
+.usage-heatmap__figure {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 10px 8px;
+}
+
+.usage-heatmap__figure + .usage-heatmap__figure {
+  border-left: 1px solid var(--line);
+}
+
+.usage-heatmap__value {
+  color: var(--text-strong);
+  font-size: 15px;
+  font-weight: var(--font-semibold);
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-heatmap__label {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.usage-heatmap__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.usage-heatmap__head h3 {
+  margin: 0;
+}
+
+.usage-heatmap__modes {
+  display: flex;
+  gap: 12px;
+}
+
+.usage-heatmap__cell {
+  cursor: pointer;
+  stroke: transparent;
+  stroke-width: 1.5px;
+}
+
+.usage-heatmap__cell:hover {
+  stroke: var(--text-strong);
+}
+
+.usage-heatmap__modes button {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.usage-heatmap__modes button:hover,
+.usage-heatmap__modes button[aria-pressed="true"] {
+  color: var(--text-strong);
+}
+
+/* Account slot state: text carries the meaning, the dot only reinforces it. */
+.account-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: var(--font-medium);
+  text-transform: none;
+  white-space: nowrap;
+}
+
+.usage-account .account-state {
+  margin-left: 0;
+}
+
+.account-state__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--status-neutral);
+}
+
+.account-state[data-state="ready"] .account-state__dot {
+  background: var(--accent);
+}
+
+.account-state[data-state="limited"] .account-state__dot,
+.account-state[data-state="expiring"] .account-state__dot {
+  background: var(--status-warning);
+}
+
+.account-state[data-state="relogin"] .account-state__dot {
+  background: var(--status-error);
+}
+
+/* Sign-ins that need the owner: what is wrong and the exact command that fixes it. */
+.usage-signins {
+  display: grid;
+  gap: 10px;
+}
+
+.usage-signins h3 {
+  margin: 0;
+}
+
+.usage-signins__row {
+  display: grid;
+  grid-template-columns: 14px auto auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.usage-signins__row svg {
+  width: 14px;
+  height: 14px;
+}
+
+.usage-signins__name {
+  color: var(--text-strong);
+  font-weight: var(--font-semibold);
+}
+
+.usage-signins__state {
+  color: var(--status-error);
+}
+
+.usage-signins__fix {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+/* A sidebar entry with a sign-in that needs attention. */
+.sidebar__nav-item-alert {
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-radius: var(--radius-pill);
+  background: var(--status-error);
+}
+
+.usage-signins__state[data-state="unknown"] {
+  color: var(--muted);
+}
