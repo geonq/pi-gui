@@ -98,9 +98,11 @@ The app is an Electron shell with a typed IPC boundary between the React rendere
 `packages/pi-sdk-driver` adapts the pi coding agent without forking it, and pi's own session
 files stay the source of truth. See [docs/architecture.md](docs/architecture.md).
 
-CI runs the formatting, lint, architecture, type and unit checks plus both packaging jobs.
-The end-to-end UI suite inherited from pi-gui still targets the old pi-gui screens; it runs on
-demand while it is being moved over to the Pegasus shell.
+GitHub Actions is turned off for this repository; `pnpm check` (formatting, lint, architecture,
+types and unit tests) runs locally before every release, and the release builds are packaged on
+Windows and macOS directly. The workflow files from pi-gui stay in `.github/workflows` for
+reference. The end-to-end UI suite inherited from pi-gui still targets the old pi-gui screens and
+is being moved over to the Pegasus shell.
 
 ## Credits
 
