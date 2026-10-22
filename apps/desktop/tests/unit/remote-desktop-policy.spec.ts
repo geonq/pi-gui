@@ -1,0 +1,254 @@
+import { expect, test } from "@playwright/test";
+import { createEmptyDesktopAppState, type WorkspaceRecord } from "../../contracts/desktop-state";
+import {
+  filterRemoteState,
+  validateRemoteDesktopInvocation,
+} from "../../electron/remote/remote-desktop-policy";
+
+const allowedWorkspaceId = "D:\\Pi\\Alpha";
+const deniedWorkspaceId = "D:\\Pi\\Private";
+const workspaceScope = new Set([allowedWorkspaceId]);
+
+test("remote method policy scopes workspaces and rejects unsafe public methods and fields", () => {
+  expect(validateRemoteDesktopInvocation("getState", [], workspaceScope)).toEqual({
+    method: "getState",
+    args: [],
+  });
+  expect(validateRemoteDesktopInvocation("cancelCurrentRun", [], workspaceScope)).toEqual({
+    method: "cancelCurrentRun",
+    args: [],
+  });
+  expect(
+    validateRemoteDesktopInvocation(
+      "selectSession",
+      [{ workspaceId: allowedWorkspaceId, sessionId: "thread-a" }],
+      workspaceScope,
+    ),
+  ).toEqual({
+    method: "selectSession",
+    args: [{ workspaceId: allowedWorkspaceId, sessionId: "thread-a" }],
+  });
+
+  expect(() =>
+    validateRemoteDesktopInvocation("selectWorkspace", [deniedWorkspaceId], workspaceScope),
+  ).toThrow("not authorized");
+  expect(() => validateRemoteDesktopInvocation("listCustomProviders", [], workspaceScope)).toThrow(
+    "not allowed",
+  );
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "startThread",
+      [
+        {
+          rootWorkspaceId: allowedWorkspaceId,
+          environment: "local",
+          attachments: [{ kind: "file", fsPath: "D:\\outside.txt" }],
+        },
+      ],
+      workspaceScope,
+    ),
+  ).toThrow("invalid fields");
+});
+
+test("remote usage reads allow only the documented cachedOnly metadata option", () => {
+  for (const method of ["getSignIns", "getAccountStates", "getUsageReport"] as const) {
+    expect(validateRemoteDesktopInvocation(method, [], workspaceScope)).toEqual({
+      method,
+      args: [],
+    });
+    expect(() => validateRemoteDesktopInvocation(method, [true], workspaceScope)).toThrow(
+      "Expected 0 remote method argument",
+    );
+  }
+
+  expect(validateRemoteDesktopInvocation("getAccountLimits", [], workspaceScope)).toEqual({
+    method: "getAccountLimits",
+    args: [],
+  });
+  expect(
+    validateRemoteDesktopInvocation("getAccountLimits", [{ cachedOnly: true }], workspaceScope),
+  ).toEqual({ method: "getAccountLimits", args: [{ cachedOnly: true }] });
+  expect(
+    validateRemoteDesktopInvocation("getAccountLimits", [{ cachedOnly: false }], workspaceScope),
+  ).toEqual({ method: "getAccountLimits", args: [{ cachedOnly: false }] });
+  for (const args of [
+    [null],
+    [{ cachedOnly: "yes" }],
+    [{ cachedOnly: true, provider: "secret" }],
+    [{}, {}],
+  ]) {
+    expect(() => validateRemoteDesktopInvocation("getAccountLimits", args, workspaceScope)).toThrow();
+  }
+});
+
+test("remote folder policy keeps Windows and Mac roots separate", () => {
+  const folderRoots = {
+    windows: new Set(["D:\\Pi\\projects"]),
+    mac: new Set(["uniDocuments", "uniVault"]),
+  };
+  expect(
+    validateRemoteDesktopInvocation(
+      "listWorkspaceFolderRoots",
+      ["mac"],
+      workspaceScope,
+      folderRoots,
+    ),
+  ).toEqual({ method: "listWorkspaceFolderRoots", args: ["mac"] });
+  expect(
+    validateRemoteDesktopInvocation(
+      "listWorkspaceFolders",
+      ["windows", "D:\\Pi\\projects"],
+      workspaceScope,
+      folderRoots,
+    ),
+  ).toEqual({ method: "listWorkspaceFolders", args: ["windows", "D:\\Pi\\projects"] });
+  expect(
+    validateRemoteDesktopInvocation(
+      "listWorkspaceFolders",
+      ["windows", "D:\\Pi\\projects", "NextSemis"],
+      workspaceScope,
+      folderRoots,
+    ),
+  ).toEqual({
+    method: "listWorkspaceFolders",
+    args: ["windows", "D:\\Pi\\projects", "NextSemis"],
+  });
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "listWorkspaceFolders",
+      ["mac", "D:\\Pi\\projects"],
+      workspaceScope,
+      folderRoots,
+    ),
+  ).toThrow("not authorized");
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "addWorkspaceFolder",
+      ["other", "D:\\Pi\\projects", "NextSemis"],
+      workspaceScope,
+      folderRoots,
+    ),
+  ).toThrow("Folder device is invalid");
+});
+
+test("remote archive actions authorize the workspace and validate the exact session target", () => {
+  for (const method of ["archiveSession", "unarchiveSession"] as const) {
+    expect(
+      validateRemoteDesktopInvocation(
+        method,
+        [{ workspaceId: allowedWorkspaceId, sessionId: "thread-a" }],
+        workspaceScope,
+      ),
+    ).toEqual({
+      method,
+      args: [{ workspaceId: allowedWorkspaceId, sessionId: "thread-a" }],
+    });
+
+    expect(() =>
+      validateRemoteDesktopInvocation(
+        method,
+        [{ workspaceId: deniedWorkspaceId, sessionId: "private-thread" }],
+        workspaceScope,
+      ),
+    ).toThrow("not authorized");
+    expect(() =>
+      validateRemoteDesktopInvocation(
+        method,
+        [{ workspaceId: allowedWorkspaceId, sessionId: "thread-a", force: true }],
+        workspaceScope,
+      ),
+    ).toThrow("invalid fields");
+    expect(() =>
+      validateRemoteDesktopInvocation(
+        method,
+        [{ workspaceId: allowedWorkspaceId, sessionId: "" }],
+        workspaceScope,
+      ),
+    ).toThrow("sessionId must be a non-empty string");
+  }
+});
+
+test("remote state projection removes unauthorized projects and their selection", () => {
+  const workspace = (id: string): WorkspaceRecord => ({
+    id,
+    name: id,
+    path: id,
+    lastOpenedAt: "2026-10-21T00:00:00.000Z",
+    kind: "primary",
+    sessions: [
+      {
+        id: `thread-${id}`,
+        title: `Thread ${id}`,
+        updatedAt: "2026-10-21T00:00:00.000Z",
+        preview: "",
+        status: "idle",
+        hasUnseenUpdate: false,
+      },
+    ],
+  });
+  const allowed = workspace(allowedWorkspaceId);
+  const denied = workspace(deniedWorkspaceId);
+  const state = {
+    ...createEmptyDesktopAppState(),
+    workspaces: [allowed, denied],
+    selectedWorkspaceId: denied.id,
+    selectedSessionId: denied.sessions[0]!.id,
+    workspaceDescriptions: { [allowed.id]: "Allowed", [denied.id]: "Private" },
+    workspaceOrder: [denied.id, allowed.id],
+  };
+
+  const projected = filterRemoteState(state, workspaceScope);
+
+  expect(projected.workspaces.map((entry) => entry.id)).toEqual([allowedWorkspaceId]);
+  expect(projected.selectedWorkspaceId).toBe(allowedWorkspaceId);
+  expect(projected.selectedSessionId).toBe("");
+  expect(projected.workspaceDescriptions).toEqual({ [allowedWorkspaceId]: "Allowed" });
+  expect(projected.workspaceOrder).toEqual([allowedWorkspaceId]);
+});
+
+
+test("remote workspace runtime loads and thread grouping validate exact scoped arguments", () => {
+  expect(
+    validateRemoteDesktopInvocation("loadWorkspaceRuntime", [allowedWorkspaceId], workspaceScope),
+  ).toEqual({ method: "loadWorkspaceRuntime", args: [allowedWorkspaceId] });
+  expect(
+    validateRemoteDesktopInvocation(
+      "loadWorkspaceRuntime",
+      [allowedWorkspaceId, { refresh: true }],
+      workspaceScope,
+    ),
+  ).toEqual({
+    method: "loadWorkspaceRuntime",
+    args: [allowedWorkspaceId, { refresh: true }],
+  });
+  expect(
+    validateRemoteDesktopInvocation(
+      "loadWorkspaceRuntime",
+      [allowedWorkspaceId, {}],
+      workspaceScope,
+    ),
+  ).toEqual({ method: "loadWorkspaceRuntime", args: [allowedWorkspaceId] });
+  expect(() =>
+    validateRemoteDesktopInvocation("loadWorkspaceRuntime", [deniedWorkspaceId], workspaceScope),
+  ).toThrow("not authorized");
+  for (const args of [
+    [],
+    [allowedWorkspaceId, { refresh: "yes" }],
+    [allowedWorkspaceId, { refresh: false, provider: "secret" }],
+    [allowedWorkspaceId, {}, {}],
+  ]) {
+    expect(() =>
+      validateRemoteDesktopInvocation("loadWorkspaceRuntime", args, workspaceScope),
+    ).toThrow();
+  }
+
+  for (const grouping of ["time", "workspace"] as const) {
+    expect(validateRemoteDesktopInvocation("setThreadGrouping", [grouping], workspaceScope)).toEqual({
+      method: "setThreadGrouping",
+      args: [grouping],
+    });
+  }
+  expect(() =>
+    validateRemoteDesktopInvocation("setThreadGrouping", ["invalid"], workspaceScope),
+  ).toThrow("Thread grouping is invalid");
+});
