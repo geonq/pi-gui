@@ -1,0 +1,52 @@
+/* Bklit UI charts (vendored in src/vendor/bklit) need Tailwind's theme and utilities.
+   No preflight, and only the chart sources and the Usage view are scanned, so no other
+   class name can produce a utility. Tailwind lives in layers: the app's unlayered CSS
+   always wins over it. */
+@layer theme, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+@source "../vendor/bklit";
+@source "../features/usage";
+
+@theme inline {
+  --color-foreground: var(--foreground);
+  --color-muted: var(--chart-muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-chart-label: var(--chart-label);
+  --color-chart-tooltip-background: var(--chart-tooltip-background);
+  --color-chart-tooltip-foreground: var(--chart-tooltip-foreground);
+  --color-chart-tooltip-muted: var(--chart-tooltip-muted);
+}
+
+/* Bklit's variables mapped onto the app theme; series lead with the owner's blue. */
+.usage-view {
+  --foreground: var(--text-strong);
+  --muted-foreground: var(--muted);
+  --chart-muted: var(--overlay-hover);
+  --chart-1: #0253c4;
+  --chart-2: color-mix(in srgb, #0253c4 55%, var(--text-strong));
+  --chart-3: color-mix(in srgb, var(--text-strong) 70%, transparent);
+  --chart-4: color-mix(in srgb, var(--text-strong) 45%, transparent);
+  --chart-5: color-mix(in srgb, var(--text-strong) 25%, transparent);
+  --chart-line-primary: var(--accent);
+  --chart-line-secondary: var(--muted-soft);
+  --chart-background: transparent;
+  --chart-grid: var(--line);
+  --chart-label: var(--muted);
+  --chart-foreground: var(--text-strong);
+  --chart-foreground-muted: var(--muted);
+  --chart-crosshair: var(--line-strong);
+  --chart-tooltip-background: var(--surface);
+  --chart-tooltip-foreground: var(--text-strong);
+  --chart-tooltip-muted: var(--muted);
+  --chart-indicator-color: var(--accent);
+  --chart-indicator-secondary-color: var(--muted-soft);
+  --chart-marker-background: var(--surface);
+  --chart-marker-border: var(--line-strong);
+  --chart-marker-foreground: var(--text-strong);
+  --chart-marker-badge-background: var(--accent);
+  --chart-marker-badge-foreground: #fff;
+  --chart-segment-background: var(--overlay-subtle);
+  --chart-segment-line: var(--line-strong);
+  --chart-brush-border: var(--line-strong);
+}
