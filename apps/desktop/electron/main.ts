@@ -224,6 +224,12 @@ function createWindowsWorkspaceFolderRoots(
   for (const id of rootIds) {
     const record = records.get(id);
     if (!record || !existsSync(record.path)) {
+      // A creation root is a parent folder for new projects ("D:\Pi\projects"); it need not be
+      // a sidebar folder itself, so an unregistered root is used by its path.
+      if (!record && createRootIds.has(id) && path.isAbsolute(id) && existsSync(id)) {
+        roots.push({ id, label: path.basename(id), canCreate: true, path: id });
+        continue;
+      }
       if (createRootIds.has(id)) {
         throw new Error("A configured Windows folder root is unavailable.");
       }
@@ -1416,7 +1422,7 @@ app
       const localFolderService: WorkspaceFolderService = createWorkspaceFolderService({
         windowsRoots: createWindowsWorkspaceFolderRoots(
           store,
-          allWorkspaceIds,
+          new Set([...allWorkspaceIds, ...createRootIds]),
           createRootIds,
         ),
         ...(macWorkspaceFolderAdapter ? { mac: macWorkspaceFolderAdapter } : {}),
