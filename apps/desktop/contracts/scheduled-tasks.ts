@@ -331,7 +331,7 @@ export function formatScheduledTaskRecurrence(schedule: ScheduledTaskSchedule): 
     if (Number.isNaN(at)) {
       return "Once";
     }
-    return `Once at ${new Date(at).toLocaleString(undefined, {
+    return `Once at ${new Date(at).toLocaleString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",

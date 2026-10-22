@@ -31,7 +31,7 @@ function formatStatValue(
   prefix?: string,
   suffix?: string,
 ): string {
-  const formatted = new Intl.NumberFormat(undefined, formatOptions).format(value);
+  const formatted = new Intl.NumberFormat("en-US", formatOptions).format(value);
   return `${prefix ?? ""}${formatted}${suffix ?? ""}`;
 }
 
@@ -101,6 +101,7 @@ export function ChartStatFlow({
           <NumberFlow
             format={formatOptions}
             isolate
+            locales="en-US"
             prefix={prefix}
             suffix={suffix}
             value={value}

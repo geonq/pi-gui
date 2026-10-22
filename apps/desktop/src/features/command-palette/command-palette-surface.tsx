@@ -186,7 +186,7 @@ export function CommandPaletteSurface({
             ? "Searching…"
             : query.trim()
               ? "No matching files."
-              : `Type to search ${(files?.length ?? 0).toLocaleString()} files.`;
+              : `Type to search ${(files?.length ?? 0).toLocaleString("en-US")} files.`;
   } else if (mode === "models") {
     label = "Switch model";
     placeholder = "Switch model";

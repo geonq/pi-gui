@@ -21,7 +21,7 @@ const MODES = [
 ] as const;
 type Mode = (typeof MODES)[number]["id"];
 
-const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
+const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
 /** Empty dot, then four blues from faint to the full accent. */
 const LEVELS = [
   "var(--overlay-hover)",

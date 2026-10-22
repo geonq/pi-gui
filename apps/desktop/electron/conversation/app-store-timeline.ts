@@ -574,7 +574,7 @@ function workedForLabel(startedAt: string, endedAt: string): string {
 }
 
 function relativeDetail(timestamp: string): string {
-  return new Date(timestamp).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return new Date(timestamp).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 }
 
 function summarizeToolDetail(value: string): string {

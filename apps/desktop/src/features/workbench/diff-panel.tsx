@@ -746,7 +746,7 @@ function CoverageNotice({ coverage }: { readonly coverage: ReviewCoverage }) {
 
 function formatCaptureTime(value: string): string {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString("en-US");
 }
 
 function errorMessage(error: unknown): string {

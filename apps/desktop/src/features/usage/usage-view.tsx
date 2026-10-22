@@ -33,8 +33,9 @@ const PERIODS = [
 ] as const;
 type PeriodId = (typeof PERIODS)[number]["id"];
 
-const compact = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 });
-const usd = new Intl.NumberFormat(undefined, { style: "currency", currency: "USD" });
+// The app is English, so numbers read "17.5B" on every system locale.
+const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
 const providerOf = (modelKey: string) => modelKey.split("/")[0] ?? "";
 /** The provider logo carries the brand, so "claude-haiku-5-5" reads "haiku-5-5". */
 const shortName = (modelKey: string) =>

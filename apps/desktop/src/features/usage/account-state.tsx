@@ -14,9 +14,9 @@ const LABELS: Record<ProviderState, string> = {
   expiring: "Sign in soon",
   unknown: "Not checked",
 };
-const time = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit" });
-const limitsAsOf = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-const weekdayTime = new Intl.DateTimeFormat(undefined, {
+const time = new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit" });
+const limitsAsOf = new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" });
+const weekdayTime = new Intl.DateTimeFormat("en-US", {
   weekday: "short",
   hour: "2-digit",
   minute: "2-digit",
