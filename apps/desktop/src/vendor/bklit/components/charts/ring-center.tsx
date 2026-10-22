@@ -73,11 +73,7 @@ export function RingCenter({
   if (children && hoveredData) {
     return (
       <div
-        className={cn(
-          chartCenterContainerClassName,
-          "flex items-center justify-center",
-          className
-        )}
+        className={cn(chartCenterContainerClassName, "flex items-center justify-center", className)}
         style={{ width: centerSize, height: centerSize }}
       >
         {children({
@@ -97,7 +93,7 @@ export function RingCenter({
       className={cn(
         chartCenterContainerClassName,
         "flex flex-col items-center justify-center text-center",
-        className
+        className,
       )}
       style={{ width: centerSize, height: centerSize }}
     >

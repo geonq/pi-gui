@@ -10,5 +10,4 @@ export const PatternOrientation = {
   diagonalRightToLeft: "diagonalRightToLeft",
 } as const;
 
-export type PatternOrientationType =
-  (typeof PatternOrientation)[keyof typeof PatternOrientation];
+export type PatternOrientationType = (typeof PatternOrientation)[keyof typeof PatternOrientation];

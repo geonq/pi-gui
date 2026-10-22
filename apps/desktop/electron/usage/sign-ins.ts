@@ -18,8 +18,15 @@ interface SignInPaths {
 
 const run = (file: string, args: readonly string[], env?: NodeJS.ProcessEnv) =>
   new Promise<{ output: string; interrupted: boolean }>((resolve) => {
-    execFile(file, args, { env: env ?? process.env, timeout: 12_000, maxBuffer: 256 * 1024, windowsHide: true }, (error, stdout) =>
-      resolve({ output: stdout ?? "", interrupted: Boolean(error?.killed || (error && typeof error.code !== "number")) }),
+    execFile(
+      file,
+      args,
+      { env: env ?? process.env, timeout: 12_000, maxBuffer: 256 * 1024, windowsHide: true },
+      (error, stdout) =>
+        resolve({
+          output: stdout ?? "",
+          interrupted: Boolean(error?.killed || (error && typeof error.code !== "number")),
+        }),
     );
   });
 
@@ -44,24 +51,39 @@ async function readJson<T>(file: string): Promise<T | null> {
 }
 
 /** Every Claude slot Pi is allowed to use: `claude auth status` (local), plus the refresh token's end date. */
-async function claudeSignIns({ stateDir, claudeCommand }: SignInPaths, now: number): Promise<SignInStatus[]> {
-  const ledger = await readJson<{ accounts?: Record<string, { approved?: boolean }> }>(join(stateDir, "claude", "accounts.json"));
-  const slots = Object.entries(ledger?.accounts ?? {}).filter(([, record]) => record.approved === true);
+async function claudeSignIns(
+  { stateDir, claudeCommand }: SignInPaths,
+  now: number,
+): Promise<SignInStatus[]> {
+  const ledger = await readJson<{ accounts?: Record<string, { approved?: boolean }> }>(
+    join(stateDir, "claude", "accounts.json"),
+  );
+  const slots = Object.entries(ledger?.accounts ?? {}).filter(
+    ([, record]) => record.approved === true,
+  );
   if (!claudeCommand || !existsSync(claudeCommand)) return [];
   return Promise.all(
     slots.map(async ([id]): Promise<SignInStatus> => {
       const slot = /(\d)$/.exec(id)?.[1] ?? "?";
       const directory = join(stateDir, "claude", `account-${slot}`);
-      const profile = await readJson<{ oauthAccount?: { displayName?: string } }>(join(directory, ".claude.json"));
+      const profile = await readJson<{ oauthAccount?: { displayName?: string } }>(
+        join(directory, ".claude.json"),
+      );
       const owner = profile?.oauthAccount?.displayName?.trim();
       const name = owner ? `Claude · ${owner}` : `Claude account ${slot}`;
       const fix = `Run scripts\\Login-Claude.ps1 ${slot} (Mac: scripts/Login-Claude.sh ${slot}) in pi-ecosystem.`;
-      const result = await run(claudeCommand, ["auth", "status"], { ...process.env, CLAUDE_CONFIG_DIR: directory });
+      const result = await run(claudeCommand, ["auth", "status"], {
+        ...process.env,
+        CLAUDE_CONFIG_DIR: directory,
+      });
       const state = parseClaudeAuthStatus(result.output, result.interrupted);
       if (state !== "ok") return { id, name, state, ...(state === "signed-out" ? { fix } : {}) };
-      const credentials = await readJson<{ claudeAiOauth?: { refreshTokenExpiresAt?: number } }>(join(directory, ".credentials.json"));
+      const credentials = await readJson<{ claudeAiOauth?: { refreshTokenExpiresAt?: number } }>(
+        join(directory, ".credentials.json"),
+      );
       const expiresAt = credentials?.claudeAiOauth?.refreshTokenExpiresAt;
-      if (expiresAt && expiresAt - now < EXPIRY_WARNING_MS) return { id, name, state: "expiring", expiresAt, fix };
+      if (expiresAt && expiresAt - now < EXPIRY_WARNING_MS)
+        return { id, name, state: "expiring", expiresAt, fix };
       return { id, name, state: "ok", expiresAt };
     }),
   );
@@ -69,21 +91,40 @@ async function claudeSignIns({ stateDir, claudeCommand }: SignInPaths, now: numb
 
 /** Pi's own ChatGPT sign-in renews itself; it is only "signed out" when the stored login is gone. */
 async function openAiSignIn({ stateDir }: SignInPaths): Promise<SignInStatus> {
-  const auth = await readJson<{ openai?: { refresh?: string } }>(join(stateDir, "agent", "auth.json"));
+  const auth = await readJson<{ openai?: { refresh?: string } }>(
+    join(stateDir, "agent", "auth.json"),
+  );
   return auth?.openai?.refresh
     ? { id: "openai", name: "ChatGPT (Pi)", state: "ok" }
-    : { id: "openai", name: "ChatGPT (Pi)", state: "signed-out", fix: "Run scripts\\Login-OpenAI.ps1 in pi-ecosystem." };
+    : {
+        id: "openai",
+        name: "ChatGPT (Pi)",
+        state: "signed-out",
+        fix: "Run scripts\\Login-OpenAI.ps1 in pi-ecosystem.",
+      };
 }
 
 /** agy says "sign in" when its login is gone; `agy models` lists models only (no model call). */
 async function antigravitySignIn(): Promise<SignInStatus | null> {
-  const agy = process.platform === "win32"
-    ? join(process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"), "agy", "bin", "agy.exe")
-    : join(homedir(), ".local", "bin", "agy");
+  const agy =
+    process.platform === "win32"
+      ? join(
+          process.env.LOCALAPPDATA ?? join(homedir(), "AppData", "Local"),
+          "agy",
+          "bin",
+          "agy.exe",
+        )
+      : join(homedir(), ".local", "bin", "agy");
   if (!existsSync(agy)) return null;
   const { output, interrupted } = await run(agy, ["models"]);
   if (interrupted) return { id: "antigravity", name: "AGY", state: "unknown" };
-  if (/sign in/i.test(output)) return { id: "antigravity", name: "Antigravity", state: "signed-out", fix: "Run `agy` in a terminal and sign in there." };
+  if (/sign in/i.test(output))
+    return {
+      id: "antigravity",
+      name: "Antigravity",
+      state: "signed-out",
+      fix: "Run `agy` in a terminal and sign in there.",
+    };
   return /\t/.test(output) ? { id: "antigravity", name: "Antigravity", state: "ok" } : null;
 }
 
@@ -94,12 +135,24 @@ async function codexSignIn(): Promise<SignInStatus | null> {
   const auth = await readJson<{ tokens?: { refresh_token?: string } }>(join(home, "auth.json"));
   return auth?.tokens?.refresh_token
     ? { id: "codex", name: "Codex CLI", state: "ok" }
-    : { id: "codex", name: "Codex CLI", state: "signed-out", fix: "Run `codex login` in a terminal." };
+    : {
+        id: "codex",
+        name: "Codex CLI",
+        state: "signed-out",
+        fix: "Run `codex login` in a terminal.",
+      };
 }
 
 export async function checkSignIns(paths: SignInPaths, now = Date.now()): Promise<SignInStatus[]> {
-  const settled = await Promise.allSettled([claudeSignIns(paths, now), openAiSignIn(paths), antigravitySignIn(), codexSignIn()]);
-  return settled.flatMap((result) => (result.status === "fulfilled" ? [result.value].flat() : [])).filter((entry): entry is SignInStatus => entry !== null);
+  const settled = await Promise.allSettled([
+    claudeSignIns(paths, now),
+    openAiSignIn(paths),
+    antigravitySignIn(),
+    codexSignIn(),
+  ]);
+  return settled
+    .flatMap((result) => (result.status === "fulfilled" ? [result.value].flat() : []))
+    .filter((entry): entry is SignInStatus => entry !== null);
 }
 
 /**

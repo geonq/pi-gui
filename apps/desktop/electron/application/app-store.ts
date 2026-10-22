@@ -2226,7 +2226,10 @@ export class DesktopAppStore {
       const syncDiagnostics = await this.syncStartupWorkspaces(
         [...workspacesToSync.entries()].map(([path, displayName]) => ({ path, displayName })),
       );
-      traceStartupDuration(`workspace sync (${workspacesToSync.size} workspaces)`, workspaceSyncStarted);
+      traceStartupDuration(
+        `workspace sync (${workspacesToSync.size} workspaces)`,
+        workspaceSyncStarted,
+      );
       startupDiagnostics.push(
         ...syncDiagnostics.filter((diagnostic): diagnostic is StartupDiagnostic =>
           Boolean(diagnostic),

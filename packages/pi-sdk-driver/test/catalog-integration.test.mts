@@ -64,10 +64,8 @@ function withBlockingWorkspaceUpserts(store: SessionFileCatalogStorage): {
         store.setSessionFile(sessionRef, sessionFile),
       deleteSessionFile: (sessionRef: SessionRef): Promise<void> =>
         store.deleteSessionFile(sessionRef),
-      replaceWorkspaceSyncBatch: (
-        newWorkspaces: readonly WorkspaceCatalogEntry[],
-        replacements,
-      ) => store.replaceWorkspaceSyncBatch(newWorkspaces, replacements),
+      replaceWorkspaceSyncBatch: (newWorkspaces: readonly WorkspaceCatalogEntry[], replacements) =>
+        store.replaceWorkspaceSyncBatch(newWorkspaces, replacements),
       replaceWorkspaceSessions: async (
         workspaceId: WorkspaceId,
         entries: readonly SessionCatalogEntry[],

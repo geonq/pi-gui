@@ -146,7 +146,9 @@ test("adds singleton tool tabs, closes to a neighbor, and keeps an empty chooser
     // An empty Enter proves the shell is reading input before the command is typed.
     await window.keyboard.press("Enter");
     await expect
-      .poll(async () => ((await terminal.locator(".xterm-rows").textContent()) ?? "").split("$").length)
+      .poll(
+        async () => ((await terminal.locator(".xterm-rows").textContent()) ?? "").split("$").length,
+      )
       .toBeGreaterThan(2);
     await window.keyboard.type("printf 'WORKBENCH_'\"READY\\n\"; pwd");
     await window.keyboard.press("Enter");

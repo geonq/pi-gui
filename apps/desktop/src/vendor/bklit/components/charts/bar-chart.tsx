@@ -26,12 +26,7 @@ import {
   renderKeyedChartLayers,
   resolveChartChildElement,
 } from "./chart-child-passthrough";
-import {
-  ChartProvider,
-  type LineConfig,
-  type Margin,
-  type TooltipData,
-} from "./chart-context";
+import { ChartProvider, type LineConfig, type Margin, type TooltipData } from "./chart-context";
 import { isGradientDefComponent, isPatternDefComponent } from "./chart-defs";
 import { shortDateFmt } from "./chart-formatters";
 import { ParentSize } from "./chart-parent-size";
@@ -116,9 +111,7 @@ function extractBarConfigs(children: ReactNode): LineConfig[] {
       return;
     }
     const componentName =
-      typeof child.type === "function"
-        ? childType.displayName || childType.name || ""
-        : "";
+      typeof child.type === "function" ? childType.displayName || childType.name || "" : "";
 
     const props = child.props as BarProps | undefined;
     const isBarComponent =
@@ -129,8 +122,7 @@ function extractBarConfigs(children: ReactNode): LineConfig[] {
     if (isBarComponent && props?.dataKey) {
       // Use stroke for tooltip dot color if provided, otherwise fall back to fill
       // This allows gradient/pattern fills to have a solid dot color
-      const dotColor =
-        props.stroke || props.fill || "var(--chart-line-primary)";
+      const dotColor = props.stroke || props.fill || "var(--chart-line-primary)";
       configs.push({
         dataKey: props.dataKey,
         stroke: dotColor,
@@ -217,7 +209,7 @@ const ChartCore = memo(function ChartCore({
       }
       return String(value ?? "");
     },
-    [xDataKey]
+    [xDataKey],
   );
 
   // For compatibility with ChartContext, provide a Date-based xAccessor
@@ -229,15 +221,13 @@ const ChartCore = memo(function ChartCore({
       }
       return new Date();
     },
-    [xDataKey]
+    [xDataKey],
   );
 
   // Category scale (band) - for the categorical axis
   const categoryScale = useMemo(() => {
     const domain = data.map((d) => categoryAccessor(d));
-    const range: [number, number] = isHorizontal
-      ? [0, innerHeight]
-      : [0, innerWidth];
+    const range: [number, number] = isHorizontal ? [0, innerHeight] : [0, innerWidth];
     return scaleBand<string>({
       range,
       domain,
@@ -349,10 +339,7 @@ const ChartCore = memo(function ChartCore({
   }, [innerWidth, innerHeight, data.length, isHorizontal]);
 
   // Pre-compute labels for ticker animation
-  const dateLabels = useMemo(
-    () => data.map((d) => categoryAccessor(d)),
-    [data, categoryAccessor]
-  );
+  const dateLabels = useMemo(() => data.map((d) => categoryAccessor(d)), [data, categoryAccessor]);
 
   // Create a fake time scale for compatibility with ChartContext
   const fakeTimeScale = useMemo(() => {
@@ -418,9 +405,7 @@ const ChartCore = memo(function ChartCore({
         const seriesCount = lines.length;
         const groupGap = seriesCount > 1 ? 4 : 0;
         const individualBarHeight =
-          seriesCount > 0
-            ? (bandWidth - groupGap * (seriesCount - 1)) / seriesCount
-            : bandWidth;
+          seriesCount > 0 ? (bandWidth - groupGap * (seriesCount - 1)) / seriesCount : bandWidth;
 
         if (stacked) {
           // Stacked horizontal: all bars same y, x at cumulative end
@@ -429,8 +414,7 @@ const ChartCore = memo(function ChartCore({
             const value = d[line.dataKey];
             if (typeof value === "number") {
               cumulative += value;
-              const axisScale =
-                yScales[normalizeYAxisId(line.yAxisId)] ?? valueScale;
+              const axisScale = yScales[normalizeYAxisId(line.yAxisId)] ?? valueScale;
               xPositions[line.dataKey] = axisScale(cumulative) ?? 0;
               yPositions[line.dataKey] = barPos + bandWidth / 2;
             }
@@ -440,13 +424,10 @@ const ChartCore = memo(function ChartCore({
           lines.forEach((line, idx) => {
             const value = d[line.dataKey];
             if (typeof value === "number") {
-              const axisScale =
-                yScales[normalizeYAxisId(line.yAxisId)] ?? valueScale;
+              const axisScale = yScales[normalizeYAxisId(line.yAxisId)] ?? valueScale;
               xPositions[line.dataKey] = axisScale(value) ?? 0;
               yPositions[line.dataKey] =
-                barPos +
-                idx * (individualBarHeight + groupGap) +
-                individualBarHeight / 2;
+                barPos + idx * (individualBarHeight + groupGap) + individualBarHeight / 2;
             }
           });
         }
@@ -458,8 +439,7 @@ const ChartCore = memo(function ChartCore({
           const value = d[line.dataKey];
           if (typeof value === "number") {
             cumulative += value;
-            const axisScale =
-              yScales[normalizeYAxisId(line.yAxisId)] ?? primaryYScale;
+            const axisScale = yScales[normalizeYAxisId(line.yAxisId)] ?? primaryYScale;
             const gapOffset = seriesIdx * stackGap;
             yPositions[line.dataKey] = (axisScale(cumulative) ?? 0) - gapOffset;
             seriesIdx++;
@@ -470,15 +450,12 @@ const ChartCore = memo(function ChartCore({
         const seriesCount = lines.length;
         const groupGap = seriesCount > 1 ? 4 : 0;
         const individualBarWidth =
-          seriesCount > 0
-            ? (bandWidth - groupGap * (seriesCount - 1)) / seriesCount
-            : bandWidth;
+          seriesCount > 0 ? (bandWidth - groupGap * (seriesCount - 1)) / seriesCount : bandWidth;
 
         lines.forEach((line, idx) => {
           const value = d[line.dataKey];
           if (typeof value === "number") {
-            const axisScale =
-              yScales[normalizeYAxisId(line.yAxisId)] ?? primaryYScale;
+            const axisScale = yScales[normalizeYAxisId(line.yAxisId)] ?? primaryYScale;
             const baselineY = axisScale(0) ?? innerHeight;
             const valueY = axisScale(value) ?? 0;
             const barLengthPx = baselineY - valueY;
@@ -496,9 +473,7 @@ const ChartCore = memo(function ChartCore({
             }
 
             xPositions[line.dataKey] =
-              barPos +
-              idx * (individualBarWidth + groupGap) +
-              individualBarWidth / 2;
+              barPos + idx * (individualBarWidth + groupGap) + individualBarWidth / 2;
           }
         });
       }
@@ -539,7 +514,7 @@ const ChartCore = memo(function ChartCore({
       primaryYScale,
       squareSnap,
       innerHeight,
-    ]
+    ],
   );
 
   const handleMouseLeave = useCallback(() => {
@@ -565,9 +540,7 @@ const ChartCore = memo(function ChartCore({
     } else if (isPostOverlayComponent(resolvedChild)) {
       postOverlayChildren.push(resolvedChild);
     } else if (isClipExcludedComponent(resolvedChild)) {
-      clipExcludedChildren.push(
-        isChartClipPassthrough(child.type) ? resolvedChild : child
-      );
+      clipExcludedChildren.push(isChartClipPassthrough(child.type) ? resolvedChild : child);
     } else if (isUnderlayComponent(resolvedChild)) {
       underlayChildren.push(resolvedChild);
     } else {
@@ -575,10 +548,7 @@ const ChartCore = memo(function ChartCore({
     }
   });
 
-  const referenceAreas = useMemo(
-    () => extractReferenceAreaConfigs(children),
-    [children]
-  );
+  const referenceAreas = useMemo(() => extractReferenceAreaConfigs(children), [children]);
 
   const contextValue = {
     ...DEFAULT_CHART_LIFECYCLE,
@@ -586,9 +556,7 @@ const ChartCore = memo(function ChartCore({
     chartStatus: status,
     data,
     renderData: data,
-    xScale: fakeTimeScale as unknown as ReturnType<
-      typeof import("@visx/scale").scaleTime<number>
-    >,
+    xScale: fakeTimeScale as unknown as ReturnType<typeof import("@visx/scale").scaleTime<number>>,
     yScale: isHorizontal ? valueScale : primaryYScale,
     yScales,
     width,
@@ -622,12 +590,7 @@ const ChartCore = memo(function ChartCore({
 
   return (
     <ChartProvider value={contextValue}>
-      <svg
-        aria-hidden="true"
-        className="overflow-visible"
-        height={height}
-        width={width}
-      >
+      <svg aria-hidden="true" className="overflow-visible" height={height} width={width}>
         {/* Gradient and pattern definitions */}
         {defsChildren.length > 0 && <defs>{defsChildren}</defs>}
 
@@ -641,13 +604,7 @@ const ChartCore = memo(function ChartCore({
           transform={`translate(${margin.left},${margin.top})`}
         >
           {/* Background rect for mouse event detection */}
-          <rect
-            fill="transparent"
-            height={innerHeight}
-            width={innerWidth}
-            x={0}
-            y={0}
-          />
+          <rect fill="transparent" height={innerHeight} width={innerWidth} x={0} y={0} />
 
           {renderKeyedChartLayers(clipExcludedChildren)}
           {renderKeyedChartLayers(underlayChildren)}

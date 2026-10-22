@@ -115,7 +115,9 @@ test("switches between app-global and per-repo model scope while worktrees inher
     await expect(window.getByTestId("new-thread-composer")).toHaveCount(0);
 
     await selectComposerModel(window, "GPT-4 Turbo");
-    await expect(window.getByRole("button", { name: "OpenAI · GPT-4 Turbo" }).first()).toBeVisible();
+    await expect(
+      window.getByRole("button", { name: "OpenAI · GPT-4 Turbo" }).first(),
+    ).toBeVisible();
 
     await openSettings(window);
     await openSettingsSection(window, "Models");
@@ -130,7 +132,9 @@ test("switches between app-global and per-repo model scope while worktrees inher
     await expect(window.getByLabel("Default model", { exact: true })).toHaveValue("openai:gpt-5");
 
     await window.getByRole("button", { name: "Back to app", exact: true }).click();
-    await expect(window.getByRole("button", { name: "OpenAI · GPT-4 Turbo" }).first()).toBeVisible();
+    await expect(
+      window.getByRole("button", { name: "OpenAI · GPT-4 Turbo" }).first(),
+    ).toBeVisible();
     await expectComposerModelOptions(window, {
       visibleModelLabels: ["GPT-5", "GPT-4 Turbo"],
       hiddenModelLabels: ["GPT-4o"],
@@ -287,7 +291,9 @@ test("a default reasoning level picked in Settings shows at once and is still ch
       await waitForWorkspaceByPath(again, workspace);
       await again.keyboard.press(desktopShortcut(","));
       await openSettingsSection(again, "Models");
-      await expect(again.getByRole("combobox", { name: "Reasoning", exact: true })).toHaveValue(next);
+      await expect(again.getByRole("combobox", { name: "Reasoning", exact: true })).toHaveValue(
+        next,
+      );
     } finally {
       await second.close();
     }

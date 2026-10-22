@@ -104,10 +104,15 @@ test("toggles the diff panel from the keyboard shortcut and renders changed file
     await window.getByTestId("toggle-side-panel").click();
     await expect(window.getByTestId("workbench")).toBeVisible();
     await expect(
-      window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab", { name: "Agents", exact: true }),
+      window
+        .getByRole("tablist", { name: "Workspace tools" })
+        .getByRole("tab", { name: "Agents", exact: true }),
     ).toHaveAttribute("aria-selected", "true");
     await expect(diffPanel).toHaveCount(0);
-    await window.getByRole("tablist", { name: "Workspace tools" }).getByRole("tab", { name: "Review", exact: true }).click();
+    await window
+      .getByRole("tablist", { name: "Workspace tools" })
+      .getByRole("tab", { name: "Review", exact: true })
+      .click();
     await expect(diffPanel).toBeVisible();
     await window.getByTestId("toggle-side-panel").click();
     await expect(diffPanel).toHaveCount(0);

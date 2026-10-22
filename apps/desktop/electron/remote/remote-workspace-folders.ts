@@ -17,11 +17,7 @@ const HIDDEN_FOLDER_NAMES = new Set([
 ]);
 
 export type RemoteWorkspaceFolderErrorCode =
-  | "ROOT_UNAVAILABLE"
-  | "INVALID_PATH"
-  | "NOT_FOUND"
-  | "CONFLICT"
-  | "IO_FAILURE";
+  "ROOT_UNAVAILABLE" | "INVALID_PATH" | "NOT_FOUND" | "CONFLICT" | "IO_FAILURE";
 
 export class RemoteWorkspaceFolderError extends Error {
   constructor(
@@ -61,7 +57,11 @@ export function createRemoteWorkspaceFolders(roots: ReadonlyMap<string, string>)
     contains(rootId: string, candidatePath: string, includeRoot = false): Promise<boolean> {
       return isWorkspacePathInsideRoot(configuredRoots, rootId, candidatePath, includeRoot);
     },
-    create(rootId: string, parentRelativePath: string, name: string): Promise<{
+    create(
+      rootId: string,
+      parentRelativePath: string,
+      name: string,
+    ): Promise<{
       readonly absolutePath: string;
       readonly relativePath: string;
     }> {
@@ -94,12 +94,12 @@ async function listWorkspaceFolders(
         // A path that changed or escaped during enumeration is omitted.
       }
     }
-    folders.sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true }));
+    folders.sort((left, right) =>
+      left.name.localeCompare(right.name, undefined, { numeric: true }),
+    );
     return {
       relativePath,
-      ...(relativePath
-        ? { parentRelativePath: parentRelativePath(relativePath) }
-        : {}),
+      ...(relativePath ? { parentRelativePath: parentRelativePath(relativePath) } : {}),
       folders: folders.slice(0, MAX_LISTED_FOLDERS),
       truncated: folders.length > MAX_LISTED_FOLDERS,
     };
@@ -177,7 +177,10 @@ async function isWorkspacePathInsideRoot(
   }
 }
 
-async function resolveAllowedRoot(roots: ReadonlyMap<string, string>, rootId: string): Promise<string> {
+async function resolveAllowedRoot(
+  roots: ReadonlyMap<string, string>,
+  rootId: string,
+): Promise<string> {
   const configuredPath = roots.get(rootId);
   if (!configuredPath) {
     throw folderError("ROOT_UNAVAILABLE", "This folder root is not authorized.");
@@ -260,7 +263,10 @@ function isAlreadyExists(error: unknown): boolean {
   return isRecord(error) && (error.code === "EEXIST" || error.code === "ENOTEMPTY");
 }
 
-function toFolderError(error: unknown, fallback: RemoteWorkspaceFolderErrorCode): RemoteWorkspaceFolderError {
+function toFolderError(
+  error: unknown,
+  fallback: RemoteWorkspaceFolderErrorCode,
+): RemoteWorkspaceFolderError {
   return error instanceof RemoteWorkspaceFolderError
     ? error
     : folderError(fallback, "The folder operation failed.", error);

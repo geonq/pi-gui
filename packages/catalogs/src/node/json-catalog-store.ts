@@ -246,7 +246,10 @@ export class JsonCatalogStore implements SessionFileCatalogStorage {
       const nextWorkspaces = [...state.workspaces];
       for (const workspace of newWorkspaces) {
         if (nextWorkspaces.some((entry) => entry.workspaceId === workspace.workspaceId)) continue;
-        nextWorkspaces.push({ ...cloneWorkspaceEntry(workspace), sortOrder: nextWorkspaces.length });
+        nextWorkspaces.push({
+          ...cloneWorkspaceEntry(workspace),
+          sortOrder: nextWorkspaces.length,
+        });
       }
 
       const nextEntriesByWorkspace = new Map<WorkspaceId, SessionCatalogEntry[]>();
@@ -274,12 +277,11 @@ export class JsonCatalogStore implements SessionFileCatalogStorage {
           const baseline = baselineByKey.get(key);
           const current = currentByKey.get(key);
           const staged = stagedByKey.get(key);
-          const baselinePath =
-            replacement.baselineSessionFiles[key] || baseline?.sessionFilePath;
+          const baselinePath = replacement.baselineSessionFiles[key] || baseline?.sessionFilePath;
           const currentPath = state.sessionFiles[key] || current?.sessionFilePath;
           const changedSinceScan =
             Boolean(current) &&
-            (Boolean(baseline) && !areSessionEntriesEqual(current!, baseline!) ||
+            ((Boolean(baseline) && !areSessionEntriesEqual(current!, baseline!)) ||
               currentPath !== baselinePath);
           if (baseline) {
             if (!current) continue;
@@ -343,8 +345,7 @@ export class JsonCatalogStore implements SessionFileCatalogStorage {
           const key = sessionKey(entry.sessionRef);
           const baseline = baselineByKey.get(key);
           const current = currentByKey.get(key);
-          const baselinePath =
-            replacement.baselineSessionFiles[key] || baseline?.sessionFilePath;
+          const baselinePath = replacement.baselineSessionFiles[key] || baseline?.sessionFilePath;
           const currentPath = state.sessionFiles[key] || current?.sessionFilePath;
           const changedSinceScan =
             current &&
@@ -353,7 +354,7 @@ export class JsonCatalogStore implements SessionFileCatalogStorage {
               currentPath !== baselinePath);
           const filePath = changedSinceScan
             ? currentPath
-            : replacement.sessionFiles[key] ?? state.sessionFiles[key] ?? entry.sessionFilePath;
+            : (replacement.sessionFiles[key] ?? state.sessionFiles[key] ?? entry.sessionFilePath);
           if (filePath) nextSessionFiles[key] = filePath;
         }
       }
@@ -515,12 +516,12 @@ function areWorkspaceEntriesEqual(
 ): boolean {
   return Boolean(
     right &&
-      left.workspaceId === right.workspaceId &&
-      left.path === right.path &&
-      left.displayName === right.displayName &&
-      left.lastOpenedAt === right.lastOpenedAt &&
-      left.sortOrder === right.sortOrder &&
-      left.pinned === right.pinned,
+    left.workspaceId === right.workspaceId &&
+    left.path === right.path &&
+    left.displayName === right.displayName &&
+    left.lastOpenedAt === right.lastOpenedAt &&
+    left.sortOrder === right.sortOrder &&
+    left.pinned === right.pinned,
   );
 }
 

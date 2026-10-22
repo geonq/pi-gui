@@ -86,7 +86,9 @@ function parseBreakdown(
   const tokens = parseTokens(value.tokens);
   if (!tokens) return null;
   const byProvider =
-    value.byProvider === undefined ? undefined : parseProviderMap(value.byProvider, allowedProviders);
+    value.byProvider === undefined
+      ? undefined
+      : parseProviderMap(value.byProvider, allowedProviders);
   if (value.byProvider !== undefined && !byProvider) return null;
   return {
     key,
@@ -99,7 +101,10 @@ function parseBreakdown(
   };
 }
 
-function parseDays(value: unknown, allowedProviders: ReadonlySet<string>): readonly UsageDay[] | null {
+function parseDays(
+  value: unknown,
+  allowedProviders: ReadonlySet<string>,
+): readonly UsageDay[] | null {
   if (!Array.isArray(value) || value.length > MAX_SUMMARY_ROWS) return null;
   const days: UsageDay[] = [];
   for (const item of value) {
@@ -132,7 +137,11 @@ function parseSection(
 
   const models: UsageBreakdown[] = [];
   for (const item of value.models) {
-    if (!isRecord(item) || typeof item.provider !== "string" || !allowedProviders.has(item.provider))
+    if (
+      !isRecord(item) ||
+      typeof item.provider !== "string" ||
+      !allowedProviders.has(item.provider)
+    )
       return null;
     const provider = item.provider as HistoryProvider;
     const parsed = parseBreakdown(item, allowedProviders, provider);
@@ -169,7 +178,8 @@ function parsePotentialOverlap(value: unknown): UsageHistoryTotals | null {
 
 function parseSummary(value: unknown): HistoricalUsageRead | null {
   if (!isRecord(value) || value.schemaVersion !== 1 || value.costAvailable !== false) return null;
-  if (!isEpoch(value.generatedAt) || !isRecord(value.report) || !isRecord(value.coverage)) return null;
+  if (!isEpoch(value.generatedAt) || !isRecord(value.report) || !isRecord(value.coverage))
+    return null;
   const coverage = value.coverage;
   const tokenCoveragePartial = coverage.tokenCoveragePartial;
   const normalizationNote = coverage.normalizationNote;
@@ -246,7 +256,12 @@ function parseSummary(value: unknown): HistoricalUsageRead | null {
     unmappedProjects: mappings.unknown,
     ...(potential ? { potentialOverlap: potential } : {}),
   };
-  return { status: "available", summary: safe, ...(potential ? { potentialOverlap: potential } : {}), history };
+  return {
+    status: "available",
+    summary: safe,
+    ...(potential ? { potentialOverlap: potential } : {}),
+    history,
+  };
 }
 
 async function readBoundedJson(filePath: string): Promise<unknown> {
@@ -291,9 +306,7 @@ export async function readHistoricalUsageSummary(filePath: string): Promise<Hist
     const parsed = parseSummary(await readBoundedJson(filePath));
     return parsed ?? unavailable("unavailable");
   } catch (error) {
-    return unavailable(
-      isRecord(error) && error.code === "ENOENT" ? "missing" : "unavailable",
-    );
+    return unavailable(isRecord(error) && error.code === "ENOENT" ? "missing" : "unavailable");
   }
 }
 
@@ -321,7 +334,9 @@ function mergeDays(left: readonly UsageDay[], right: readonly UsageDay[]): reado
     }
     merged.set(day.dayStart, byModel);
   }
-  return [...merged].sort(([a], [b]) => a - b).map(([dayStart, byModel]) => ({ dayStart, byModel }));
+  return [...merged]
+    .sort(([a], [b]) => a - b)
+    .map(([dayStart, byModel]) => ({ dayStart, byModel }));
 }
 
 /** Merge only the importer's safe additive section; possible AGY overlap stays separate. */

@@ -4,8 +4,7 @@
  * Uses CSS container query units (`cqw`) so values scale with the center
  * hole — not the viewport — which keeps stat text readable on small charts.
  */
-export const chartCenterContainerClassName =
-  "@container/chart-center size-full min-w-0";
+export const chartCenterContainerClassName = "@container/chart-center size-full min-w-0";
 
 /** Primary stat — ~22% of center width, clamped between text-sm and text-3xl. */
 export const chartCenterValueClassName =

@@ -1,5 +1,8 @@
 import { ipcMain, type IpcMainInvokeEvent } from "electron";
-import type { WorkspaceFolderAdapters, WorkspaceFolderDevice } from "../../contracts/workspace-folders";
+import type {
+  WorkspaceFolderAdapters,
+  WorkspaceFolderDevice,
+} from "../../contracts/workspace-folders";
 import { desktopIpc } from "../../contracts/ipc";
 import type { WindowOwner } from "../windows/window-owner";
 import { expectOptionalWorkspaceFolderListingPath } from "./workspace-folder-ipc-validation";
@@ -34,7 +37,8 @@ export function registerWorkspaceFolderIpc(
       if (rawDevice === "windows") {
         return windows.runStateResultAction(window, async () => {
           const result = await adapters.windows.open(rootId, relativePath);
-          if (result.device !== "windows") throw new Error("Windows folder adapter result is invalid.");
+          if (result.device !== "windows")
+            throw new Error("Windows folder adapter result is invalid.");
           return result;
         });
       }
@@ -60,7 +64,8 @@ export function registerWorkspaceFolderIpc(
       if (rawDevice === "windows") {
         return windows.runStateResultAction(window, async () => {
           const result = await adapters.windows.create(rootId, parentRelativePath, name);
-          if (result.device !== "windows") throw new Error("Windows folder adapter result is invalid.");
+          if (result.device !== "windows")
+            throw new Error("Windows folder adapter result is invalid.");
           return result;
         });
       }

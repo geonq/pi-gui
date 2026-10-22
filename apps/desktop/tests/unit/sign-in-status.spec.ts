@@ -19,7 +19,11 @@ test("unknown checks never notify or clear the remembered real sign-out", async 
   const paths = { stateDir: dir, memoryFile: join(dir, "notices.json") };
   let state: SignInStatus["state"] = "unknown";
   const notified: string[] = [];
-  const monitor = startSignInMonitor(paths, status => notified.push(status.state), async () => [{ id: "claude-code-account-1", name: "Claude", state }]);
+  const monitor = startSignInMonitor(
+    paths,
+    (status) => notified.push(status.state),
+    async () => [{ id: "claude-code-account-1", name: "Claude", state }],
+  );
   try {
     await monitor.checkNow();
     expect(notified).toEqual([]);

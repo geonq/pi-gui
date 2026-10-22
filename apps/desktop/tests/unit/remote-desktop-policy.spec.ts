@@ -77,7 +77,9 @@ test("remote usage reads allow only the documented cachedOnly metadata option", 
     [{ cachedOnly: true, provider: "secret" }],
     [{}, {}],
   ]) {
-    expect(() => validateRemoteDesktopInvocation("getAccountLimits", args, workspaceScope)).toThrow();
+    expect(() =>
+      validateRemoteDesktopInvocation("getAccountLimits", args, workspaceScope),
+    ).toThrow();
   }
 });
 
@@ -206,7 +208,6 @@ test("remote state projection removes unauthorized projects and their selection"
   expect(projected.workspaceOrder).toEqual([allowedWorkspaceId]);
 });
 
-
 test("remote workspace runtime loads and thread grouping validate exact scoped arguments", () => {
   expect(
     validateRemoteDesktopInvocation("loadWorkspaceRuntime", [allowedWorkspaceId], workspaceScope),
@@ -243,7 +244,9 @@ test("remote workspace runtime loads and thread grouping validate exact scoped a
   }
 
   for (const grouping of ["time", "workspace"] as const) {
-    expect(validateRemoteDesktopInvocation("setThreadGrouping", [grouping], workspaceScope)).toEqual({
+    expect(
+      validateRemoteDesktopInvocation("setThreadGrouping", [grouping], workspaceScope),
+    ).toEqual({
       method: "setThreadGrouping",
       args: [grouping],
     });

@@ -25,7 +25,8 @@ export class RemoteWorkspaceStateProjector {
   ): Promise<void> {
     const revision = this.observeRevision(state);
     const task = this.enqueue(async () => {
-      if (revision < this.latestObservedRevision || revision <= this.latestProjectedRevision) return;
+      if (revision < this.latestObservedRevision || revision <= this.latestProjectedRevision)
+        return;
       const projection = await this.project(state, revision);
       if (!projection || revision < this.latestObservedRevision) return;
       publish(this.commit(projection, revision));

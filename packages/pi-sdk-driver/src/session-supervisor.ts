@@ -521,11 +521,11 @@ export class SessionSupervisor {
           sessionSnapshot.sessions
             .filter((session) => targetIds.has(session.workspaceId))
             .map(async (session) => {
-            const key = sessionKey(session.sessionRef);
-            const filePath =
-              session.sessionFilePath ?? (await this.catalogs.getSessionFile(session.sessionRef));
-            if (filePath) baselineSessionFiles[key] = filePath;
-          }),
+              const key = sessionKey(session.sessionRef);
+              const filePath =
+                session.sessionFilePath ?? (await this.catalogs.getSessionFile(session.sessionRef));
+              if (filePath) baselineSessionFiles[key] = filePath;
+            }),
         );
 
         const scanned = await Promise.all(
@@ -554,8 +554,7 @@ export class SessionSupervisor {
                   existingSessions.map(async (session) => {
                     const key = sessionKey(session.sessionRef);
                     if (discoveredKeys.has(key)) return undefined;
-                    const sessionFilePath =
-                      baselineSessionFiles[key] ?? session.sessionFilePath;
+                    const sessionFilePath = baselineSessionFiles[key] ?? session.sessionFilePath;
                     if (!sessionFilePath) return undefined;
                     try {
                       await access(sessionFilePath);
@@ -564,7 +563,9 @@ export class SessionSupervisor {
                     }
                     const record = this.records.get(key);
                     const runtimeSnapshot =
-                      record && record.session && !record.closed ? buildSnapshot(record) : undefined;
+                      record && record.session && !record.closed
+                        ? buildSnapshot(record)
+                        : undefined;
                     return {
                       ...session,
                       sessionFilePath,
@@ -612,8 +613,8 @@ export class SessionSupervisor {
             }
           }),
         );
-        const successful = scanned.filter(
-          (entry): entry is NonNullable<typeof entry> => Boolean(entry),
+        const successful = scanned.filter((entry): entry is NonNullable<typeof entry> =>
+          Boolean(entry),
         );
         if (successful.length === 0) return;
 

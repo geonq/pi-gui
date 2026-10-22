@@ -152,7 +152,9 @@ test("merges only safe history and keeps possible AGY overlap and unknown cost s
     expect(merged.history?.piCoverageAvailable).toBe(false);
     expect(merged.history?.complete).toBe(false);
     expect(merged.history?.potentialOverlap?.totals).toEqual(tokens(40, 10));
-    expect(merged.history?.potentialOverlap?.days[0]?.byModel).toEqual({ "history-agy/gemini": 50 });
+    expect(merged.history?.potentialOverlap?.days[0]?.byModel).toEqual({
+      "history-agy/gemini": 50,
+    });
     expect(merged.days[0]?.byModel).not.toHaveProperty("history-agy/gemini");
   } finally {
     await rm(dir, { recursive: true, force: true });

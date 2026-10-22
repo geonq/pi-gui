@@ -119,14 +119,20 @@ test("rejects a workspace junction that resolves outside the allowlisted root", 
     try {
       await symlink(outsideRoot, join(workspaceRoot, "outside-link"), "junction");
     } catch (error) {
-      testInfo.skip(true, `The platform cannot create a directory junction for this test: ${String(error)}`);
+      testInfo.skip(
+        true,
+        `The platform cannot create a directory junction for this test: ${String(error)}`,
+      );
     }
 
     const transfers = createWorkspaceFileTransfers({
       allowlistedWorkspaces: new Map([["project-1", workspaceRoot]]),
     });
     await expect(
-      transfers.openDownload({ workspaceId: "project-1", relativePath: "outside-link/private.txt" }),
+      transfers.openDownload({
+        workspaceId: "project-1",
+        relativePath: "outside-link/private.txt",
+      }),
     ).rejects.toMatchObject({ code: "UNSAFE_FILE" });
     await expect(
       transfers.upload({

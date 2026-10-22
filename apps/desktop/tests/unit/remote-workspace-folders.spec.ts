@@ -13,10 +13,7 @@ test("remote folder browsing and creation stay inside an explicit root without o
   await mkdir(projectsRoot);
   await mkdir(path.join(projectsRoot, "Alpha"));
   await mkdir(path.join(projectsRoot, ".ssh"));
-  const folders = createRemoteWorkspaceFolders(new Map([[
-    "projects-root",
-    projectsRoot,
-  ]]));
+  const folders = createRemoteWorkspaceFolders(new Map([["projects-root", projectsRoot]]));
 
   try {
     const listing = await folders.list("projects-root");

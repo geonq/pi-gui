@@ -1,13 +1,7 @@
 "use client";
 
 import type { Transition } from "motion/react";
-import {
-  createContext,
-  type ReactNode,
-  type RefObject,
-  useContext,
-  useMemo,
-} from "react";
+import { createContext, type ReactNode, type RefObject, useContext, useMemo } from "react";
 
 // CSS variable references for ring chart theming
 export const ringCssVars = {
@@ -56,7 +50,7 @@ export function getRingHitRadii(
   index: number,
   baseInnerRadius: number,
   strokeWidth: number,
-  ringGap: number
+  ringGap: number,
 ): { innerRadius: number; outerRadius: number } {
   const halfGap = Math.max(0, ringGap) / 2;
   const bandInner = baseInnerRadius + index * (strokeWidth + ringGap);
@@ -161,7 +155,7 @@ export function RingProvider({
       value.startAngle,
       value.endAngle,
       value.geometryScrubbing,
-    ]
+    ],
   );
 
   const hover = useMemo<RingHoverContextValue>(
@@ -169,14 +163,12 @@ export function RingProvider({
       hoveredIndex: value.hoveredIndex,
       setHoveredIndex: value.setHoveredIndex,
     }),
-    [value.hoveredIndex, value.setHoveredIndex]
+    [value.hoveredIndex, value.setHoveredIndex],
   );
 
   return (
     <RingStableContext.Provider value={stable}>
-      <RingHoverContext.Provider value={hover}>
-        {children}
-      </RingHoverContext.Provider>
+      <RingHoverContext.Provider value={hover}>{children}</RingHoverContext.Provider>
     </RingStableContext.Provider>
   );
 }
@@ -186,7 +178,7 @@ export function useRingStable(): RingStableContextValue {
   if (!context) {
     throw new Error(
       "useRingStable must be used within a RingProvider. " +
-        "Make sure your component is wrapped in <RingChart>."
+        "Make sure your component is wrapped in <RingChart>.",
     );
   }
   return context;
@@ -197,7 +189,7 @@ export function useRingHover(): RingHoverContextValue {
   if (!context) {
     throw new Error(
       "useRingHover must be used within a RingProvider. " +
-        "Make sure your component is wrapped in <RingChart>."
+        "Make sure your component is wrapped in <RingChart>.",
     );
   }
   return context;

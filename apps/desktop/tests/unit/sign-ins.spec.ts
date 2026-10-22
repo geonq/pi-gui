@@ -22,10 +22,15 @@ test("every provider gets its status by the same rules", () => {
   ];
   const limits: AccountLimits[] = [
     // The weekly window is used up; the fresh 5-hour window resets sooner but does not help.
-    { id: "openai", name: "ChatGPT", asOf: NOW, windows: [
-      { label: "5-hour", usedPercent: 100, resetsAt: NOW + HOUR },
-      { label: "Weekly", usedPercent: 100, resetsAt: NOW + 48 * HOUR },
-    ] },
+    {
+      id: "openai",
+      name: "ChatGPT",
+      asOf: NOW,
+      windows: [
+        { label: "5-hour", usedPercent: 100, resetsAt: NOW + HOUR },
+        { label: "Weekly", usedPercent: 100, resetsAt: NOW + 48 * HOUR },
+      ],
+    },
   ];
   const statuses = providerStatuses(accounts, signIns, limits, NOW);
   expect(Object.fromEntries(statuses)).toEqual({
@@ -37,10 +42,18 @@ test("every provider gets its status by the same rules", () => {
 
 test("a sign-in about to end outranks a limit; a lost sign-in outranks everything", () => {
   const signIns: SignInStatus[] = [
-    { id: "claude-code-account-1", name: "Claude · work", state: "expiring", expiresAt: NOW + 2 * 24 * HOUR },
+    {
+      id: "claude-code-account-1",
+      name: "Claude · work",
+      state: "expiring",
+      expiresAt: NOW + 2 * 24 * HOUR,
+    },
   ];
   const accounts = new Map<string, AccountStatus>([
-    ["claude-code-account-1", { id: "claude-code-account-1", state: "limited", resetAt: NOW + HOUR }],
+    [
+      "claude-code-account-1",
+      { id: "claude-code-account-1", state: "limited", resetAt: NOW + HOUR },
+    ],
     ["claude-code-account-3", { id: "claude-code-account-3", state: "relogin" }],
   ]);
   expect(Object.fromEntries(providerStatuses(accounts, signIns, [], NOW))).toEqual({
@@ -52,9 +65,16 @@ test("a sign-in about to end outranks a limit; a lost sign-in outranks everythin
 test("one notification per new problem, also across restarts; none again once it is fixed and stays fixed", async () => {
   const dir = await mkdtemp(join(tmpdir(), "pi-signins-"));
   const paths = { stateDir: dir, memoryFile: join(dir, "notices.json") };
-  let world: SignInStatus[] = [{ id: "antigravity", name: "Antigravity", state: "signed-out", fix: "Run `agy`" }];
+  let world: SignInStatus[] = [
+    { id: "antigravity", name: "Antigravity", state: "signed-out", fix: "Run `agy`" },
+  ];
   const notified: string[] = [];
-  const start = () => startSignInMonitor(paths, (problem) => notified.push(`${problem.id}:${problem.state}`), async () => world);
+  const start = () =>
+    startSignInMonitor(
+      paths,
+      (problem) => notified.push(`${problem.id}:${problem.state}`),
+      async () => world,
+    );
   try {
     const first = start();
     await first.checkNow();

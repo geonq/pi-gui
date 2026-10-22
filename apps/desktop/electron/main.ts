@@ -88,7 +88,10 @@ import {
   type RemoteDesktopMacFoldersConfig,
 } from "./remote/remote-desktop-config";
 import { RemoteDesktopHttpClient } from "./remote/remote-desktop-http-client";
-import { startRemoteDesktopHttpHost, type RemoteDesktopHttpHost } from "./remote/remote-desktop-http-host";
+import {
+  startRemoteDesktopHttpHost,
+  type RemoteDesktopHttpHost,
+} from "./remote/remote-desktop-http-host";
 import {
   DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES,
   loadRemoteDesktopClientPreferences,
@@ -96,10 +99,7 @@ import {
   validateRemoteDesktopClientPreferencesPatch,
   type RemoteDesktopClientPreferences,
 } from "./remote/remote-desktop-client-preferences";
-import {
-  remoteClientIpc,
-  type RemoteDesktopEvent,
-} from "./remote/remote-desktop-protocol";
+import { remoteClientIpc, type RemoteDesktopEvent } from "./remote/remote-desktop-protocol";
 import { remoteClientInvocationFromIpc } from "./remote/remote-desktop-client-preload";
 import type { DesktopAppState, DesktopAppViewState } from "../contracts/desktop-state";
 import {
@@ -141,7 +141,13 @@ if (process.platform === "darwin" && !remoteDesktopDefaultsDisabled) {
   if (existsSync(clientConfigPath)) {
     process.env.PI_REMOTE_DESKTOP_CLIENT = "1";
     process.env.PI_REMOTE_DESKTOP_CLIENT_CONFIG = clientConfigPath;
-    process.env.PI_APP_USER_DATA_DIR ||= path.join(homedir(), "Pi", "runtime", "remote-desktop", "gui");
+    process.env.PI_APP_USER_DATA_DIR ||= path.join(
+      homedir(),
+      "Pi",
+      "runtime",
+      "remote-desktop",
+      "gui",
+    );
     // A remote client must not run the managed local provider/profile preparation step.
     process.env.PI_GUI_INTEGRATED_LAUNCH = "1";
   }
@@ -264,7 +270,11 @@ async function loadMacWorkspaceFolderAdapter(
     throw new Error("The configured Mac folder adapter is not an approved host module.");
   }
   const [metadata, canonicalPath] = await Promise.all([lstat(modulePath), realpath(modulePath)]);
-  if (!metadata.isFile() || metadata.isSymbolicLink() || canonicalPath.toLowerCase() !== modulePath.toLowerCase()) {
+  if (
+    !metadata.isFile() ||
+    metadata.isSymbolicLink() ||
+    canonicalPath.toLowerCase() !== modulePath.toLowerCase()
+  ) {
     throw new Error("The configured Mac folder adapter is unavailable.");
   }
   const loaded = (await import(pathToFileURL(modulePath).href)) as {
@@ -623,7 +633,7 @@ function currentWindowBackground(): string {
   return windowBackgroundFor(
     remoteDesktopClientMode
       ? remoteDesktopClientPreferences.themePresetId
-      : store?.snapshot().themePresetId ?? "default",
+      : (store?.snapshot().themePresetId ?? "default"),
     themeManager.getResolvedTheme(),
   );
 }
@@ -733,8 +743,7 @@ function createWindow({ deferContent = false }: { deferContent?: boolean } = {})
   });
 
   if (process.platform === "win32") {
-    const restoreMaterial = () =>
-      setWindowTransparency(window, nativeWindowTransparencyEnabled());
+    const restoreMaterial = () => setWindowTransparency(window, nativeWindowTransparencyEnabled());
     window.webContents.on("did-finish-load", restoreMaterial);
     window.on("maximize", restoreMaterial);
     window.on("unmaximize", restoreMaterial);
@@ -1277,9 +1286,8 @@ app
         process.platform,
         parseRemoteDesktopClientConfig,
       );
-      remoteDesktopClientPreferences = await loadRemoteDesktopClientPreferences(
-        configuredUserDataDir,
-      );
+      remoteDesktopClientPreferences =
+        await loadRemoteDesktopClientPreferences(configuredUserDataDir);
       remoteDesktopClient = new RemoteDesktopHttpClient(config);
     }
     traceStartup("electron ready");
@@ -1416,7 +1424,8 @@ app
       }
 
       const createRootIds = new Set(
-        remoteDesktopHostConfig?.clients.flatMap((client) => client.folderRootWorkspaceIds ?? []) ?? [],
+        remoteDesktopHostConfig?.clients.flatMap((client) => client.folderRootWorkspaceIds ?? []) ??
+          [],
       );
       const allWorkspaceIds = new Set(store.getWorkspaceRecords().map((record) => record.id));
       const localFolderService: WorkspaceFolderService = createWorkspaceFolderService({
@@ -1495,7 +1504,9 @@ app
       );
     }
     themeManager.setMode(
-      remoteDesktopClientMode ? remoteDesktopClientPreferences.themeMode : store.snapshot().themeMode,
+      remoteDesktopClientMode
+        ? remoteDesktopClientPreferences.themeMode
+        : store.snapshot().themeMode,
     );
     integratedTerminalShell = (await store.getState()).integratedTerminalShell;
     nativeTheme.on("updated", refreshWindowBackgrounds);
@@ -1788,11 +1799,7 @@ app
           const folderRootIds = new Set(client.folderRootWorkspaceIds ?? []);
           const visibleRootIds = new Set([...client.workspaceIds, ...folderRootIds]);
           const clientFolderService = createWorkspaceFolderService({
-            windowsRoots: createWindowsWorkspaceFolderRoots(
-              store,
-              visibleRootIds,
-              folderRootIds,
-            ),
+            windowsRoots: createWindowsWorkspaceFolderRoots(store, visibleRootIds, folderRootIds),
             ...(macWorkspaceFolderAdapter ? { mac: macWorkspaceFolderAdapter } : {}),
             addWorkspacePath: (workspacePath) => store.addWorkspace(workspacePath),
           });
@@ -1814,7 +1821,10 @@ app
             }
           }
           const pageUrl = process.env.ELECTRON_RENDERER_URL
-            ? new URL("remote-broker.html", `${process.env.ELECTRON_RENDERER_URL.replace(/\/$/u, "")}/`).href
+            ? new URL(
+                "remote-broker.html",
+                `${process.env.ELECTRON_RENDERER_URL.replace(/\/$/u, "")}/`,
+              ).href
             : pathToFileURL(path.join(__dirname, "..", "renderer", "remote-broker.html")).href;
           const broker = await RemoteDesktopBroker.create({
             clientId: client.id,

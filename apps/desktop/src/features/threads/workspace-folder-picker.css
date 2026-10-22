@@ -225,8 +225,6 @@
   max-width: 300px;
 }
 
-
-
 @media (max-width: 620px) {
   .workspace-folder-picker__footer {
     align-items: stretch;

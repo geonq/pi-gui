@@ -54,9 +54,7 @@ export interface HeatmapLevelRange {
 }
 
 /** Min/max contribution levels present in the dataset. */
-export function computeHeatmapLevelRange(
-  data: HeatmapColumn[]
-): HeatmapLevelRange {
+export function computeHeatmapLevelRange(data: HeatmapColumn[]): HeatmapLevelRange {
   let min = Number.POSITIVE_INFINITY;
   let max = Number.NEGATIVE_INFINITY;
 
@@ -82,7 +80,7 @@ export function computeHeatmapLevelRange(
 /** Per-cell fade duration derived from the motion enter transition. */
 export function resolveHeatmapEnterFadeDurationSec(
   enterTransition: Transition | undefined,
-  animationDurationMs: number
+  animationDurationMs: number,
 ): number {
   if (
     enterTransition &&
@@ -111,15 +109,10 @@ export function computeHeatmapEnterFadeDelayMs({
   enterStaggerScale: number;
   fadeDurationSec: number;
 }): number {
-  const random = seededRandom(
-    heatmapCellSeed(column, row) + revealEpoch * 524_287
-  );
+  const random = seededRandom(heatmapCellSeed(column, row) + revealEpoch * 524_287);
   const fadeMs = fadeDurationSec * 1000;
   const maxDelayMs = Math.max(0, animationDurationMs - fadeMs);
-  const spreadMs =
-    maxDelayMs *
-    HEATMAP_ENTER_STAGGER_SPREAD *
-    Math.max(enterStaggerScale, 0.25);
+  const spreadMs = maxDelayMs * HEATMAP_ENTER_STAGGER_SPREAD * Math.max(enterStaggerScale, 0.25);
 
   return random() * spreadMs;
 }
@@ -128,7 +121,7 @@ export function computeHeatmapEnterFadeDelayMs({
 export function heatmapLoadingCellParticipates(
   column: number,
   row: number,
-  randomness: number
+  randomness: number,
 ): boolean {
   if (randomness >= 1) {
     return true;

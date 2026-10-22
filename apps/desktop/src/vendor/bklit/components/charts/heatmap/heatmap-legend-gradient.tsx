@@ -3,10 +3,7 @@
 import { motion } from "motion/react";
 import { memo } from "react";
 import type { HeatmapLevelStyles } from "./heatmap-colors";
-import {
-  buildHeatmapLegendGradient,
-  resolveHeatmapHoverStyle,
-} from "./heatmap-utils";
+import { buildHeatmapLegendGradient, resolveHeatmapHoverStyle } from "./heatmap-utils";
 
 const HEATMAP_INACTIVE_TRANSITION = {
   duration: 0.22,
@@ -53,10 +50,7 @@ export const HeatmapLegendGradient = memo(function HeatmapLegendGradient({
   const gradient = buildHeatmapLegendGradient(levelStyles);
 
   return (
-    <div
-      className="relative shrink-0"
-      style={{ width: barWidth, height: barHeight }}
-    >
+    <div className="relative shrink-0" style={{ width: barWidth, height: barHeight }}>
       <motion.div
         animate={{
           opacity: isDimming && highlightedLevel === null ? inactiveOpacity : 1,

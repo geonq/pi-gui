@@ -57,7 +57,11 @@ async function executeRequest(
         }
         value = await adapter.open(rootId, relativePath);
       } else {
-        if (typeof rootId !== "string" || typeof relativePath !== "string" || typeof name !== "string") {
+        if (
+          typeof rootId !== "string" ||
+          typeof relativePath !== "string" ||
+          typeof name !== "string"
+        ) {
           throw new TypeError("New folder target is invalid.");
         }
         value = await adapter.create(rootId, relativePath, name);

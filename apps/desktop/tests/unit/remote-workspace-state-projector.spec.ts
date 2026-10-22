@@ -74,13 +74,9 @@ test("future workspace grants use only contained real directories and publish th
       revision: 4,
       workspaces: [...liveState.workspaces, workspace("newest", futurePath)],
     };
-    const pendingOlder = projector.enqueueEvent(
-      staleState,
-      (state) => events.push(state.revision),
-    );
-    const pendingNewer = projector.enqueueEvent(
-      newestState,
-      (state) => events.push(state.revision),
+    const pendingOlder = projector.enqueueEvent(staleState, (state) => events.push(state.revision));
+    const pendingNewer = projector.enqueueEvent(newestState, (state) =>
+      events.push(state.revision),
     );
     await Promise.all([pendingOlder, pendingNewer]);
     const projectedNewest = await projector.projectResponse(newestState);

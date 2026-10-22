@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
-import { buildModelOptions, isModelSelectable } from "../../src/features/conversation/composer-commands";
+import {
+  buildModelOptions,
+  isModelSelectable,
+} from "../../src/features/conversation/composer-commands";
 
 const model = {
   providerId: "openai",

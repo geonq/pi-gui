@@ -174,20 +174,22 @@ function UsageCells() {
         yScale={yScale}
       >
         {(cells) =>
-          cells.flat().map((cell) => (
-            <rect
-              className="usage-heatmap__cell"
-              data-column={cell.column}
-              data-row={cell.row}
-              fill={cell.color}
-              height={cell.height}
-              key={`${cell.column}-${cell.row}`}
-              rx={6}
-              width={cell.width}
-              x={cell.x}
-              y={cell.y}
-            />
-          ))
+          cells
+            .flat()
+            .map((cell) => (
+              <rect
+                className="usage-heatmap__cell"
+                data-column={cell.column}
+                data-row={cell.row}
+                fill={cell.color}
+                height={cell.height}
+                key={`${cell.column}-${cell.row}`}
+                rx={6}
+                width={cell.width}
+                x={cell.x}
+                y={cell.y}
+              />
+            ))
         }
       </HeatmapRect>
     ),

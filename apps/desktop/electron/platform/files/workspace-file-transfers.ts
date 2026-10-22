@@ -1,22 +1,10 @@
 import { constants } from "node:fs";
-import {
-  link,
-  lstat,
-  open,
-  realpath,
-  rename,
-  rm,
-  stat,
-  unlink,
-} from "node:fs/promises";
+import { link, lstat, open, realpath, rename, rm, stat, unlink } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import type { FileHandle } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
-import {
-  resolveExistingWorkspacePath,
-  resolveWorkspacePath,
-} from "./workspace-paths";
+import { resolveExistingWorkspacePath, resolveWorkspacePath } from "./workspace-paths";
 
 export const MAX_WORKSPACE_FILE_TRANSFER_BYTES = 64 * 1024 * 1024;
 
@@ -142,7 +130,10 @@ async function uploadWorkspaceFile(
 ): Promise<WorkspaceFileUploadResult> {
   const parsedPath = parseTransferPath(input.relativePath);
   if (input.originalName !== parsedPath.fileName || !isSafeFileName(input.originalName)) {
-    throw transferError("INVALID_REQUEST", "The original filename must match the destination name.");
+    throw transferError(
+      "INVALID_REQUEST",
+      "The original filename must match the destination name.",
+    );
   }
   const expectedSha256 = input.expectedSha256?.toLowerCase();
   if (expectedSha256 !== undefined && !/^[a-f0-9]{64}$/.test(expectedSha256)) {
@@ -155,7 +146,11 @@ async function uploadWorkspaceFile(
   const lexicalTargetPath = resolveLexicalTarget(workspaceRoot, input.relativePath);
 
   if (expectedSha256 !== undefined) {
-    const currentHash = await hashExistingTarget(workspaceRoot, input.relativePath, lexicalTargetPath);
+    const currentHash = await hashExistingTarget(
+      workspaceRoot,
+      input.relativePath,
+      lexicalTargetPath,
+    );
     if (currentHash !== expectedSha256) {
       throw transferError("CONFLICT", "The workspace file changed before replacement.");
     }
@@ -207,7 +202,11 @@ async function uploadWorkspaceFile(
         return;
       }
 
-      const currentHash = await hashExistingTarget(workspaceRoot, input.relativePath, lexicalTargetPath);
+      const currentHash = await hashExistingTarget(
+        workspaceRoot,
+        input.relativePath,
+        lexicalTargetPath,
+      );
       if (currentHash !== expectedSha256) {
         throw transferError("CONFLICT", "The workspace file changed before replacement.");
       }
@@ -254,7 +253,11 @@ async function openWorkspaceFileDownload(
 
     handle = await openReadOnly(resolvedTargetPath);
     const openedStats = await handle.stat();
-    if (!sameFileIdentity(lexicalStats, openedStats) || !openedStats.isFile() || openedStats.nlink > 1) {
+    if (
+      !sameFileIdentity(lexicalStats, openedStats) ||
+      !openedStats.isFile() ||
+      openedStats.nlink > 1
+    ) {
       throw transferError("UNSAFE_FILE", "This workspace file changed during access.");
     }
     if (openedStats.size > MAX_WORKSPACE_FILE_TRANSFER_BYTES) {
@@ -291,13 +294,19 @@ async function resolveAllowedWorkspaceRoot(
 ): Promise<string> {
   const configuredPath = workspaceRoots.get(workspaceId);
   if (!configuredPath) {
-    throw transferError("WORKSPACE_UNAVAILABLE", "This workspace is not available for file transfer.");
+    throw transferError(
+      "WORKSPACE_UNAVAILABLE",
+      "This workspace is not available for file transfer.",
+    );
   }
   try {
     const workspaceRoot = await realpath(path.resolve(configuredPath));
     const rootStats = await stat(workspaceRoot);
     if (!rootStats.isDirectory()) {
-      throw transferError("WORKSPACE_UNAVAILABLE", "This workspace is not available for file transfer.");
+      throw transferError(
+        "WORKSPACE_UNAVAILABLE",
+        "This workspace is not available for file transfer.",
+      );
     }
     return workspaceRoot;
   } catch (error) {
@@ -349,7 +358,11 @@ async function hashExistingTarget(
 
     handle = await openReadOnly(resolvedTargetPath);
     const openedStats = await handle.stat();
-    if (!sameFileIdentity(lexicalStats, openedStats) || !openedStats.isFile() || openedStats.nlink > 1) {
+    if (
+      !sameFileIdentity(lexicalStats, openedStats) ||
+      !openedStats.isFile() ||
+      openedStats.nlink > 1
+    ) {
       throw transferError("UNSAFE_FILE", "This workspace file changed during access.");
     }
     if (openedStats.size > MAX_WORKSPACE_FILE_TRANSFER_BYTES) {
@@ -422,10 +435,7 @@ function parseTransferPath(relativePath: string): ParsedRelativePath {
   }
 
   const segments = relativePath.split("/");
-  if (
-    segments.some((segment) => !isSafeFileName(segment)) ||
-    isBlockedTransferPath(segments)
-  ) {
+  if (segments.some((segment) => !isSafeFileName(segment)) || isBlockedTransferPath(segments)) {
     throw transferError("INVALID_PATH", "This path is not eligible for file transfer.");
   }
 
@@ -486,7 +496,10 @@ async function withTargetLock<T>(
   }
 }
 
-function sameFileIdentity(left: { dev: number; ino: number }, right: { dev: number; ino: number }): boolean {
+function sameFileIdentity(
+  left: { dev: number; ino: number },
+  right: { dev: number; ino: number },
+): boolean {
   return left.dev === right.dev && left.ino === right.ino;
 }
 
@@ -494,14 +507,21 @@ function isAlreadyExists(error: unknown): boolean {
   return isNodeError(error) && error.code === "EEXIST";
 }
 
-function toTransferError(error: unknown, fallback: WorkspaceFileTransferErrorCode): WorkspaceFileTransferError {
+function toTransferError(
+  error: unknown,
+  fallback: WorkspaceFileTransferErrorCode,
+): WorkspaceFileTransferError {
   if (error instanceof WorkspaceFileTransferError) return error;
   if (error instanceof Error && error.message === "Path escapes workspace") {
     return transferError("UNSAFE_FILE", "This path is outside the allowed workspace.", error);
   }
   if (isNodeError(error)) {
     if (error.code === "ENOENT") {
-      return transferError(fallback === "WORKSPACE_UNAVAILABLE" ? fallback : "NOT_FOUND", "The workspace file was not found.", error);
+      return transferError(
+        fallback === "WORKSPACE_UNAVAILABLE" ? fallback : "NOT_FOUND",
+        "The workspace file was not found.",
+        error,
+      );
     }
     if (error.code === "EEXIST") {
       return transferError("CONFLICT", "A file already exists at the destination.", error);

@@ -42,12 +42,7 @@ export function HighlightSegment({
       <defs>
         <clipPath id={clipId}>
           {/* Bleed by strokeWidth so a stroke at the min/max value keeps its full width. */}
-          <motion.rect
-            height={height + strokeWidth * 2}
-            width={width}
-            x={x}
-            y={-strokeWidth}
-          />
+          <motion.rect height={height + strokeWidth * 2} width={width} x={x} y={-strokeWidth} />
         </clipPath>
       </defs>
       <motion.path

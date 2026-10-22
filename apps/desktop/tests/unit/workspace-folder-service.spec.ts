@@ -57,7 +57,9 @@ test("Windows folder service registers only contained folders and returns their 
 
     const opened = await service.adapters.windows.open("projects-root", "NextSemis");
     expect(opened).toMatchObject({ device: "windows", workspaceId: "NextSemis" });
-    await expect(service.adapters.windows.open("projects-root", "../outside")).rejects.toMatchObject({
+    await expect(
+      service.adapters.windows.open("projects-root", "../outside"),
+    ).rejects.toMatchObject({
       code: "INVALID_PATH",
     });
     expect(registeredPaths).toEqual([

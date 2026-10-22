@@ -260,7 +260,9 @@ function createRemoteWorkspaceFolderAdapter(
 ): NonNullable<PiDesktopApi["workspaceFolders"]>["windows"] {
   return {
     async listRoots() {
-      return (await invokeRemote("listWorkspaceFolderRoots", [device])) as readonly WorkspaceFolderRoot[];
+      return (await invokeRemote("listWorkspaceFolderRoots", [
+        device,
+      ])) as readonly WorkspaceFolderRoot[];
     },
     async list(rootId, relativePath) {
       const args = relativePath === undefined ? [device, rootId] : [device, rootId, relativePath];
@@ -268,8 +270,7 @@ function createRemoteWorkspaceFolderAdapter(
     },
     async open(rootId, relativePath) {
       const result = (await invokeRemote("addWorkspaceFolder", [device, rootId, relativePath])) as
-        | WorkspaceFolderOpenResult
-        | undefined;
+        WorkspaceFolderOpenResult | undefined;
       if (result?.device === "windows") {
         return { ...result, state: await overlayState(result.state) };
       }

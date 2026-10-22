@@ -90,8 +90,7 @@ export const HeatmapSeparator = memo(function HeatmapSeparator({
   strokeWidth = 1,
   strokeOpacity = 1,
 }: HeatmapSeparatorProps) {
-  const { gap, innerHeight, margin, separatorLayout, xScale, containerRef } =
-    useHeatmap();
+  const { gap, innerHeight, margin, separatorLayout, xScale, containerRef } = useHeatmap();
 
   const [mounted, setMounted] = useState(false);
   const reactId = useId().replace(/:/g, "");
@@ -140,7 +139,7 @@ export const HeatmapSeparator = memo(function HeatmapSeparator({
   const resolvedStroke = gradient ? `url(#${gradientId})` : stroke;
   const resolvedStrokeDasharray = resolveHeatmapSeparatorStrokeDasharray(
     strokeStyle,
-    strokeDasharray
+    strokeDasharray,
   );
   const gradientStops = gradient
     ? buildHeatmapSeparatorGradientStops(gradient, strokeOpacity)
@@ -162,17 +161,12 @@ export const HeatmapSeparator = memo(function HeatmapSeparator({
                 justifyContent: "flex-start",
               }}
             >
-              <span
-                className={cn(
-                  "whitespace-nowrap text-chart-label text-xs",
-                  labelClassName
-                )}
-              >
+              <span className={cn("whitespace-nowrap text-chart-label text-xs", labelClassName)}>
                 {tick.label}
               </span>
             </div>
           )),
-          container
+          container,
         )
       : null;
 
@@ -237,9 +231,7 @@ export const HeatmapSeparator = memo(function HeatmapSeparator({
   );
 });
 
-(HeatmapSeparator as unknown as Record<string, boolean>)[
-  HEATMAP_SEPARATOR_MARKER
-] = true;
+(HeatmapSeparator as unknown as Record<string, boolean>)[HEATMAP_SEPARATOR_MARKER] = true;
 
 HeatmapSeparator.displayName = "HeatmapSeparator";
 

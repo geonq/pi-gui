@@ -15,7 +15,9 @@ export function shouldAdoptComposerSnapshot(
   if (!localEditPending) {
     return true;
   }
-  return source !== "persist" && source !== "state" && source !== "command" && source !== "selection";
+  return (
+    source !== "persist" && source !== "state" && source !== "command" && source !== "selection"
+  );
 }
 
 interface UseComposerDraftSyncParams {

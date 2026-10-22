@@ -30,7 +30,9 @@ test("folds a folder group from its row and keeps it folded across restart", asy
     await createSessionViaIpc(window, betaPath, "Beta planning");
     await chooseThreadGrouping(window, "workspace");
 
-    const group = window.locator(`.workspace-group[data-workspace-id=${JSON.stringify(workspaceId)}]`);
+    const group = window.locator(
+      `.workspace-group[data-workspace-id=${JSON.stringify(workspaceId)}]`,
+    );
     const folderRow = group.locator(".workspace-row__select");
     await expect(group.locator(".session-row__title")).toHaveText(["Alpha planning"]);
     await expect(folderRow).toHaveAttribute("aria-expanded", "true");
@@ -66,7 +68,9 @@ test("folds a folder group from its row and keeps it folded across restart", asy
   try {
     const window = await secondRun.firstWindow();
     await waitForWorkspaceByPath(window, alphaPath);
-    const group = window.locator(`.workspace-group[data-workspace-id=${JSON.stringify(workspaceId)}]`);
+    const group = window.locator(
+      `.workspace-group[data-workspace-id=${JSON.stringify(workspaceId)}]`,
+    );
     const folderRow = group.locator(".workspace-row__select");
     await expect(folderRow).toHaveAttribute("aria-expanded", "false");
     await expect(group.locator(".session-row")).toHaveCount(0);

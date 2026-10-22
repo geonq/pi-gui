@@ -35,10 +35,7 @@ export function HeatmapChartLoading({
   label = "Loading",
   className = "",
 }: HeatmapChartLoadingProps) {
-  const skeletonData = useMemo(
-    () => generateHeatmapSkeletonFromTarget(data),
-    [data]
-  );
+  const skeletonData = useMemo(() => generateHeatmapSkeletonFromTarget(data), [data]);
 
   return (
     <HeatmapChart

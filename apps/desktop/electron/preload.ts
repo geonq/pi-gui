@@ -315,7 +315,11 @@ const localPiDesktopApi = {
   refreshRuntime: (workspaceId?: string) =>
     ipcRenderer.invoke(desktopIpc.refreshRuntime, workspaceId) as Promise<DesktopAppState>,
   loadWorkspaceRuntime: (workspaceId: string, options?: { readonly refresh?: boolean }) =>
-    ipcRenderer.invoke(desktopIpc.loadWorkspaceRuntime, workspaceId, options) as Promise<DesktopAppState>,
+    ipcRenderer.invoke(
+      desktopIpc.loadWorkspaceRuntime,
+      workspaceId,
+      options,
+    ) as Promise<DesktopAppState>,
   setModelSettingsScopeMode: (mode: "app-global" | "per-repo") =>
     ipcRenderer.invoke(desktopIpc.setModelSettingsScopeMode, mode) as Promise<DesktopAppState>,
   setDefaultModel: (workspaceId: string, provider: string, modelId: string) =>
@@ -653,10 +657,8 @@ const piDesktopApi =
         localPiDesktopApi,
         (method, args) => ipcRenderer.invoke(remoteClientIpc.invoke, { method, args }),
         (listener) => {
-          const stateChanged = (
-            _event: Electron.IpcRendererEvent,
-            state: DesktopAppState,
-          ) => listener({ type: "stateChanged", state });
+          const stateChanged = (_event: Electron.IpcRendererEvent, state: DesktopAppState) =>
+            listener({ type: "stateChanged", state });
           const transcriptChanged = (
             _event: Electron.IpcRendererEvent,
             transcript: SelectedTranscriptRecord | null,
@@ -665,7 +667,10 @@ const piDesktopApi =
           ipcRenderer.on(remoteClientIpc.selectedTranscriptChanged, transcriptChanged);
           return () => {
             ipcRenderer.removeListener(remoteClientIpc.stateChanged, stateChanged);
-            ipcRenderer.removeListener(remoteClientIpc.selectedTranscriptChanged, transcriptChanged);
+            ipcRenderer.removeListener(
+              remoteClientIpc.selectedTranscriptChanged,
+              transcriptChanged,
+            );
           };
         },
         () =>
@@ -682,13 +687,14 @@ const piDesktopApi =
 
 contextBridge.exposeInMainWorld("piApp", piDesktopApi);
 
-function createIpcWorkspaceFolderAdapter(device: WorkspaceFolderDevice): WorkspaceFolderAdapters["windows"] {
+function createIpcWorkspaceFolderAdapter(
+  device: WorkspaceFolderDevice,
+): WorkspaceFolderAdapters["windows"] {
   return {
     listRoots: () =>
-      ipcRenderer.invoke(
-        desktopIpc.listWorkspaceFolderRoots,
-        device,
-      ) as Promise<readonly WorkspaceFolderRoot[]>,
+      ipcRenderer.invoke(desktopIpc.listWorkspaceFolderRoots, device) as Promise<
+        readonly WorkspaceFolderRoot[]
+      >,
     list: (rootId, relativePath) =>
       ipcRenderer.invoke(
         desktopIpc.listWorkspaceFolders,

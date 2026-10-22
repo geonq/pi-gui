@@ -179,14 +179,22 @@ await test("awaits provider registration refresh, then refreshes cached snapshot
       2,
       "SDK provider registration starts a refresh; the fresh context awaits one more for settled availability",
     );
-    assert.equal(getAvailableCalls, 0, "snapshot building reads the refreshed availability snapshot");
+    assert.equal(
+      getAvailableCalls,
+      0,
+      "snapshot building reads the refreshed availability snapshot",
+    );
     assert.ok(
       first.models.some((model) => model.providerId === JSON_PROVIDER && model.available),
       "the freshly built snapshot retains available models",
     );
 
     const second = await supervisor.getRuntimeSnapshot(workspace);
-    assert.equal(refreshCalls, 3, "an existing context is explicitly refreshed on the next snapshot");
+    assert.equal(
+      refreshCalls,
+      3,
+      "an existing context is explicitly refreshed on the next snapshot",
+    );
     assert.equal(getAvailableCalls, 0);
     assert.ok(second.models.some((model) => model.providerId === JSON_PROVIDER && model.available));
   } finally {

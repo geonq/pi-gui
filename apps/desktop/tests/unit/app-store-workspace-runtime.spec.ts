@@ -73,7 +73,12 @@ test("workspace runtime loading preserves project scope and never reloads sessio
     providers: [],
     models: [],
     skills: [
-      skill(workspace, "global-guide", "user", join(agentDir, "skills", "global-guide", "SKILL.md")),
+      skill(
+        workspace,
+        "global-guide",
+        "user",
+        join(agentDir, "skills", "global-guide", "SKILL.md"),
+      ),
       skill(
         workspace,
         workspace.workspaceId + "-only",
@@ -112,10 +117,9 @@ test("workspace runtime loading preserves project scope and never reloads sessio
 
   try {
     await store.initialize();
-    expect((await store.getState()).runtimeByWorkspace.alpha?.skills.map((entry) => entry.name)).toEqual([
-      "global-guide",
-      "alpha-only",
-    ]);
+    expect(
+      (await store.getState()).runtimeByWorkspace.alpha?.skills.map((entry) => entry.name),
+    ).toEqual(["global-guide", "alpha-only"]);
 
     const alphaRefresh = store.loadWorkspaceRuntime("alpha", { refresh: true });
     const betaRefresh = store.loadWorkspaceRuntime("beta", { refresh: true });

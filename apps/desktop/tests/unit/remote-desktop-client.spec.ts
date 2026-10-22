@@ -119,12 +119,14 @@ test("remote client sends usage metadata reads to Windows and returns their real
   const invocations: Array<{ method: RemoteDesktopMethod; args: readonly unknown[] }> = [];
   const signIns = [{ id: "openai", name: "OpenAI", state: "ok" as const }];
   const accountStates = [{ id: "claude-code-account-1", state: "ready" as const }];
-  const accountLimits = [{
-    id: "openai",
-    name: "OpenAI",
-    windows: [{ label: "Weekly", usedPercent: 12 }],
-    asOf: 1_792_570_000_000,
-  }];
+  const accountLimits = [
+    {
+      id: "openai",
+      name: "OpenAI",
+      windows: [{ label: "Weekly", usedPercent: 12 }],
+      asOf: 1_792_570_000_000,
+    },
+  ];
   const api = createRemoteDesktopClientApi(
     {
       getSignIns: async () => [],

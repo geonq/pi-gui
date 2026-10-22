@@ -53,9 +53,7 @@ export function useAnimatedSeriesPath({
   enabled,
 }: UseAnimatedSeriesPathOptions) {
   const reducedMotion = useReducedMotion();
-  const [animatedPath, setAnimatedPath] = useState<DisplayedSeriesPath | null>(
-    null
-  );
+  const [animatedPath, setAnimatedPath] = useState<DisplayedSeriesPath | null>(null);
   const displayedRef = useRef<DisplayedSeriesPath | null>(null);
   const animatingRef = useRef(false);
 
@@ -74,18 +72,17 @@ export function useAnimatedSeriesPath({
         xDomainMin: xScaleDomain[0]?.getTime?.() ?? 0,
         xDomainMax: xScaleDomain[1]?.getTime?.() ?? 0,
       }),
-    [renderData, xAccessor, dataKey, innerWidth, xScaleDomain]
+    [renderData, xAccessor, dataKey, innerWidth, xScaleDomain],
   );
 
   const targetPoints = useMemo(
-    () =>
-      computeSeriesPathPoints(renderData, xAccessor, xScale, yScale, dataKey),
-    [renderData, xAccessor, xScale, yScale, dataKey]
+    () => computeSeriesPathPoints(renderData, xAccessor, xScale, yScale, dataKey),
+    [renderData, xAccessor, xScale, yScale, dataKey],
   );
 
   const dataSignature = useMemo(
     () => seriesDataSignature(renderData, xAccessor, dataKey),
-    [renderData, xAccessor, dataKey]
+    [renderData, xAccessor, dataKey],
   );
 
   const prevTransitionSignatureRef = useRef(transitionSignature);
@@ -110,7 +107,7 @@ export function useAnimatedSeriesPath({
       latest.xAccessor,
       latest.xScale,
       latest.yScale,
-      latest.dataKey
+      latest.dataKey,
     );
   };
 
@@ -155,9 +152,7 @@ export function useAnimatedSeriesPath({
     // rises and falls into shape. Same data with a moved x-domain (brush pan /
     // resize): slide points by key so the series tracks the viewport.
     const morph = dataChanged || from.polyline;
-    const fromPolyline = from.polyline
-      ? from.points
-      : flattenSeriesPath(from.points, curve);
+    const fromPolyline = from.polyline ? from.points : flattenSeriesPath(from.points, curve);
 
     const renderFrame = (progress: number) => {
       const currentTarget = computeLatestTarget();
@@ -166,16 +161,12 @@ export function useAnimatedSeriesPath({
             points: morphSeriesPolylines(
               fromPolyline,
               flattenSeriesPath(currentTarget, latestRef.current.curve),
-              progress
+              progress,
             ),
             polyline: true,
           }
         : {
-            points: interpolateSeriesPathPoints(
-              from.points,
-              currentTarget,
-              progress
-            ),
+            points: interpolateSeriesPathPoints(from.points, currentTarget, progress),
             polyline: false,
           };
       displayedRef.current = next;
@@ -222,12 +213,9 @@ export function useAnimatedSeriesPath({
   const pathD = useMemo(
     () =>
       animatedPath
-        ? seriesPathFromPoints(
-            animatedPath.points,
-            animatedPath.polyline ? curveLinear : curve
-          )
+        ? seriesPathFromPoints(animatedPath.points, animatedPath.polyline ? curveLinear : curve)
         : seriesPathFromPoints(targetPoints, curve),
-    [animatedPath, targetPoints, curve]
+    [animatedPath, targetPoints, curve],
   );
 
   return {

@@ -57,8 +57,7 @@ const TOOLTIP_PANEL_CLASS_NAME =
   "relative min-w-[160px] rounded-xl border not-dark:bg-clip-padding text-chart-tooltip-foreground shadow-lg/5 before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-xl)-1px)] before:shadow-[0_1px_rgb(0_0_0/0.04)] dark:before:shadow-[0_-1px_rgb(255_255_255/0.06)]";
 
 /** Clips content to the panel's inner radius without clipping the edge highlight. */
-const TOOLTIP_PANEL_INNER_CLASS_NAME =
-  "overflow-hidden rounded-[calc(var(--radius-xl)-1px)]";
+const TOOLTIP_PANEL_INNER_CLASS_NAME = "overflow-hidden rounded-[calc(var(--radius-xl)-1px)]";
 
 // Inner-only-on-visible so `useSpring` initializes at the cursor's actual x/y
 // instead of (0, 0) on first hover.
@@ -111,10 +110,7 @@ function TooltipBoxInner({
   const th = tooltipHeightRef.current;
   const shouldFlipX = x + tw + offset > containerWidth;
   const targetX = shouldFlipX ? x - offset - tw : x + offset;
-  const targetY = Math.max(
-    offset,
-    Math.min(y - th / 2, containerHeight - th - offset)
-  );
+  const targetY = Math.max(offset, Math.min(y - th / 2, containerHeight - th - offset));
 
   const animatedLeft = useSpring(targetX, effectiveSpring);
   const animatedTop = useSpring(targetY, effectiveSpring);
@@ -143,10 +139,7 @@ function TooltipBoxInner({
     const h2 = tooltipHeightRef.current;
     const flip = x + w2 + offset > containerWidth;
     const tx = flip ? x - offset - w2 : x + offset;
-    const ty = Math.max(
-      offset,
-      Math.min(y - h2 / 2, containerHeight - h2 - offset)
-    );
+    const ty = Math.max(offset, Math.min(y - h2 / 2, containerHeight - h2 - offset));
     if (!animate) {
       setStaticPosition({ left: tx, top: ty });
       return;
@@ -180,9 +173,7 @@ function TooltipBoxInner({
     }
   }, [shouldFlipX]);
 
-  const finalLeft = animate
-    ? (leftOverride ?? animatedLeft)
-    : staticPosition.left;
+  const finalLeft = animate ? (leftOverride ?? animatedLeft) : staticPosition.left;
   const finalTop = animate ? (topOverride ?? animatedTop) : staticPosition.top;
   const isFlipped = flippedOverride ?? shouldFlipX;
   const transformOrigin = isFlipped ? "right top" : "left top";
@@ -192,7 +183,7 @@ function TooltipBoxInner({
     panelStyle?.backgroundColor === undefined &&
       backgroundColor === chartCssVars.tooltipBackground &&
       "bg-chart-tooltip-background",
-    panelStyle?.backdropFilter === undefined && "backdrop-blur-md"
+    panelStyle?.backdropFilter === undefined && "backdrop-blur-md",
   );
   const panelStyleResolved = {
     transformOrigin,
@@ -213,7 +204,7 @@ function TooltipBoxInner({
           <div className={TOOLTIP_PANEL_INNER_CLASS_NAME}>{children}</div>
         </div>
       </div>,
-      container
+      container,
     );
   }
 
@@ -238,7 +229,7 @@ function TooltipBoxInner({
         <div className={TOOLTIP_PANEL_INNER_CLASS_NAME}>{children}</div>
       </motion.div>
     </motion.div>,
-    container
+    container,
   );
 }
 

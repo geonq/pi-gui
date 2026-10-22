@@ -304,7 +304,9 @@ export function SignInNotice({ signIns }: { readonly signIns: readonly SignInSta
           <span className="usage-signins__state" data-state={signIn.state}>
             {signIn.state === "expiring" && signIn.expiresAt
               ? `Sign-in ends ${atLabel(signIn.expiresAt)}`
-              : signIn.state === "unknown" ? "Could not verify sign-in" : "Signed out"}
+              : signIn.state === "unknown"
+                ? "Could not verify sign-in"
+                : "Signed out"}
           </span>
           {signIn.fix ? <code className="usage-signins__fix">{signIn.fix}</code> : null}
         </div>

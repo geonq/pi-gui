@@ -31,7 +31,7 @@ export const HeatmapLegendSwatch = memo(function HeatmapLegendSwatch({
     const patternNode = renderPatternPreset(
       style.pattern,
       patternId,
-      heatmapLevelPatternRenderOptions(style)
+      heatmapLevelPatternRenderOptions(style),
     );
     const opacity = style.patternOpacity ?? 1;
 
@@ -41,11 +41,7 @@ export const HeatmapLegendSwatch = memo(function HeatmapLegendSwatch({
         className="block shrink-0 overflow-hidden"
         style={{ ...shellStyle, opacity }}
       >
-        <svg
-          aria-hidden="true"
-          className="block size-full"
-          viewBox={`0 0 ${cellSize} ${cellSize}`}
-        >
+        <svg aria-hidden="true" className="block size-full" viewBox={`0 0 ${cellSize} ${cellSize}`}>
           {patternNode ? <defs>{patternNode}</defs> : null}
           <rect
             fill={patternNode ? `url(#${patternId})` : style.color}

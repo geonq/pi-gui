@@ -25,11 +25,7 @@ export const HeatmapPatternDefs = memo(function HeatmapPatternDefs({
       return [];
     }
 
-    const node = renderPatternPreset(
-      pattern,
-      id,
-      heatmapLevelPatternRenderOptions(style)
-    );
+    const node = renderPatternPreset(pattern, id, heatmapLevelPatternRenderOptions(style));
 
     return node ? [<Fragment key={id}>{node}</Fragment>] : [];
   });

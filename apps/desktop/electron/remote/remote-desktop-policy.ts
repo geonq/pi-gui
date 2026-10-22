@@ -47,8 +47,7 @@ export type RemoteDesktopInvocation =
   | {
       readonly method: "listWorkspaceFolders";
       readonly args:
-        | readonly [WorkspaceFolderDevice, string]
-        | readonly [WorkspaceFolderDevice, string, string];
+        readonly [WorkspaceFolderDevice, string] | readonly [WorkspaceFolderDevice, string, string];
     }
   | {
       readonly method: "addWorkspaceFolder";

@@ -33,7 +33,11 @@ function decodePreferences(value: unknown): RemoteDesktopClientPreferences {
   if (
     !isRecord(value) ||
     Object.keys(value).some(
-      (key) => key !== "version" && key !== "enableTransparency" && key !== "themeMode" && key !== "themePresetId",
+      (key) =>
+        key !== "version" &&
+        key !== "enableTransparency" &&
+        key !== "themeMode" &&
+        key !== "themePresetId",
     ) ||
     value.version !== 1 ||
     typeof value.enableTransparency !== "boolean" ||
@@ -73,7 +77,8 @@ export async function loadRemoteDesktopClientPreferences(
   const filePath = path.join(userDataDir, PREFERENCES_FILE);
   try {
     const raw = await readFile(filePath, "utf8");
-    if (Buffer.byteLength(raw, "utf8") > 4_096) throw new Error("Local preferences exceed their size limit.");
+    if (Buffer.byteLength(raw, "utf8") > 4_096)
+      throw new Error("Local preferences exceed their size limit.");
     return decodePreferences(JSON.parse(raw) as unknown);
   } catch (error) {
     if (isMissingFile(error)) {
@@ -81,7 +86,8 @@ export async function loadRemoteDesktopClientPreferences(
         const persisted = await readPersistedUiState(path.join(userDataDir, "ui-state.json"));
         return {
           enableTransparency:
-            persisted.enableTransparency ?? DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES.enableTransparency,
+            persisted.enableTransparency ??
+            DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES.enableTransparency,
           themeMode: persisted.themeMode ?? DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES.themeMode,
           themePresetId:
             persisted.themePresetId ?? DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES.themePresetId,

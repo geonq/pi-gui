@@ -3,10 +3,7 @@
 import { motion } from "motion/react";
 import { memo, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import {
-  defaultHeatmapColorScale,
-  type HeatmapLevelStyles,
-} from "./heatmap-colors";
+import { defaultHeatmapColorScale, type HeatmapLevelStyles } from "./heatmap-colors";
 import { useHeatmapInteractionOptional } from "./heatmap-context";
 import { HeatmapLegendGradient } from "./heatmap-legend-gradient";
 import { HeatmapLegendSwatch } from "./heatmap-legend-swatch";
@@ -92,27 +89,20 @@ export const HeatmapLegend = memo(function HeatmapLegend({
       pattern: "none" as const,
     })) as unknown as HeatmapLevelStyles);
 
-  const {
-    hoveredLegendLevel,
-    tooltipData,
-    setHoveredCell,
-    setHoveredLegendLevel,
-    setTooltipData,
-  } = interaction ?? {
-    hoveredLegendLevel: null,
-    tooltipData: null,
-    setHoveredCell: () => undefined,
-    setHoveredLegendLevel: () => undefined,
-    setTooltipData: () => undefined,
-  };
+  const { hoveredLegendLevel, tooltipData, setHoveredCell, setHoveredLegendLevel, setTooltipData } =
+    interaction ?? {
+      hoveredLegendLevel: null,
+      tooltipData: null,
+      setHoveredCell: () => undefined,
+      setHoveredLegendLevel: () => undefined,
+      setTooltipData: () => undefined,
+    };
 
   const highlightedLevel =
-    hoveredLegendLevel ??
-    (tooltipData ? getHeatmapContributionLevel(tooltipData.count) : null);
+    hoveredLegendLevel ?? (tooltipData ? getHeatmapContributionLevel(tooltipData.count) : null);
   const hoverParams = { inactiveOpacity, inactiveScale, activeScale };
   const inactiveEnabled = isHeatmapHoverEffectEnabled(hoverParams);
-  const isDimming =
-    isInteractive && highlightedLevel !== null && inactiveEnabled;
+  const isDimming = isInteractive && highlightedLevel !== null && inactiveEnabled;
 
   const handleLegendEnter = useCallback(
     (level: number) => {
@@ -124,7 +114,7 @@ export const HeatmapLegend = memo(function HeatmapLegend({
       setHoveredCell(null);
       setTooltipData(null);
     },
-    [isInteractive, setHoveredCell, setHoveredLegendLevel, setTooltipData]
+    [isInteractive, setHoveredCell, setHoveredLegendLevel, setTooltipData],
   );
 
   const handleLegendLeave = useCallback(() => {
@@ -144,7 +134,7 @@ export const HeatmapLegend = memo(function HeatmapLegend({
         align === "start" && "justify-start",
         align === "center" && "justify-center",
         align === "end" && "justify-end",
-        className
+        className,
       )}
       style={labelStyle}
     >
@@ -171,11 +161,7 @@ export const HeatmapLegend = memo(function HeatmapLegend({
           {HEATMAP_LEGEND_LEVELS.map((level) => {
             const isHighlighted = highlightedLevel === level;
             const isDimmed = isDimming && !isHighlighted;
-            const hoverStyle = resolveHeatmapHoverStyle(
-              isHighlighted,
-              isDimmed,
-              hoverParams
-            );
+            const hoverStyle = resolveHeatmapHoverStyle(isHighlighted, isDimmed, hoverParams);
             const style = levelStyles[level];
 
             return (

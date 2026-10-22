@@ -82,7 +82,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isIdentifier(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 256 && !value.includes("\0");
+  return (
+    typeof value === "string" && value.length > 0 && value.length <= 256 && !value.includes("\0")
+  );
 }
 
 function validateOrigins(values: readonly string[]): Set<string> {
@@ -156,7 +158,9 @@ function authenticate(
 ): ClientRecord {
   const raw = request.headers.authorization;
   const match = typeof raw === "string" ? /^Bearer ([A-Za-z0-9._~-]{32,256})$/u.exec(raw) : null;
-  const digest = createHash("sha256").update(match?.[1] ?? "", "utf8").digest();
+  const digest = createHash("sha256")
+    .update(match?.[1] ?? "", "utf8")
+    .digest();
   let authenticated: ClientRecord | undefined;
   for (const client of clients.values()) {
     if (timingSafeEqual(digest, client.tokenDigest) && match) authenticated = client;
@@ -172,7 +176,11 @@ function writeJson(response: ServerResponse, status: number, value: unknown): vo
     if (typeof serialized !== "string") throw new Error("not json");
     body = Buffer.from(serialized, "utf8");
   } catch {
-    throw new HttpError(500, "serialization_failed", "The remote response could not be serialized.");
+    throw new HttpError(
+      500,
+      "serialization_failed",
+      "The remote response could not be serialized.",
+    );
   }
   if (body.byteLength > MAX_RESPONSE_BYTES) {
     throw new HttpError(413, "response_too_large", "The remote response exceeds its size limit.");
@@ -312,11 +320,7 @@ export async function startRemoteDesktopHttpHost(
     return stream.response.writableLength + stream.queuedBytes + byteLength <= MAX_SSE_BUFFER_BYTES;
   }
   function waitForDrain(stream: SseConnection): void {
-    if (
-      stream.waitingForDrain ||
-      stream.response.writableEnded ||
-      stream.response.destroyed
-    ) {
+    if (stream.waitingForDrain || stream.response.writableEnded || stream.response.destroyed) {
       return;
     }
     stream.waitingForDrain = true;
@@ -372,8 +376,7 @@ export async function startRemoteDesktopHttpHost(
   }
   function queueFrame(stream: SseConnection, frame: SerializedSseFrame): void {
     const tail = stream.queuedEvents[stream.queuedEvents.length - 1];
-    const replaceTail =
-      frame.type === "stateChanged" && tail?.type === "stateChanged";
+    const replaceTail = frame.type === "stateChanged" && tail?.type === "stateChanged";
     const replacedBytes = replaceTail ? tail.byteLength : 0;
     const nextQueuedBytes = stream.queuedBytes - replacedBytes + frame.byteLength;
     const nextQueuedCount = stream.queuedEvents.length + (replaceTail ? 0 : 1);
@@ -445,7 +448,10 @@ export async function startRemoteDesktopHttpHost(
   }
 
   for (const [id, client] of clients) {
-    unsubscribe.set(id, client.broker.subscribe((event) => publish(id, event)));
+    unsubscribe.set(
+      id,
+      client.broker.subscribe((event) => publish(id, event)),
+    );
   }
 
   const hostOrigin = (port: number) => `http://${HOST}:${port}`;
@@ -454,12 +460,18 @@ export async function startRemoteDesktopHttpHost(
     response.setHeader("Cache-Control", "no-store");
     const actualPort = (server.address() as AddressInfo | null)?.port;
     if (actualPort !== config.port || request.headers.host !== `${HOST}:${config.port}`) {
-      writeError(response, new HttpError(400, "invalid_host", "The loopback Host header is invalid."));
+      writeError(
+        response,
+        new HttpError(400, "invalid_host", "The loopback Host header is invalid."),
+      );
       return;
     }
     const origin = request.headers.origin;
     if (typeof origin !== "string" || !origins.has(origin)) {
-      writeError(response, new HttpError(403, "origin_denied", "The request origin is not allowed."));
+      writeError(
+        response,
+        new HttpError(403, "origin_denied", "The request origin is not allowed."),
+      );
       return;
     }
     response.setHeader("Access-Control-Allow-Origin", origin);
@@ -512,11 +524,14 @@ export async function startRemoteDesktopHttpHost(
                     : 500;
           writeError(response, new HttpError(status, error.code.toLowerCase(), error.message));
         } else {
-          writeError(response, new HttpError(
-            400,
-            "operation_failed",
-            error instanceof TypeError ? error.message : "The remote native operation failed.",
-          ));
+          writeError(
+            response,
+            new HttpError(
+              400,
+              "operation_failed",
+              error instanceof TypeError ? error.message : "The remote native operation failed.",
+            ),
+          );
         }
       }
       return;
@@ -525,16 +540,31 @@ export async function startRemoteDesktopHttpHost(
     if (request.method === "GET" && url.pathname === "/v1/events") {
       if (!isEmptyRequest(request)) {
         request.resume();
-        writeError(response, new HttpError(400, "unexpected_body", "The event stream has no body."));
+        writeError(
+          response,
+          new HttpError(400, "unexpected_body", "The event stream has no body."),
+        );
         return;
       }
-      if (!request.headers.accept?.split(",").some((value) => value.trim().startsWith("text/event-stream"))) {
-        writeError(response, new HttpError(406, "event_stream_required", "Accept: text/event-stream is required."));
+      if (
+        !request.headers.accept
+          ?.split(",")
+          .some((value) => value.trim().startsWith("text/event-stream"))
+      ) {
+        writeError(
+          response,
+          new HttpError(406, "event_stream_required", "Accept: text/event-stream is required."),
+        );
         return;
       }
-      const clientStreams = [...streams].filter((stream) => stream.clientId === client.config.id).length;
+      const clientStreams = [...streams].filter(
+        (stream) => stream.clientId === client.config.id,
+      ).length;
       if (streams.size >= MAX_SSE_STREAMS || clientStreams >= MAX_SSE_PER_CLIENT) {
-        writeError(response, new HttpError(429, "too_many_event_streams", "The event-stream limit was reached."));
+        writeError(
+          response,
+          new HttpError(429, "too_many_event_streams", "The event-stream limit was reached."),
+        );
         return;
       }
       response.writeHead(200, {
@@ -559,7 +589,10 @@ export async function startRemoteDesktopHttpHost(
           if (stream.initializing || stream.waitingForDrain || stream.queuedEvents.length > 0) {
             return;
           }
-          if (response.writableLength + Buffer.byteLength(SSE_HEARTBEAT_FRAME, "utf8") > MAX_SSE_BUFFER_BYTES) {
+          if (
+            response.writableLength + Buffer.byteLength(SSE_HEARTBEAT_FRAME, "utf8") >
+            MAX_SSE_BUFFER_BYTES
+          ) {
             destroyStream(stream);
             return;
           }
@@ -589,7 +622,7 @@ export async function startRemoteDesktopHttpHost(
         }
         const transcriptFrame = serializeSseEvent({
           type: "selectedTranscriptChanged",
-          transcript: transcript && isRecord(transcript) ? transcript as never : null,
+          transcript: transcript && isRecord(transcript) ? (transcript as never) : null,
         });
         if (!transcriptFrame) {
           destroyStream(stream);
@@ -604,7 +637,10 @@ export async function startRemoteDesktopHttpHost(
     }
 
     request.resume();
-    writeError(response, new HttpError(404, "not_found", "The remote desktop route was not found."));
+    writeError(
+      response,
+      new HttpError(404, "not_found", "The remote desktop route was not found."),
+    );
   };
 
   server = createServer(

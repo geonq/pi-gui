@@ -16,14 +16,8 @@ import {
 import { cn } from "@/lib/utils";
 import type { Margin } from "../chart-context";
 import type { ChartPhase, ChartStatus } from "../chart-phase";
-import {
-  HEATMAP_DEFAULT_LEVEL_COLORS,
-  type HeatmapLevelStyles,
-} from "./heatmap-colors";
-import type {
-  HeatmapSeparatorLayout,
-  HeatmapWeekStartDay,
-} from "./heatmap-utils";
+import { HEATMAP_DEFAULT_LEVEL_COLORS, type HeatmapLevelStyles } from "./heatmap-colors";
+import type { HeatmapSeparatorLayout, HeatmapWeekStartDay } from "./heatmap-utils";
 
 type HeatmapTimeScale = ReturnType<typeof scaleTime<number>>;
 type HeatmapLinearScale = ReturnType<typeof scaleLinear<number>>;
@@ -100,24 +94,15 @@ export interface HeatmapContextValue {
 export type HeatmapRevealMode = "enter" | "fromLoading" | null;
 
 const HeatmapContext = createContext<HeatmapContextValue | null>(null);
-const HeatmapInteractionContext =
-  createContext<HeatmapInteractionContextValue | null>(null);
+const HeatmapInteractionContext = createContext<HeatmapInteractionContextValue | null>(null);
 
-export function HeatmapInteractionProvider({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export function HeatmapInteractionProvider({ children }: { children: ReactNode }) {
   const [hoveredCell, setHoveredCell] = useState<{
     column: number;
     row: number;
   } | null>(null);
-  const [hoveredLegendLevel, setHoveredLegendLevel] = useState<number | null>(
-    null
-  );
-  const [tooltipData, setTooltipData] = useState<HeatmapTooltipData | null>(
-    null
-  );
+  const [hoveredLegendLevel, setHoveredLegendLevel] = useState<number | null>(null);
+  const [tooltipData, setTooltipData] = useState<HeatmapTooltipData | null>(null);
 
   const clearInteraction = useCallback(() => {
     setHoveredCell(null);
@@ -135,7 +120,7 @@ export function HeatmapInteractionProvider({
       setTooltipData,
       clearInteraction,
     }),
-    [clearInteraction, hoveredCell, hoveredLegendLevel, tooltipData]
+    [clearInteraction, hoveredCell, hoveredLegendLevel, tooltipData],
   );
 
   return (
@@ -152,9 +137,7 @@ export function HeatmapProvider({
   children: ReactNode;
   value: HeatmapContextValue;
 }) {
-  return (
-    <HeatmapContext.Provider value={value}>{children}</HeatmapContext.Provider>
-  );
+  return <HeatmapContext.Provider value={value}>{children}</HeatmapContext.Provider>;
 }
 
 export function useHeatmap(): HeatmapContextValue {
@@ -168,9 +151,7 @@ export function useHeatmap(): HeatmapContextValue {
 export function useHeatmapInteraction(): HeatmapInteractionContextValue {
   const context = useContext(HeatmapInteractionContext);
   if (!context) {
-    throw new Error(
-      "useHeatmapInteraction must be used within a HeatmapInteractionProvider"
-    );
+    throw new Error("useHeatmapInteraction must be used within a HeatmapInteractionProvider");
   }
   return context;
 }
@@ -190,10 +171,7 @@ export function HeatmapInteractionBoundary({
   const { clearInteraction } = useHeatmapInteraction();
 
   return (
-    <div
-      className={cn("size-full min-h-0 min-w-0", className)}
-      onPointerLeave={clearInteraction}
-    >
+    <div className={cn("size-full min-h-0 min-w-0", className)} onPointerLeave={clearInteraction}>
       {children}
     </div>
   );

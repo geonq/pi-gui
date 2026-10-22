@@ -17,12 +17,18 @@ const FILE = "window-state.json";
  */
 export function loadWindowState(userDataDir: string): SavedWindowState | undefined {
   try {
-    const saved = JSON.parse(readFileSync(path.join(userDataDir, FILE), "utf8")) as SavedWindowState;
+    const saved = JSON.parse(
+      readFileSync(path.join(userDataDir, FILE), "utf8"),
+    ) as SavedWindowState;
     const { x, y, width, height } = saved.bounds;
-    if (![x, y, width, height].every(Number.isFinite) || width < 400 || height < 300) return undefined;
+    if (![x, y, width, height].every(Number.isFinite) || width < 400 || height < 300)
+      return undefined;
     const area = screen.getDisplayMatching(saved.bounds).workArea;
     const onScreen =
-      x < area.x + area.width - 80 && x + width > area.x + 80 && y >= area.y - 40 && y < area.y + area.height - 80;
+      x < area.x + area.width - 80 &&
+      x + width > area.x + 80 &&
+      y >= area.y - 40 &&
+      y < area.y + area.height - 80;
     return onScreen ? saved : { ...saved, bounds: { width, height } as Rectangle };
   } catch {
     return undefined;

@@ -356,10 +356,13 @@ await test("startup batch sync preserves concurrent and untargeted catalog recor
     const baselineSessions = (await store.sessions.listSessions("target")).sessions;
     const baselineFiles = Object.fromEntries(
       await Promise.all(
-        baselineSessions.map(async (entry) => [
-          `${entry.workspaceId}:${entry.sessionRef.sessionId}`,
-          (await store.getSessionFile(entry.sessionRef)) ?? "",
-        ] as const),
+        baselineSessions.map(
+          async (entry) =>
+            [
+              `${entry.workspaceId}:${entry.sessionRef.sessionId}`,
+              (await store.getSessionFile(entry.sessionRef)) ?? "",
+            ] as const,
+        ),
       ),
     );
     await Promise.all([
@@ -392,7 +395,10 @@ await test("startup batch sync preserves concurrent and untargeted catalog recor
 
     assert.deepEqual(removedRefs, [removed.sessionRef]);
     const workspaces = (await store.workspaces.listWorkspaces()).workspaces;
-    assert.equal(workspaces.find((entry) => entry.workspaceId === "target")?.lastOpenedAt, target.lastOpenedAt);
+    assert.equal(
+      workspaces.find((entry) => entry.workspaceId === "target")?.lastOpenedAt,
+      target.lastOpenedAt,
+    );
     assert.ok(workspaces.some((entry) => entry.workspaceId === "new"));
     const catalogSessions = (await store.sessions.listSessions()).sessions
       .map(({ sessionRef, title }) => [sessionRef.workspaceId, sessionRef.sessionId, title])
@@ -407,6 +413,9 @@ await test("startup batch sync preserves concurrent and untargeted catalog recor
       ["unrelated", "unrelated-session", "unrelated"],
     ]);
     assert.equal(await store.getSessionFile(original.sessionRef), "/concurrent/session.jsonl");
-    assert.equal(await store.getSessionFile({ workspaceId: "target", sessionId: "discovered" }), "/found.jsonl");
+    assert.equal(
+      await store.getSessionFile({ workspaceId: "target", sessionId: "discovered" }),
+      "/found.jsonl",
+    );
   });
 });

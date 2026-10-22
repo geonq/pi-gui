@@ -5,13 +5,7 @@ import { getHeatmapContributionLevel } from "./heatmap-utils";
 /** Default Less → More scale using {@link CHART_SCALE_VARS}. */
 export const HEATMAP_DEFAULT_LEVEL_COLORS = CHART_SCALE_VARS;
 
-export type HeatmapLevelColors = readonly [
-  string,
-  string,
-  string,
-  string,
-  string,
-];
+export type HeatmapLevelColors = readonly [string, string, string, string, string];
 
 export type HeatmapLevelFillMode = "solid" | "pattern";
 
@@ -71,11 +65,7 @@ export function heatmapLevelPatternId(level: number): string {
 }
 
 export function isHeatmapLevelPattern(style: HeatmapLevelStyle): boolean {
-  return (
-    style.fillMode === "pattern" &&
-    style.pattern != null &&
-    style.pattern !== "none"
-  );
+  return style.fillMode === "pattern" && style.pattern != null && style.pattern !== "none";
 }
 
 export function heatmapPatternStrokeFallback(color: string): string {
@@ -92,9 +82,7 @@ export function heatmapLevelPatternRenderOptions(style: HeatmapLevelStyle) {
   return {
     color:
       style.patternColor?.trim() ||
-      (preset === "accent"
-        ? "#e879f9"
-        : heatmapPatternStrokeFallback(style.color)),
+      (preset === "accent" ? "#e879f9" : heatmapPatternStrokeFallback(style.color)),
     tileBackground: style.patternTileBackground?.trim() || style.color,
     scale: style.patternScale ?? defaultScale,
     strokeWidth: style.patternStrokeWidth,
@@ -112,9 +100,7 @@ export function heatmapLevelCellFillOpacity(style: HeatmapLevelStyle): number {
   return style.patternOpacity ?? 1;
 }
 
-export function levelColorsFromStyles(
-  levelStyles: HeatmapLevelStyles
-): HeatmapLevelColors {
+export function levelColorsFromStyles(levelStyles: HeatmapLevelStyles): HeatmapLevelColors {
   return [
     levelStyles[0].color,
     levelStyles[1].color,
@@ -124,9 +110,7 @@ export function levelColorsFromStyles(
   ];
 }
 
-export function levelStylesFromColors(
-  levelColors: HeatmapLevelColors
-): HeatmapLevelStyles {
+export function levelStylesFromColors(levelColors: HeatmapLevelColors): HeatmapLevelStyles {
   return [
     { color: levelColors[0], fillMode: "solid", pattern: "none" },
     { color: levelColors[1], fillMode: "solid", pattern: "none" },
@@ -138,7 +122,7 @@ export function levelStylesFromColors(
 
 export function resolveHeatmapLevelStyles(
   levelColors?: HeatmapLevelColors,
-  levelStyles?: HeatmapLevelStyles
+  levelStyles?: HeatmapLevelStyles,
 ): HeatmapLevelStyles {
   if (levelStyles) {
     return levelStyles;
@@ -150,13 +134,13 @@ export function resolveHeatmapLevelStyles(
 }
 
 export function buildHeatmapColorScale(
-  levelColors: HeatmapLevelColors
+  levelColors: HeatmapLevelColors,
 ): (count: number | null | undefined) => string {
   return buildHeatmapColorScaleFromStyles(levelStylesFromColors(levelColors));
 }
 
 export function buildHeatmapColorScaleFromStyles(
-  levelStyles: HeatmapLevelStyles
+  levelStyles: HeatmapLevelStyles,
 ): (count: number | null | undefined) => string {
   return (count: number | null | undefined) => {
     const level = getHeatmapContributionLevel(count ?? 0);
@@ -165,7 +149,7 @@ export function buildHeatmapColorScaleFromStyles(
 }
 
 export function buildHeatmapFillScale(
-  levelStyles: HeatmapLevelStyles
+  levelStyles: HeatmapLevelStyles,
 ): (count: number | null | undefined) => string {
   return (count: number | null | undefined) => {
     const level = getHeatmapContributionLevel(count ?? 0);
@@ -179,10 +163,6 @@ export function buildHeatmapFillScale(
   };
 }
 
-export const defaultHeatmapColorScale = buildHeatmapColorScale(
-  HEATMAP_DEFAULT_LEVEL_COLORS
-);
+export const defaultHeatmapColorScale = buildHeatmapColorScale(HEATMAP_DEFAULT_LEVEL_COLORS);
 
-export const defaultHeatmapFillScale = buildHeatmapFillScale(
-  HEATMAP_DEFAULT_LEVEL_STYLES
-);
+export const defaultHeatmapFillScale = buildHeatmapFillScale(HEATMAP_DEFAULT_LEVEL_STYLES);

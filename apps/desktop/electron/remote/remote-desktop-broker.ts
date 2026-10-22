@@ -23,9 +23,7 @@ import {
   type RemoteDesktopInvocation,
 } from "./remote-desktop-policy";
 import type { WindowOwner } from "../windows/window-owner";
-import {
-  createRemoteWorkspaceFolders,
-} from "./remote-workspace-folders";
+import { createRemoteWorkspaceFolders } from "./remote-workspace-folders";
 import { RemoteWorkspaceStateProjector } from "./remote-workspace-state-projector";
 
 const MAX_PENDING_REQUESTS = 32;
@@ -189,7 +187,7 @@ export class RemoteDesktopBroker {
     }
     const broker = new RemoteDesktopBroker({ ...options, workspaceIds });
     try {
-      const macRoots = await options.workspaceFolders.mac?.listRoots() ?? [];
+      const macRoots = (await options.workspaceFolders.mac?.listRoots()) ?? [];
       const macRootIds = new Set(macRoots.map((root) => root.id));
       if (macRootIds.size !== macRoots.length) {
         throw new TypeError("Mac folder root IDs must be unique.");
@@ -228,20 +226,11 @@ export class RemoteDesktopBroker {
       }
       case "addWorkspaceFolder": {
         const [device, rootId, relativePath] = invocation.args;
-        return this.openWorkspaceFolder(
-          device,
-          rootId,
-          relativePath,
-        );
+        return this.openWorkspaceFolder(device, rootId, relativePath);
       }
       case "createWorkspaceFolder": {
         const [device, rootId, parentRelativePath, name] = invocation.args;
-        return this.createWorkspaceFolder(
-          device,
-          rootId,
-          parentRelativePath,
-          name,
-        );
+        return this.createWorkspaceFolder(device, rootId, parentRelativePath, name);
       }
     }
     if (invocation.method === "sendText") {
@@ -309,10 +298,7 @@ export class RemoteDesktopBroker {
     const selected = result.state.workspaces.find(
       (workspace) => workspace.id === result.workspaceId,
     );
-    if (
-      !selected ||
-      !(await this.windowsWorkspaceFolders.contains(rootId, selected.path, true))
-    ) {
+    if (!selected || !(await this.windowsWorkspaceFolders.contains(rootId, selected.path, true))) {
       throw new Error("The registered Windows workspace is outside its authorized root.");
     }
     this.workspaceIds.add(selected.id);
@@ -334,16 +320,14 @@ export class RemoteDesktopBroker {
     }
     const result = await this.options.windows.runStateResultAction(this.window, async () => {
       const created = await adapter.create(rootId, parentRelativePath, name);
-      if (created.device !== "windows") throw new Error("Windows folder adapter result is invalid.");
+      if (created.device !== "windows")
+        throw new Error("Windows folder adapter result is invalid.");
       return created;
     });
     const selected = result.state.workspaces.find(
       (workspace) => workspace.id === result.workspaceId,
     );
-    if (
-      !selected ||
-      !(await this.windowsWorkspaceFolders.contains(rootId, selected.path, true))
-    ) {
+    if (!selected || !(await this.windowsWorkspaceFolders.contains(rootId, selected.path, true))) {
       throw new Error("The created Windows workspace is outside its authorized root.");
     }
     this.workspaceIds.add(selected.id);

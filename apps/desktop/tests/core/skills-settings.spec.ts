@@ -178,7 +178,6 @@ Use this skill for complex or high-risk implementation work that needs plan-firs
   }
 });
 
-
 test("skills selection loads shared and project resources for each project", async () => {
   test.setTimeout(60_000);
   const userDataDir = await makeUserDataDir();

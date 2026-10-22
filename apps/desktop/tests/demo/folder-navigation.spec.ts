@@ -29,7 +29,13 @@ test("Pegasus folders, file inspection and both pane edges work before a chat", 
     await openNewThread(page);
     await expect(page).toHaveTitle("Pegasus");
     await expect(page.locator(".sidebar__brand-name")).toHaveText("Pegasus");
-    await expect.poll(() => page.locator(".sidebar__brand-mark").evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    await expect
+      .poll(() =>
+        page
+          .locator(".sidebar__brand-mark")
+          .evaluate((image: HTMLImageElement) => image.naturalWidth),
+      )
+      .toBeGreaterThan(0);
     await chooseThreadGrouping(page, "workspace");
     const actions = page.locator(".sidebar__folder-actions");
     await expect(actions.getByRole("button", { name: "New folder", exact: true })).toBeVisible();

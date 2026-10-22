@@ -35,7 +35,9 @@ function exactKeys(value: Record<string, unknown>, keys: readonly string[]): boo
 }
 
 function isIdentifier(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && value.length <= 256 && !value.includes("\0");
+  return (
+    typeof value === "string" && value.length > 0 && value.length <= 256 && !value.includes("\0")
+  );
 }
 
 export function parseRemoteDesktopHostConfig(value: unknown): RemoteDesktopHostFileConfig {
@@ -81,7 +83,8 @@ export function parseRemoteDesktopHostConfig(value: unknown): RemoteDesktopHostF
       (candidate.folderRootWorkspaceIds !== undefined &&
         (!Array.isArray(candidate.folderRootWorkspaceIds) ||
           candidate.folderRootWorkspaceIds.some((id) => !isIdentifier(id)) ||
-          new Set(candidate.folderRootWorkspaceIds).size !== candidate.folderRootWorkspaceIds.length)) ||
+          new Set(candidate.folderRootWorkspaceIds).size !==
+            candidate.folderRootWorkspaceIds.length)) ||
       (candidate.initialWorkspaceId !== undefined && !isIdentifier(candidate.initialWorkspaceId)) ||
       (candidate.initialSessionId !== undefined && !isIdentifier(candidate.initialSessionId))
     ) {

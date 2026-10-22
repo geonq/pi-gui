@@ -56,8 +56,7 @@ function addTokens(target: Mutable<UsageTokens>, usage: UsageTokens): void {
   target.output += usage.output;
   target.cacheRead += usage.cacheRead;
   target.cacheWrite += usage.cacheWrite;
-  target.cost =
-    target.cost === null || usage.cost === null ? null : target.cost + usage.cost;
+  target.cost = target.cost === null || usage.cost === null ? null : target.cost + usage.cost;
 }
 
 function localDayStart(time: number): number {
@@ -102,8 +101,7 @@ export async function collectUsage(
 ): Promise<UsageReport> {
   // The Electron main bundle is CommonJS and pi's agent package is ESM-only.
   const pi: PiAgent = await import("@earendil-works/pi-coding-agent");
-  const summaryPath =
-    options.historySummaryPath ?? usageHistorySummaryPath(resolveAgentDir());
+  const summaryPath = options.historySummaryPath ?? usageHistorySummaryPath(resolveAgentDir());
   const [infos, historical] = await Promise.all([
     pi.SessionManager.listAll(options.sessionDir, undefined, options.signal),
     readHistoricalUsageSummary(summaryPath),

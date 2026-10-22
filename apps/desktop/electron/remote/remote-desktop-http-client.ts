@@ -44,7 +44,10 @@ export class RemoteDesktopHttpClient {
     this.connecting = true;
     const request = http.request(this.eventOptions(), (response) => {
       this.connecting = false;
-      if (response.statusCode !== 200 || !response.headers["content-type"]?.startsWith("text/event-stream")) {
+      if (
+        response.statusCode !== 200 ||
+        !response.headers["content-type"]?.startsWith("text/event-stream")
+      ) {
         response.resume();
         this.scheduleReconnect();
         return;
@@ -129,7 +132,10 @@ export class RemoteDesktopHttpClient {
         },
         (response) => this.readJsonResponse(response, (value) => finish(undefined, value), finish),
       );
-      timeout = setTimeout(() => request.destroy(new Error("The Windows backend timed out.")), REQUEST_TIMEOUT_MS);
+      timeout = setTimeout(
+        () => request.destroy(new Error("The Windows backend timed out.")),
+        REQUEST_TIMEOUT_MS,
+      );
       request.on("error", (error) => finish(error));
       if (body !== undefined) request.write(body);
       request.end();

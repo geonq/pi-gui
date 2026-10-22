@@ -279,12 +279,20 @@ export function WorkspaceFolderPicker({
         </div>
 
         {error ? (
-          <div className="tree-modal__error error-banner" data-testid="workspace-folder-error" role="alert">
+          <div
+            className="tree-modal__error error-banner"
+            data-testid="workspace-folder-error"
+            role="alert"
+          >
             {error}
           </div>
         ) : null}
         {notice ? (
-          <div className="workspace-folder-picker__notice" data-testid="workspace-folder-notice" role="status">
+          <div
+            className="workspace-folder-picker__notice"
+            data-testid="workspace-folder-notice"
+            role="status"
+          >
             {notice}
           </div>
         ) : null}
@@ -340,7 +348,9 @@ export function WorkspaceFolderPicker({
 
           <div aria-label="Folders" className="workspace-folder-picker__list" role="list">
             {loadingRoots || loadingListing ? (
-              <div className="tree-modal__loading" role="status">Loading folders…</div>
+              <div className="tree-modal__loading" role="status">
+                Loading folders…
+              </div>
             ) : null}
             {!loadingRoots && !loadingListing && roots.length === 0 && !error ? (
               <div className="tree-modal__empty">

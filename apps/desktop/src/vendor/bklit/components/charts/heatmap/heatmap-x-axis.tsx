@@ -13,9 +13,7 @@ export interface HeatmapXAxisProps {
 
 const monthFmt = new Intl.DateTimeFormat("en-US", { month: "short" });
 
-export const HeatmapXAxis = memo(function HeatmapXAxis({
-  className,
-}: HeatmapXAxisProps) {
+export const HeatmapXAxis = memo(function HeatmapXAxis({ className }: HeatmapXAxisProps) {
   const { containerRef, data, margin, xScale } = useHeatmap();
   const [mounted, setMounted] = useState(false);
 
@@ -75,17 +73,12 @@ export const HeatmapXAxis = memo(function HeatmapXAxis({
           justifyContent: "flex-start",
         }}
       >
-        <span
-          className={cn(
-            "whitespace-nowrap text-chart-label text-xs",
-            className
-          )}
-        >
+        <span className={cn("whitespace-nowrap text-chart-label text-xs", className)}>
           {tick.label}
         </span>
       </div>
     )),
-    container
+    container,
   );
 });
 

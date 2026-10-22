@@ -221,7 +221,8 @@ export function TreeModal({
       event.preventDefault();
       cancelAutoScroll();
       setSelectedId(
-        displayRows[Math.min(displayRows.length - 1, currentIndex + 1)]?.node.id ?? effectiveSelectedId,
+        displayRows[Math.min(displayRows.length - 1, currentIndex + 1)]?.node.id ??
+          effectiveSelectedId,
       );
       return;
     }
