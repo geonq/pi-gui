@@ -13,13 +13,14 @@ async function main() {
     readFile(path.join(repoRoot, "apps", "website", "app", "page.tsx"), "utf8"),
   ]);
 
+  // The README describes this build's own releases: Windows and macOS assets, no Homebrew tap.
   assert.match(
     readme,
-    /Download the latest `\.dmg` \(macOS\), `\.AppImage` or `\.deb` \(Linux\), or `\.exe` \(Windows\) from the\s+\[Releases page\]/,
+    /Download the latest build from the \[Releases page\]\(https:\/\/github\.com\/geonq\/pi-gui\/releases\)/,
   );
-  assert.match(readme, /brew install --cask pi-gui/);
-  assert.match(readme, /brew upgrade --cask pi-gui/);
-  assert.doesNotMatch(readme, /Homebrew installation will be published/);
+  assert.match(readme, /`Pegasus-<version>-x64-setup\.exe`/);
+  assert.match(readme, /`Pegasus-<version>-arm64-mac\.zip`/);
+  assert.doesNotMatch(readme, /brew install/);
 
   assert.match(
     siteMetadata,
