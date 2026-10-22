@@ -63,7 +63,7 @@ test("uploads preserve filenames, downloads stream bytes, and replacement requir
       relativePath: "reports/résumé (final).pdf",
     });
     const chunks: Buffer[] = [];
-    for await (const chunk of download.stream) chunks.push(Buffer.from(chunk));
+    for await (const chunk of download.stream) chunks.push(Buffer.from(chunk as Uint8Array));
     expect(Buffer.concat(chunks).toString("utf8")).toBe("approved replacement");
     expect(download.fileName).toBe("résumé (final).pdf");
   } finally {

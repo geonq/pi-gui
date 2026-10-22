@@ -39,15 +39,29 @@ export async function readAntigravityLimits(): Promise<AccountLimits | null> {
   };
 }
 
+/** Shapes the agy usage command reports; every field is still checked before use. */
+interface AgyUsageGroup {
+  readonly name?: unknown;
+  readonly buckets?: unknown;
+}
+
+interface AgyUsageBucket {
+  readonly name?: unknown;
+  readonly window?: unknown;
+  readonly remaining_fraction?: unknown;
+  readonly reset_time?: unknown;
+}
+
 export function parseAntigravityLimits(value: unknown, now = Date.now()): AccountLimits | null {
   if (!value || typeof value !== "object") return null;
   const command = (value as { command?: { name?: unknown; data?: { groups?: unknown } } }).command;
   if (command?.name !== "usage" || !Array.isArray(command.data?.groups)) return null;
   const windows: UsageLimitWindow[] = [];
-  for (const group of command.data.groups.slice(0, 32)) {
+  for (const group of (command.data.groups as (AgyUsageGroup | null)[]).slice(0, 32)) {
     if (!group || typeof group.name !== "string" || !Array.isArray(group.buckets)) continue;
-    for (const bucket of group.buckets.slice(0, 64)) {
-      const left = bucket?.remaining_fraction;
+    for (const bucket of (group.buckets as (AgyUsageBucket | null)[]).slice(0, 64)) {
+      if (!bucket) continue;
+      const left = bucket.remaining_fraction;
       if (typeof left !== "number" || !Number.isFinite(left) || left < 0 || left > 1) continue;
       const period =
         bucket.window === "weekly" ? "Weekly" : bucket.window === "5h" ? "5-hour" : bucket.name;

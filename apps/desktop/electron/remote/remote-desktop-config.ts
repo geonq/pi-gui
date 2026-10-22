@@ -103,9 +103,9 @@ export function parseRemoteDesktopHostConfig(value: unknown): RemoteDesktopHostF
     return {
       id: candidate.id,
       token: candidate.token,
-      workspaceIds: [...candidate.workspaceIds] as string[],
+      workspaceIds: [...(candidate.workspaceIds as string[])],
       ...(candidate.folderRootWorkspaceIds !== undefined
-        ? { folderRootWorkspaceIds: [...candidate.folderRootWorkspaceIds] as string[] }
+        ? { folderRootWorkspaceIds: [...(candidate.folderRootWorkspaceIds as string[])] }
         : {}),
       ...(candidate.initialWorkspaceId !== undefined
         ? { initialWorkspaceId: candidate.initialWorkspaceId }
@@ -118,7 +118,7 @@ export function parseRemoteDesktopHostConfig(value: unknown): RemoteDesktopHostF
   return {
     version: 1,
     port: value.port as number,
-    allowedOrigins: [...value.allowedOrigins] as string[],
+    allowedOrigins: [...(value.allowedOrigins as string[])],
     clients,
     ...(value.macFolders !== undefined
       ? { macFolders: parseMacFoldersConfig(value.macFolders) }

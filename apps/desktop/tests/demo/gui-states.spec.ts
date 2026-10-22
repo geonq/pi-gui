@@ -38,7 +38,7 @@ test("captures every main GUI state", async () => {
     // Real pi session files with known usage, so the Usage page has data to draw.
     await seedUsageSessions({ cwd: workspacePath, agentDir: join(userDataDir, "agent") });
     // Renderer screenshots cannot show OS glass, so review the opaque surfaces.
-    await window.evaluate(() => window.piApp?.setEnableTransparency(false));
+    await window.evaluate(() => globalThis.window.piApp?.setEnableTransparency(false));
 
     for (const variant of ["dark", "light"] as const) {
       await resize(harness, 1480, 980);
