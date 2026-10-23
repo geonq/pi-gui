@@ -3,6 +3,7 @@ import { isCardEntryItem, sessionKey } from "@pi-gui/session-driver";
 import type { SessionTranscriptItem, SessionTranscriptPin } from "@pi-gui/session-driver";
 import type { SessionDriverEvent, SessionQueuedMessage, SessionRef } from "@pi-gui/session-driver";
 import type { TranscriptMessage } from "../../contracts/desktop-state";
+import { promptTitle } from "./thread-title-constants";
 import {
   extensionToolRowLabel,
   toolInputSummary,
@@ -469,7 +470,9 @@ function clearRunState(
 function toolLabel(toolName: string, input: unknown): string {
   const detail = toolInputSummary(input);
   if (toolName === createChildThreadToolName) {
-    return detail ? `Started child thread: ${detail}` : "Started child thread";
+    // The child's task reads like its sidebar title, without role tags or markers.
+    const prompt = isRecord(input) && typeof input.prompt === "string" ? input.prompt : "";
+    return prompt ? `Started subagent: ${promptTitle(prompt, 80)}` : "Started subagent";
   }
   if (toolName === listThreadsToolName) {
     return "Listed threads";
