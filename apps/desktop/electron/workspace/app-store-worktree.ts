@@ -12,7 +12,7 @@ import type {
 } from "../../contracts/desktop-state";
 import type { CreateWorktreeOptions } from "../platform/worktrees/worktree-manager";
 import type { WorkspaceOwnerHost } from "./app-store-workspace";
-import { NEW_THREAD_PLACEHOLDER_TITLE } from "../conversation/thread-title-constants";
+import { NEW_THREAD_PLACEHOLDER_TITLE, promptTitle } from "../conversation/thread-title-constants";
 
 /* ── Public methods ─────────────────────────────────────── */
 
@@ -474,12 +474,20 @@ async function generateAndApplyAutoTitle(
   };
 
   try {
-    const generatedTitle = await store.driver.generateThreadTitle(workspace, {
-      prompt: options.prompt,
-      signal: options.signal,
-      ...(options.model ? { model: options.model } : {}),
-      ...(options.thinkingLevel ? { thinkingLevel: options.thinkingLevel } : {}),
-    });
+    // A title needs no reasoning, so the chat's thinking level is not passed on; when no model
+    // title comes back, the first sentence of the prompt names the chat instead of "New thread".
+    const modelTitle = await store.driver
+      .generateThreadTitle(workspace, {
+        prompt: options.prompt,
+        signal: options.signal,
+        ...(options.model ? { model: options.model } : {}),
+      })
+      .catch((error: unknown) => {
+        console.warn("[app-store] model title failed; using the prompt instead", error);
+        return null;
+      });
+    const generatedTitle =
+      modelTitle || (options.signal.aborted ? null : promptTitle(options.prompt));
     if (!generatedTitle) {
       // Generation succeeded but produced nothing usable — the thread silently
       // keeps its placeholder title, so make the empty result visible.

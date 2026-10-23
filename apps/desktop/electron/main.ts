@@ -45,6 +45,7 @@ import {
 import { performExtensionViewHostAction } from "./extensions/extension-view-actions";
 import { extensionFrameDocument } from "./extensions/extension-frame-document";
 import { ReviewOwner } from "./workbench/review-owner";
+import { promptTitle } from "./conversation/thread-title-constants";
 import { mainFrameHandler } from "./ipc/main-frame-ipc";
 import { registerDesktopIpc } from "./ipc/register-desktop-ipc";
 import {
@@ -1387,9 +1388,10 @@ app
       shouldKeepSessionDialogs: (sessionRef) =>
         windowOwner?.isSessionVisibleInAnotherWindow(sessionRef) ?? false,
       driverOptions,
+      // With model titles switched off, the first sentence of the prompt still names the chat.
       generateThreadTitleOverride: async (workspace, options) =>
         process.env.PI_APP_GENERATE_THREAD_TITLES === "0"
-          ? null
+          ? promptTitle(options.prompt)
           : generateThreadTitleOverride?.(workspace, options),
     });
     windowOwner = new WindowOwner(store, {

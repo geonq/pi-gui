@@ -27,6 +27,7 @@ import type {
 } from "../../contracts/desktop-state";
 import { latestSessionActivityAt, previewFromTranscript } from "../application/app-store-utils";
 import type { RefreshStateOptions } from "../application/refresh-state-options";
+import { promptTitle } from "../conversation/thread-title-constants";
 import {
   createChildThreadAction,
   createChildThreadPromptFromToolOutput,
@@ -2130,9 +2131,5 @@ function errorMessage(error: unknown): string {
 }
 
 function titleFromPrompt(prompt: string): string {
-  const normalized = prompt.replace(/\s+/g, " ").trim();
-  if (normalized.length <= CHILD_TITLE_LIMIT) {
-    return normalized;
-  }
-  return `${normalized.slice(0, CHILD_TITLE_LIMIT - 3).trimEnd()}...`;
+  return promptTitle(prompt, CHILD_TITLE_LIMIT);
 }
