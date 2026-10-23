@@ -28,12 +28,15 @@ function isUserMessage(item: TimelineTranscriptItem | undefined): boolean {
  * message or extension message.
  */
 export function buildDisplayTimelineItems(
-  transcript: readonly TimelineTranscriptItem[],
+  source: readonly TimelineTranscriptItem[],
   options: {
     readonly lastTurnRunning?: boolean;
     readonly turnChanges?: readonly TurnChangeSummary[];
+    /** Titles of this chat's subagents that are still working after its own turn ended. */
+    readonly subagentsWorking?: readonly string[];
   } = {},
 ): readonly DisplayTimelineItem[] {
+  const transcript = withSubagentsWorking(withWorkingLast(source), options);
   // Marker to emit immediately before the transcript item at that index.
   // Index `transcript.length` means "after the last item".
   const markersBefore = new Map<number, TimelineTurnMarker>();
@@ -110,6 +113,64 @@ export function buildDisplayTimelineItems(
     }
   }
   return result;
+}
+
+/** The live "Thinking…" pill is the run's leading edge, so it always renders after the latest row. */
+function withWorkingLast(
+  transcript: readonly TimelineTranscriptItem[],
+): readonly TimelineTranscriptItem[] {
+  const index = transcript.findIndex((item) => item.kind === "activity" && item.tone === "working");
+  if (index < 0 || index === transcript.length - 1) return transcript;
+  return [...transcript.slice(0, index), ...transcript.slice(index + 1), transcript[index]!];
+}
+
+/** A chat whose own turn ended still shows that its subagents are working. */
+function withSubagentsWorking(
+  transcript: readonly TimelineTranscriptItem[],
+  options: { readonly lastTurnRunning?: boolean; readonly subagentsWorking?: readonly string[] },
+): readonly TimelineTranscriptItem[] {
+  const titles = options.subagentsWorking ?? [];
+  const last = transcript.at(-1);
+  if (options.lastTurnRunning || titles.length === 0 || !last) return transcript;
+  return [
+    ...transcript,
+    {
+      kind: "activity",
+      id: "subagents-working",
+      createdAt: last.createdAt,
+      label: titles.length === 1 ? "1 subagent working" : `${titles.length} subagents working`,
+      detail: titles.join(" · "),
+      tone: "working",
+      activityState: "solving",
+    },
+  ];
+}
+
+/** Titles of the selected chat's subagents that are queued, running or waiting. */
+export function subagentTitles(
+  state:
+    | {
+        readonly selectedWorkspaceId: string;
+        readonly selectedSessionId: string;
+        readonly orchestrationChildren: readonly {
+          readonly parentWorkspaceId: string;
+          readonly parentSessionId: string;
+          readonly status: string;
+          readonly title: string;
+        }[];
+      }
+    | null
+    | undefined,
+): readonly string[] {
+  if (!state?.selectedSessionId) return [];
+  return state.orchestrationChildren
+    .filter(
+      (child) =>
+        child.parentWorkspaceId === state.selectedWorkspaceId &&
+        child.parentSessionId === state.selectedSessionId &&
+        (child.status === "running" || child.status === "queued" || child.status === "waiting"),
+    )
+    .map((child) => child.title);
 }
 
 function turnChangeCardPositions(

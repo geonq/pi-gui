@@ -28,7 +28,7 @@ import { useRunningLabel } from "../features/conversation/hooks/use-running-labe
 
 import { useTimelineViewport } from "../features/conversation/hooks/use-timeline-viewport";
 
-import { buildDisplayTimelineItems } from "../features/conversation/timeline-turns";
+import { buildDisplayTimelineItems, subagentTitles } from "../features/conversation/timeline-turns";
 
 import { useTurnChanges } from "../features/conversation/hooks/use-turn-changes";
 
@@ -482,11 +482,10 @@ export default function App() {
     () =>
       buildDisplayTimelineItems(pins.timeline, {
         lastTurnRunning: selectedSessionRunning,
-
         turnChanges: turnChanges.turns,
+        subagentsWorking: subagentTitles(snapshot),
       }),
-
-    [pins.timeline, selectedSessionRunning, turnChanges.turns],
+    [pins.timeline, selectedSessionRunning, turnChanges.turns, snapshot],
   );
 
   const viewport = useTimelineViewport({

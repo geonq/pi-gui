@@ -133,3 +133,23 @@ test("a keyed card updated long after its turn does not stretch that turn's mark
   const marker = buildDisplayTimelineItems(transcript).find((item) => item.kind === "turn-marker");
   expect(marker?.durationMs).toBe(60_000);
 });
+
+test("the live working pill renders after the latest row", () => {
+  const transcript: TranscriptMessage[] = [
+    message("u1", "user", 0),
+    { kind: "activity", id: "working", label: "Thinking…", tone: "working", createdAt: at(1) },
+    tool("t1", 3),
+    tool("t2", 5),
+  ];
+  expect(ids(transcript, true)).toEqual(["u1", "t1", "t2", "working"]);
+});
+
+test("a finished turn shows its subagents still working", () => {
+  const transcript = [message("u1", "user", 0), message("a1", "assistant", 4)];
+  const items = buildDisplayTimelineItems(transcript, {
+    subagentsWorking: ["Planner", "Implementer"],
+  });
+  const last = items.at(-1);
+  expect(last).toMatchObject({ kind: "activity", label: "2 subagents working", tone: "working" });
+  expect(buildDisplayTimelineItems(transcript, { subagentsWorking: [] }).at(-1)?.id).toBe("a1");
+});
