@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { parseCodexLiveLimits } from "../../electron/usage/codex-limits";
+import { isCodexReleaseFor, parseCodexLiveLimits } from "../../electron/usage/codex-limits";
 import { readClaudeLimits, readCodexLimits } from "../../electron/usage/account-limits";
 
 // Records in the shape Codex writes them (sessions/YYYY/MM/DD/rollout-*.jsonl, one event per line).
@@ -171,4 +171,13 @@ test("a Claude slot with an expired token shows its saved name without calling t
     else process.env.CODEX_HOME = previous;
     await rm(state, { recursive: true, force: true });
   }
+});
+
+test("finds the managed Codex app-server by its real release folder names", () => {
+  // Folders start with the version; the live quota read never ran while the check expected the target first.
+  expect(isCodexReleaseFor("0.163.0-x86_64-pc-windows-msvc", "x64", "win32")).toBe(true);
+  expect(isCodexReleaseFor("0.163.0-aarch64-apple-darwin", "arm64", "darwin")).toBe(true);
+  expect(isCodexReleaseFor("0.163.0-aarch64-apple-darwin", "x64", "win32")).toBe(false);
+  expect(isCodexReleaseFor("x86_64-pc-windows-msvc", "x64", "win32")).toBe(false);
+  expect(isCodexReleaseFor("0.163.0-x86_64-pc-windows-msvc.old", "x64", "win32")).toBe(false);
 });

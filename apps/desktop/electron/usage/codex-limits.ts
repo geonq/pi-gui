@@ -76,28 +76,32 @@ export function parseCodexLiveLimits(
   };
 }
 
+/**
+ * Release folders are named "<version>-<target>", e.g. "0.163.0-x86_64-pc-windows-msvc" or
+ * "0.163.0-aarch64-apple-darwin": the target follows the version rather than starting the name.
+ */
+export function isCodexReleaseFor(name: string, arch: string, platform: string): boolean {
+  const archPart =
+    arch === "x64" ? "(?:x86_64|x64)" : arch === "arm64" ? "(?:aarch64|arm64)" : null;
+  const osPart =
+    platform === "win32"
+      ? "pc-windows-msvc"
+      : platform === "darwin"
+        ? "apple-darwin"
+        : platform === "linux"
+          ? "unknown-linux-(?:musl|gnu)"
+          : null;
+  if (!archPart || !osPart) return false;
+  return new RegExp(`^\\d+\\.\\d+\\.\\d+-${archPart}-${osPart}$`).test(name);
+}
+
 async function findManagedCodexBinary(home: string): Promise<string | null> {
   const releaseRoot = join(home, "packages", "app-server-daemon", "releases");
-  const archPattern =
-    process.arch === "x64"
-      ? /^(?:x86_64|x64)-/
-      : process.arch === "arm64"
-        ? /^(?:aarch64|arm64)-/
-        : null;
-  const osPattern =
-    process.platform === "win32"
-      ? /-pc-windows-msvc$/
-      : process.platform === "darwin"
-        ? /-apple-darwin$/
-        : process.platform === "linux"
-          ? /-unknown-linux-(?:musl|gnu)$/
-          : null;
-  if (!archPattern || !osPattern) return null;
-
   const releases = await readdir(releaseRoot, { withFileTypes: true }).catch(() => []);
   const candidates = releases
     .filter(
-      (entry) => entry.isDirectory() && archPattern.test(entry.name) && osPattern.test(entry.name),
+      (entry) =>
+        entry.isDirectory() && isCodexReleaseFor(entry.name, process.arch, process.platform),
     )
     .map((entry) => ({ name: entry.name, version: releaseVersion(entry.name) }))
     .filter(
