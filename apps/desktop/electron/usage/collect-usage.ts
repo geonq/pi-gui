@@ -3,6 +3,7 @@ import { basename } from "node:path";
 import { setImmediate as nextTurn } from "node:timers/promises";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { resolveAgentDir } from "../application/app-store";
+import { apiCostUsd } from "./api-pricing";
 import {
   totalTokens,
   type UsageBreakdown,
@@ -57,6 +58,8 @@ function addTokens(target: Mutable<UsageTokens>, usage: UsageTokens): void {
   target.cacheRead += usage.cacheRead;
   target.cacheWrite += usage.cacheWrite;
   target.cost = target.cost === null || usage.cost === null ? null : target.cost + usage.cost;
+  target.apiCost = (target.apiCost ?? 0) + (usage.apiCost ?? 0);
+  target.unpricedTokens = (target.unpricedTokens ?? 0) + (usage.unpricedTokens ?? 0);
 }
 
 function localDayStart(time: number): number {
@@ -143,8 +146,13 @@ export async function collectUsage(
       recorded: RecordedUsage,
       model?: { provider: string; model: string },
     ) => {
-      const usage = toTokens(recorded);
-      const amount = totalTokens(usage);
+      const recordedTokens = toTokens(recorded);
+      const amount = totalTokens(recordedTokens);
+      const apiCost = model ? apiCostUsd(model.model, recordedTokens) : null;
+      const usage: UsageTokens =
+        apiCost === null
+          ? { ...recordedTokens, unpricedTokens: amount }
+          : { ...recordedTokens, apiCost };
       if (!amount && !usage.cost) return;
       for (const target of [totals, workspace.tokens, thread.tokens]) addTokens(target, usage);
       const provider = model?.provider ?? "pi";

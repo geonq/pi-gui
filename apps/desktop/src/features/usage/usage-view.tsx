@@ -203,13 +203,9 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
       label: account === ALL ? accountName(key) : (names.get(key) ?? shortName(key)),
     }));
     const allTime = report.models.filter((model) => inAccount(model.key));
-    const allTimeOf = (field: "output" | "cacheRead") =>
-      sumValues(allTime.map((model) => model.tokens[field]));
-    let cost: number | null = 0;
-    for (const model of allTime) {
-      if (model.tokens.cost === null) cost = null;
-      else if (cost !== null) cost += model.tokens.cost;
-    }
+    // What these tokens would have cost at public API prices, priced per request.
+    const apiCost = sumValues(allTime.map((model) => model.tokens.apiCost ?? 0));
+    const unpriced = sumValues(allTime.map((model) => model.tokens.unpricedTokens ?? 0));
     const amountOf = (row: UsageBreakdown) =>
       account === ALL ? breakdownTokens(row) : (row.byProvider?.[account] ?? 0);
     // Projects read as the user named them in the app, not by folder name.
@@ -234,9 +230,10 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
       total,
       share,
       name: (key: string) => names.get(key) ?? shortName(key),
-      output: allTimeOf("output"),
-      cacheRead: allTimeOf("cacheRead"),
-      cost,
+      allTimeTokens: sumValues(allTime.map((model) => totalTokens(model.tokens))),
+      requests: sumValues(allTime.map((model) => model.replies)),
+      apiCost,
+      unpriced,
       workspaces: ranks(report.workspaces.map(renamed), 6),
       tokensByDay,
       threads: ranks(report.threads, 8),
@@ -354,25 +351,25 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
           {planLimitsCard}
 
           <section className="usage-view__stats" aria-label="Totals">
-            <Stat label="Tokens in period" value={compact.format(view.total)} />
-            <Stat label="Output, all time" value={compact.format(view.output)} />
-            <Stat label="Cache reads, all time" value={compact.format(view.cacheRead)} />
             <Stat
               label={
-                view.cost === null
-                  ? "Cost unavailable"
-                  : view.cost > 0
-                    ? "Provider-reported cost, all time"
-                    : "Threads read"
+                period === "all"
+                  ? "Tokens, all time"
+                  : `Tokens, ${PERIODS.find((entry) => entry.id === period)?.label ?? period}`
               }
-              value={
-                view.cost === null
-                  ? "Unavailable"
-                  : view.cost > 0
-                    ? usd.format(view.cost)
-                    : compact.format(report.sessions)
-              }
+              value={compact.format(view.total)}
             />
+            {period === "all" ? null : (
+              <Stat label="Tokens, all time" value={compact.format(view.allTimeTokens)} />
+            )}
+            {view.apiCost > 0 ? (
+              <Stat
+                label="API value, all time"
+                title={`What these tokens would cost at public API prices.${view.unpriced ? ` ${compact.format(view.unpriced)} tokens of models without a public price are not included.` : ""}`}
+                value={usd.format(Math.round(view.apiCost))}
+              />
+            ) : null}
+            <Stat label="Requests, all time" value={compact.format(view.requests)} />
           </section>
 
           <TokenHeatmap tokensByDay={view.tokensByDay} />
@@ -497,9 +494,17 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
   );
 }
 
-function Stat({ label, value }: { readonly label: string; readonly value: string }) {
+function Stat({
+  label,
+  value,
+  title,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly title?: string;
+}) {
   return (
-    <div className="usage-stat">
+    <div className="usage-stat" title={title}>
       <span className="usage-stat__value">{value}</span>
       <span className="usage-stat__label">{label}</span>
     </div>

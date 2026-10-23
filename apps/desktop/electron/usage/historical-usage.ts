@@ -47,12 +47,18 @@ const isEpoch = (value: unknown): value is number =>
 function parseTokens(value: unknown): UsageTokens | null {
   if (!isRecord(value) || !isCount(value.input) || !isCount(value.output)) return null;
   if (!isCount(value.cacheRead) || !isCount(value.cacheWrite) || value.cost !== null) return null;
+  const apiCost =
+    typeof value.apiCost === "number" && Number.isFinite(value.apiCost) && value.apiCost >= 0
+      ? value.apiCost
+      : undefined;
   return {
     input: value.input,
     output: value.output,
     cacheRead: value.cacheRead,
     cacheWrite: value.cacheWrite,
     cost: null,
+    ...(apiCost !== undefined ? { apiCost } : {}),
+    ...(isCount(value.unpricedTokens) ? { unpricedTokens: value.unpricedTokens } : {}),
   };
 }
 
@@ -322,6 +328,8 @@ function mergeTokens(left: UsageTokens, right: UsageTokens): UsageTokens {
     cacheRead: left.cacheRead + right.cacheRead,
     cacheWrite: left.cacheWrite + right.cacheWrite,
     cost: left.cost === null || right.cost === null ? null : left.cost + right.cost,
+    apiCost: (left.apiCost ?? 0) + (right.apiCost ?? 0),
+    unpricedTokens: (left.unpricedTokens ?? 0) + (right.unpricedTokens ?? 0),
   };
 }
 

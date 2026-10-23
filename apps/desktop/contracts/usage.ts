@@ -5,6 +5,10 @@ export interface UsageTokens {
   readonly cacheRead: number;
   readonly cacheWrite: number;
   readonly cost: number | null;
+  /** USD these tokens would cost at the provider's public API prices (pi-ai's price list). */
+  readonly apiCost?: number;
+  /** Tokens of models without a public API price, left out of `apiCost`. */
+  readonly unpricedTokens?: number;
 }
 
 /** One local calendar day: total tokens per model key (`provider/model`). */
