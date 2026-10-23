@@ -1153,16 +1153,18 @@
   justify-content: flex-end;
 }
 
+/* A queued message is a short preview: two lines, the full text in the tooltip and in Edit. */
 .queued-composer-message__text {
   min-width: 0;
   flex: 1;
-  color: var(--text-strong);
-  font-size: 14px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
   line-height: 1.45;
-  white-space: pre-wrap;
   overflow-wrap: anywhere;
-  max-height: min(160px, 20vh);
-  overflow-y: auto;
 }
 
 .queued-composer-message__attachments {
