@@ -611,6 +611,24 @@
   overflow: visible;
 }
 
+/* A subagent chat sits indented under the chat that started it, with a thin guide line. */
+.session-row--child {
+  min-height: 32px;
+  margin-left: 14px;
+  width: calc(100% - 14px);
+  font-size: 12.5px;
+}
+
+.session-row--child::before {
+  content: "";
+  position: absolute;
+  left: -7px;
+  top: 4px;
+  bottom: 4px;
+  width: 1px;
+  background: var(--line);
+}
+
 .session-list--pinned .session-row {
   cursor: grab;
 }

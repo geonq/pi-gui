@@ -1448,6 +1448,7 @@ function ThreadSessionRow({
     dragging ? "session-row--dragging" : "",
     overlay ? "session-row--overlay" : "",
     shortcutBadge ? "session-row--shortcut" : "",
+    thread.depth ? "session-row--child" : "",
   ]
     .filter(Boolean)
     .join(" ");

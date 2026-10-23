@@ -26,6 +26,8 @@ export interface ThreadListEntry {
   readonly session: SessionRecord;
   readonly environment: ThreadEnvironmentMeta;
   readonly contextLabel: string;
+  /** 1 for a subagent chat shown under the chat that started it. */
+  readonly depth?: number;
 }
 
 export interface WorkspaceThreadGroup {
@@ -75,37 +77,77 @@ export function buildThreadSidebarModel(
   state: DesktopAppState,
   nowMs: number = Date.now(),
 ): ThreadSidebarModel {
-  const entries = collectThreadEntries(state);
-  const pinnedThreads = entries
-    .filter((entry) => !entry.session.archivedAt && Boolean(entry.session.pinnedAt))
-    .sort((left, right) => comparePinnedThreads(left, right, state.pinnedSessionOrder));
+  const allEntries = collectThreadEntries(state);
+  // Subagent chats are listed under the chat that started them, not as their own top-level chats.
+  const nested = nestChildThreads(state, allEntries);
+  const entries = allEntries.filter((entry) => !nested.childKeys.has(sessionThreadKey(entry)));
+  const withChildren = nested.withChildren;
+  const pinnedThreads = withChildren(
+    entries
+      .filter((entry) => !entry.session.archivedAt && Boolean(entry.session.pinnedAt))
+      .sort((left, right) => comparePinnedThreads(left, right, state.pinnedSessionOrder)),
+  );
   const historyThreads = entries
     .filter((entry) => !entry.session.archivedAt && !entry.session.pinnedAt)
     .sort((left, right) => compareByRecency(left.session, right.session));
-  const archivedThreads = entries
+  const archivedThreads = allEntries
     .filter((entry) => Boolean(entry.session.archivedAt))
     .sort((left, right) => compareByRecency(left.session, right.session));
-  const recencyOrder = entries
-    .filter((entry) => !entry.session.archivedAt)
-    .sort((left, right) => compareByRecency(left.session, right.session));
+  const recencyOrder = withChildren(
+    entries
+      .filter((entry) => !entry.session.archivedAt)
+      .sort((left, right) => compareByRecency(left.session, right.session)),
+  );
 
   const folders = listFolders(state);
   return {
     folders,
     workspaceGroups: folders.map((workspace) => ({
       workspace,
-      threads: historyThreads.filter((entry) => entry.folderId === workspace.id),
+      threads: withChildren(historyThreads.filter((entry) => entry.folderId === workspace.id)),
     })),
     pinnedThreads,
     recencySections: RECENCY_BUCKET_ORDER.flatMap((bucket) => {
       const threads = historyThreads.filter(
         (entry) => recencyBucketId(sessionLastInteractedAt(entry.session), nowMs) === bucket,
       );
-      return threads.length > 0 ? [{ bucket, label: RECENCY_BUCKET_LABELS[bucket], threads }] : [];
+      return threads.length > 0
+        ? [{ bucket, label: RECENCY_BUCKET_LABELS[bucket], threads: withChildren(threads) }]
+        : [];
     }),
     archivedThreads,
     recencyOrder,
   };
+}
+
+/**
+ * Child chats (started by a parent's create_child_thread) whose parent is listed. `withChildren`
+ * places each parent's unarchived children directly below it, newest first, at depth 1.
+ */
+function nestChildThreads(state: DesktopAppState, entries: readonly ThreadListEntry[]) {
+  const byKey = new Map(entries.map((entry) => [sessionThreadKey(entry), entry] as const));
+  const childrenByParent = new Map<string, ThreadListEntry[]>();
+  const childKeys = new Set<string>();
+  for (const child of state.orchestrationChildren) {
+    const childKey = `${child.childWorkspaceId}:${child.childSessionId}`;
+    const parentKey = `${child.parentWorkspaceId}:${child.parentSessionId}`;
+    const entry = byKey.get(childKey);
+    if (!entry || !byKey.has(parentKey) || childKey === parentKey) continue;
+    childKeys.add(childKey);
+    if (entry.session.archivedAt) continue;
+    const siblings = childrenByParent.get(parentKey) ?? [];
+    siblings.push({ ...entry, depth: 1 });
+    childrenByParent.set(parentKey, siblings);
+  }
+  for (const siblings of childrenByParent.values()) {
+    siblings.sort((left, right) => compareByRecency(left.session, right.session));
+  }
+  const withChildren = (threads: readonly ThreadListEntry[]): ThreadListEntry[] =>
+    threads.flatMap((thread) => [
+      thread,
+      ...(childrenByParent.get(sessionThreadKey(thread)) ?? []),
+    ]);
+  return { childKeys, withChildren };
 }
 
 function listFolders(state: DesktopAppState): readonly WorkspaceRecord[] {

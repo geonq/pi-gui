@@ -436,3 +436,39 @@ test("caps a history list at five until it is expanded", () => {
   expect(threadHistoryPreview(threads, true).visible).toEqual(threads);
   expect(threadHistoryPreview(threads.slice(0, 5), false).overflow).toBe(false);
 });
+
+test("subagent chats are listed under the chat that started them", () => {
+  const parent = session("parent", "Parent chat", { updatedAt: isoDaysAgo(0, 10) });
+  const child = session("child", "Planner task", { updatedAt: isoDaysAgo(0, 11) });
+  const other = session("other", "Other chat", { updatedAt: isoDaysAgo(1) });
+  const model = buildThreadSidebarModel(
+    state([workspace("alpha", "Alpha", [parent, child, other])], {
+      orchestrationChildren: [
+        {
+          id: "link",
+          parentWorkspaceId: "alpha",
+          parentSessionId: "parent",
+          childWorkspaceId: "alpha",
+          childSessionId: "child",
+          title: "Planner task",
+          goal: "",
+          status: "running",
+          latestTranscript: "",
+          transcript: [],
+          evidence: [],
+        } as unknown as DesktopAppState["orchestrationChildren"][number],
+      ],
+    }),
+    nowMs,
+  );
+  const rows = model.workspaceGroups[0]!.threads.map((entry) => [
+    entry.session.id,
+    entry.depth ?? 0,
+  ]);
+  expect(rows).toEqual([
+    ["parent", 0],
+    ["child", 1],
+    ["other", 0],
+  ]);
+  expect(model.recencyOrder.map((entry) => entry.session.id)).toEqual(["parent", "child", "other"]);
+});
