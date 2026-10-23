@@ -28,6 +28,10 @@ export interface ThreadListEntry {
   readonly contextLabel: string;
   /** 1 for a subagent chat shown under the chat that started it. */
   readonly depth?: number;
+  /** For a subagent chat: the thread key of the chat that started it. */
+  readonly parentKey?: string;
+  /** For a chat that started subagents: how many are listed under it. */
+  readonly childCount?: number;
 }
 
 export interface WorkspaceThreadGroup {
@@ -37,14 +41,52 @@ export interface WorkspaceThreadGroup {
 
 export const THREAD_HISTORY_PREVIEW_LIMIT = 5;
 
-export function threadHistoryPreview<T>(
+/** The preview counts top-level chats only, so a chat keeps its subagent rows with it. */
+export function threadHistoryPreview<T extends { readonly depth?: number }>(
   threads: readonly T[],
   expanded: boolean,
 ): { readonly visible: readonly T[]; readonly overflow: boolean } {
-  const overflow = threads.length > THREAD_HISTORY_PREVIEW_LIMIT;
+  let topLevel = 0;
+  const cut = threads.findIndex(
+    (thread) => !thread.depth && ++topLevel > THREAD_HISTORY_PREVIEW_LIMIT,
+  );
+  const overflow = cut !== -1;
   return {
-    visible: overflow && !expanded ? threads.slice(0, THREAD_HISTORY_PREVIEW_LIMIT) : threads,
+    visible: overflow && !expanded ? threads.slice(0, cut) : threads,
     overflow,
+  };
+}
+
+/** Drops the subagent rows of chats folded shut in the sidebar. */
+export function foldChildThreads<T extends { readonly parentKey?: string }>(
+  threads: readonly T[],
+  collapsedParentKeys: ReadonlySet<string>,
+): readonly T[] {
+  if (collapsedParentKeys.size === 0) return threads;
+  return threads.filter(
+    (thread) => !thread.parentKey || !collapsedParentKeys.has(thread.parentKey),
+  );
+}
+
+export function foldThreadSidebarModel(
+  model: ThreadSidebarModel,
+  collapsedParentKeys: ReadonlySet<string>,
+): ThreadSidebarModel {
+  if (collapsedParentKeys.size === 0) return model;
+  const fold = (threads: readonly ThreadListEntry[]) =>
+    foldChildThreads(threads, collapsedParentKeys);
+  return {
+    ...model,
+    workspaceGroups: model.workspaceGroups.map((group) => ({
+      ...group,
+      threads: fold(group.threads),
+    })),
+    pinnedThreads: fold(model.pinnedThreads),
+    recencySections: model.recencySections.map((section) => ({
+      ...section,
+      threads: fold(section.threads),
+    })),
+    recencyOrder: fold(model.recencyOrder),
   };
 }
 
@@ -136,17 +178,19 @@ function nestChildThreads(state: DesktopAppState, entries: readonly ThreadListEn
     childKeys.add(childKey);
     if (entry.session.archivedAt) continue;
     const siblings = childrenByParent.get(parentKey) ?? [];
-    siblings.push({ ...entry, depth: 1 });
+    siblings.push({ ...entry, depth: 1, parentKey });
     childrenByParent.set(parentKey, siblings);
   }
   for (const siblings of childrenByParent.values()) {
     siblings.sort((left, right) => compareByRecency(left.session, right.session));
   }
   const withChildren = (threads: readonly ThreadListEntry[]): ThreadListEntry[] =>
-    threads.flatMap((thread) => [
-      thread,
-      ...(childrenByParent.get(sessionThreadKey(thread)) ?? []),
-    ]);
+    threads.flatMap((thread) => {
+      const children = childrenByParent.get(sessionThreadKey(thread)) ?? [];
+      return children.length > 0
+        ? [{ ...thread, childCount: children.length }, ...children]
+        : [thread];
+    });
   return { childKeys, withChildren };
 }
 

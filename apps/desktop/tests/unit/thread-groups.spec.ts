@@ -8,6 +8,7 @@ import {
 } from "../../contracts/desktop-state";
 import {
   buildThreadSidebarModel,
+  foldThreadSidebarModel,
   recencyHistoryExpansionKey,
   sessionThreadKey,
   threadHistoryPreview,
@@ -428,13 +429,31 @@ test("numbers visible rows in order when nothing is pinned", () => {
 });
 
 test("caps a history list at five until it is expanded", () => {
-  const threads = ["1", "2", "3", "4", "5", "6"];
+  const threads = ["1", "2", "3", "4", "5", "6"].map((id) => ({ id }));
   expect(threadHistoryPreview(threads, false)).toEqual({
-    visible: ["1", "2", "3", "4", "5"],
+    visible: threads.slice(0, 5),
     overflow: true,
   });
   expect(threadHistoryPreview(threads, true).visible).toEqual(threads);
   expect(threadHistoryPreview(threads.slice(0, 5), false).overflow).toBe(false);
+});
+
+test("the history cap counts top-level chats, keeping subagent rows with their chat", () => {
+  const rows = [
+    { id: "1" },
+    { id: "1a", depth: 1 },
+    { id: "1b", depth: 1 },
+    { id: "2" },
+    { id: "3" },
+    { id: "4" },
+    { id: "5" },
+    { id: "5a", depth: 1 },
+    { id: "6" },
+  ];
+  const preview = threadHistoryPreview(rows, false);
+  expect(preview.overflow).toBe(true);
+  expect(preview.visible.map((row) => row.id)).toEqual(["1", "1a", "1b", "2", "3", "4", "5", "5a"]);
+  expect(threadHistoryPreview(rows.slice(0, 8), false).overflow).toBe(false);
 });
 
 test("subagent chats are listed under the chat that started them", () => {
@@ -471,4 +490,41 @@ test("subagent chats are listed under the chat that started them", () => {
     ["other", 0],
   ]);
   expect(model.recencyOrder.map((entry) => entry.session.id)).toEqual(["parent", "child", "other"]);
+});
+
+test("a folded chat keeps its row and count but hides its subagent rows", () => {
+  const parent = session("parent", "Parent chat", { updatedAt: isoDaysAgo(0, 10) });
+  const child = session("child", "Planner task", { updatedAt: isoDaysAgo(0, 11) });
+  const other = session("other", "Other chat", { updatedAt: isoDaysAgo(1) });
+  const model = buildThreadSidebarModel(
+    state([workspace("alpha", "Alpha", [parent, child, other])], {
+      orchestrationChildren: [
+        {
+          id: "link",
+          parentWorkspaceId: "alpha",
+          parentSessionId: "parent",
+          childWorkspaceId: "alpha",
+          childSessionId: "child",
+          title: "Planner task",
+          status: "running",
+        } as unknown as DesktopAppState["orchestrationChildren"][number],
+      ],
+    }),
+    nowMs,
+  );
+  const parentRow = model.recencyOrder[0]!;
+  expect(parentRow.childCount).toBe(1);
+  expect(model.recencyOrder[1]!.parentKey).toBe(sessionThreadKey(parentRow));
+
+  const folded = foldThreadSidebarModel(model, new Set([sessionThreadKey(parentRow)]));
+  expect(folded.recencyOrder.map((entry) => entry.session.id)).toEqual(["parent", "other"]);
+  expect(folded.workspaceGroups[0]!.threads.map((entry) => entry.session.id)).toEqual([
+    "parent",
+    "other",
+  ]);
+  expect(folded.recencySections.flatMap((s) => s.threads).map((e) => e.session.id)).toEqual([
+    "parent",
+    "other",
+  ]);
+  expect(foldThreadSidebarModel(model, new Set())).toBe(model);
 });
