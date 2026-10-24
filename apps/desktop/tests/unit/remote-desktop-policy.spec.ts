@@ -208,6 +208,48 @@ test("remote state projection removes unauthorized projects and their selection"
   expect(projected.workspaceOrder).toEqual([allowedWorkspaceId]);
 });
 
+test("remote state projection keeps per-session records of authorized threads", () => {
+  const thread = (workspaceId: string): WorkspaceRecord => ({
+    id: workspaceId,
+    name: workspaceId,
+    path: workspaceId,
+    lastOpenedAt: "2026-10-21T00:00:00.000Z",
+    kind: "primary",
+    sessions: [
+      {
+        id: "thread-1",
+        title: "Thread",
+        updatedAt: "2026-10-21T00:00:00.000Z",
+        preview: "",
+        status: "idle",
+        hasUnseenUpdate: false,
+      },
+    ],
+  });
+  const allowedKey = `${allowedWorkspaceId}:thread-1`;
+  const deniedKey = `${deniedWorkspaceId}:thread-1`;
+  const ui = {
+    instanceId: "ui",
+    statuses: [{ key: "pi-mode", text: "reviewer" }],
+    widgets: [],
+    pendingDialogs: [],
+    notices: [],
+  };
+  const projected = filterRemoteState(
+    {
+      ...createEmptyDesktopAppState(),
+      workspaces: [thread(allowedWorkspaceId), thread(deniedWorkspaceId)],
+      sessionExtensionUiBySession: { [allowedKey]: ui, [deniedKey]: ui },
+      pinnedAtBySession: { [allowedKey]: "2026-10-21T00:00:00.000Z" },
+    },
+    workspaceScope,
+  );
+
+  // The Mac client reads a chat's mode, usage and pins from these records.
+  expect(Object.keys(projected.sessionExtensionUiBySession)).toEqual([allowedKey]);
+  expect(Object.keys(projected.pinnedAtBySession)).toEqual([allowedKey]);
+});
+
 test("remote workspace runtime loads and thread grouping validate exact scoped arguments", () => {
   expect(
     validateRemoteDesktopInvocation("loadWorkspaceRuntime", [allowedWorkspaceId], workspaceScope),

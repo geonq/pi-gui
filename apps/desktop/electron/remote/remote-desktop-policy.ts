@@ -6,6 +6,7 @@ import type {
 } from "../../contracts/desktop-state";
 import type { WorkspaceFolderDevice } from "../../contracts/workspace-folders";
 import { isSessionMode, type SessionMode } from "../../contracts/session-mode";
+import { sessionKey } from "@pi-gui/session-driver";
 import type { RemoteDesktopMethod, RemoteDesktopPiMethod } from "./remote-desktop-protocol";
 import { isRemoteDesktopPiMethod } from "./remote-desktop-protocol";
 
@@ -355,9 +356,12 @@ export function filterRemoteState(
   workspaceIds: ReadonlySet<string>,
 ): DesktopAppState {
   const workspaces = state.workspaces.filter((workspace) => workspaceIds.has(workspace.id));
+  // The same key the store uses for every per-session record (workspaceId:sessionId).
   const allowedSessionKeys = new Set(
     workspaces.flatMap((workspace) =>
-      workspace.sessions.map((session) => `${workspace.id}\0${session.id}`),
+      workspace.sessions.map((session) =>
+        sessionKey({ workspaceId: workspace.id, sessionId: session.id }),
+      ),
     ),
   );
   const allowedSessionIds = new Set(
