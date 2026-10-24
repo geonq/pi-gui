@@ -139,7 +139,8 @@ test("merges only safe history and keeps possible AGY overlap and unknown cost s
     if (loaded.status !== "available") throw new Error("expected a valid summary");
 
     const merged = mergeHistoricalUsage(nativeReport, loaded, dayStart + 1);
-    expect(merged.totals).toEqual(tokens(110, 25, null));
+    // Merging always sums API-equivalent cost; neither side priced anything here.
+    expect(merged.totals).toEqual({ ...tokens(110, 25, null), apiCost: 0, unpricedTokens: 0 });
     expect(merged.sessions).toBe(2);
     expect(merged.days).toEqual([
       {
