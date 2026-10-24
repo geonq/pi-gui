@@ -213,6 +213,9 @@ export function deriveThemeTokens(seedValue: ThemeSeed, variant: ResolvedTheme):
   const window = light ? tint(0.07, 0) : mix(s, "#000000", 0.28);
   const main = s;
   const elevated = light ? mix(s, "#ffffff", 0.4) : tint(0, 0.025);
+  // Links are read as text, so they get body-text contrast (4.5:1) on the lighter of the two
+  // surfaces they sit on; the accent itself stays the brand colour for rails and focus.
+  const link = deepenForContrast(accent, ink, light ? main : elevated, 4.5);
   const surfaceMuted = tint(0.04, 0.055);
   const line = tint(0.12, 0.11);
   const lineStrong = tint(0.19, 0.21);
@@ -246,6 +249,7 @@ export function deriveThemeTokens(seedValue: ThemeSeed, variant: ResolvedTheme):
     "--muted-path": mutedSoft,
     "--muted-settings": muted,
     "--accent": accent,
+    "--link": link,
     "--error": removed,
     "--error-ink": mix(removed, ink, pick(0.35, 0.3)),
     "--success": added,

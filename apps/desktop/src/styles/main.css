@@ -992,7 +992,7 @@
   border: none;
   background: transparent;
   padding: 0;
-  color: var(--accent);
+  color: var(--link);
   font: inherit;
   font-size: 12px;
   font-weight: var(--font-semibold);
@@ -1034,7 +1034,7 @@
   border: none;
   background: transparent;
   padding: 0;
-  color: var(--accent);
+  color: var(--link);
   font: inherit;
   font-size: 12px;
   font-weight: var(--font-semibold);

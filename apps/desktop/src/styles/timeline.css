@@ -859,7 +859,7 @@
 }
 
 .message__content a {
-  color: var(--accent);
+  color: var(--link);
   text-decoration: none;
 }
 
@@ -873,7 +873,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--accent);
+  color: var(--link);
   font: inherit;
   line-height: inherit;
   text-align: inherit;

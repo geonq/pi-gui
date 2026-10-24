@@ -35,6 +35,9 @@ test("every preset keeps text readable in both variants", () => {
       // measures 2.87:1, just under 3:1. Accepted deliberately; every other pairing stays at 3:1.
       const accentMinimum = preset.id === "default" && variant === "dark" ? 2.85 : 3;
       expect(ratio("--accent", "--surface"), label).toBeGreaterThanOrEqual(accentMinimum);
+      for (const background of ["--main", "--surface"] as const) {
+        expect(ratio("--link", background), `${label} link`).toBeGreaterThanOrEqual(4.5);
+      }
       for (const status of ["--warning", "--success", "--error"] as const) {
         expect(ratio(status, "--main"), `${label} ${status}`).toBeGreaterThanOrEqual(3);
       }
