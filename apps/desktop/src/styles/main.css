@@ -1752,6 +1752,7 @@
 }
 
 .enable-transparency .tree-modal,
+.enable-transparency .extension-dialog,
 .enable-transparency .slash-menu,
 .enable-transparency .mention-menu {
   backdrop-filter: var(--glass-blur) var(--glass-saturation);
