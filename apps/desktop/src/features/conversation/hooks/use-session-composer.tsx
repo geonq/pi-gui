@@ -24,6 +24,7 @@ import { parseTreeComposerCommand } from "../composer-commands";
 import { formatAnnotatedPrompt } from "../annotations/annotation-prompt";
 import type { TranscriptAnnotations } from "../annotations/use-transcript-annotations";
 import type { PiDesktopApi } from "../../../../contracts/ipc";
+import { usePromptHistory } from "./use-prompt-history";
 
 interface UseSessionComposerParams {
   readonly api: PiDesktopApi | undefined;
@@ -68,6 +69,7 @@ export function useSessionComposer(params: UseSessionComposerParams) {
   } = params;
 
   const [attachmentsClearedOnSubmit, setAttachmentsClearedOnSubmit] = useState(false);
+  const { recordSentPrompt, handlePromptHistoryKeyDown } = usePromptHistory();
   const composerAttachments = attachmentsClearedOnSubmit
     ? []
     : (snapshot?.composerAttachments ?? []);
@@ -118,6 +120,7 @@ export function useSessionComposer(params: UseSessionComposerParams) {
     }
 
     const previousDraft = composerDraft;
+    recordSentPrompt(previousDraft);
     // A slash command keeps its annotations for the next message rather than breaking the command.
     const sentAnnotations = composerDraft.trimStart().startsWith("/") ? null : annotations.take();
     const text = sentAnnotations?.taken.length
@@ -347,6 +350,10 @@ export function useSessionComposer(params: UseSessionComposerParams) {
     }
 
     if (handleSlashKeyDown(event)) {
+      return;
+    }
+
+    if (handlePromptHistoryKeyDown(event, composerDraft, setComposerDraft)) {
       return;
     }
 

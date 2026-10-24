@@ -34,6 +34,7 @@ import { getEffectiveModelRuntime } from "../../settings/model-settings";
 import type { SettingsSection } from "../../settings/settings-view";
 import { useMentionMenu } from "../../conversation/hooks/use-mention-menu";
 import { useSlashMenu } from "../../conversation/hooks/use-slash-menu";
+import { usePromptHistory } from "../../conversation/hooks/use-prompt-history";
 import { resolveRepoWorkspaceId } from "../../../../contracts/workspace-roots";
 
 interface UseNewThreadControllerParams {
@@ -65,6 +66,7 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
   const [rootWorkspaceId, setRootWorkspaceId] = useState("");
   const [environment, setEnvironment] = useState<NewThreadEnvironment>("local");
   const [prompt, setPrompt] = useState("");
+  const { recordSentPrompt, handlePromptHistoryKeyDown } = usePromptHistory();
   const [attachments, setAttachments] = useState<readonly ComposerAttachment[]>([]);
   const [provider, setProvider] = useState<string | undefined>();
   const [modelId, setModelId] = useState<string | undefined>();
@@ -315,6 +317,7 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
       ...(Object.keys(extensionFlags).length > 0 ? { extensionFlags } : {}),
     };
     startingGenerationRef.current = generation;
+    recordSentPrompt(prompt);
     void updateSnapshot(setSnapshot, () => api.startThread(input))
       .then(() => {
         if (surfaceGenerationRef.current !== generation) {
@@ -343,6 +346,7 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
     extensionFlags,
     modelOnboarding.requiresModelSelection,
     prompt,
+    recordSentPrompt,
     resolvedModelId,
     resolvedProvider,
     resolvedThinkingLevel,
@@ -395,6 +399,10 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
         return;
       }
 
+      if (handlePromptHistoryKeyDown(event, prompt, updatePrompt)) {
+        return;
+      }
+
       if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) {
         return;
       }
@@ -413,11 +421,13 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
       api,
       appendAttachment,
       attachments.length,
+      handlePromptHistoryKeyDown,
       mentionMenu,
       modelOnboarding.requiresModelSelection,
       prompt,
       slashMenu,
       startThread,
+      updatePrompt,
     ],
   );
 
