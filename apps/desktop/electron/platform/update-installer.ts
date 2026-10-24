@@ -165,6 +165,13 @@ export class AppUpdater {
     return hash.digest("hex");
   }
 
+  /** Re-reads the Windows host's version (after a reconnect the host may run a new build). */
+  async refreshHostVersion(): Promise<void> {
+    const hostVersion = await this.options.getHostVersion?.().catch(() => undefined);
+    if (!hostVersion || hostVersion === this.status.hostVersion) return;
+    this.publish({ ...this.status, hostVersion });
+  }
+
   private publish(status: UpdateStatus): void {
     this.status = status;
     for (const listener of this.listeners) {

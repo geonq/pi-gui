@@ -17,6 +17,7 @@ const RECONNECT_DELAY_MS = 2_000;
 
 export class RemoteDesktopHttpClient {
   private readonly listeners = new Set<(event: RemoteDesktopEvent) => void>();
+  private readonly readyListeners = new Set<() => void>();
   private eventRequest: ClientRequest | undefined;
   private reconnectTimer: ReturnType<typeof setTimeout> | undefined;
   private closed = false;
@@ -27,6 +28,12 @@ export class RemoteDesktopHttpClient {
   subscribe(listener: (event: RemoteDesktopEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /** Runs each time the event stream (re)connects, for example after the Windows host restarted. */
+  onReady(listener: () => void): () => void {
+    this.readyListeners.add(listener);
+    return () => this.readyListeners.delete(listener);
   }
 
   async invoke(method: unknown, args: unknown): Promise<unknown> {
@@ -111,6 +118,7 @@ export class RemoteDesktopHttpClient {
     this.eventRequest?.destroy();
     this.eventRequest = undefined;
     this.listeners.clear();
+    this.readyListeners.clear();
   }
 
   private request(method: "GET" | "POST", pathname: string, body?: string): Promise<unknown> {
@@ -215,7 +223,16 @@ export class RemoteDesktopHttpClient {
   }
 
   private receiveEvent(name: string, raw: string): void {
-    if (name === "ready") return;
+    if (name === "ready") {
+      for (const listener of this.readyListeners) {
+        try {
+          listener();
+        } catch {
+          // A failing listener must not break the event stream.
+        }
+      }
+      return;
+    }
     let value: unknown;
     try {
       value = JSON.parse(raw);

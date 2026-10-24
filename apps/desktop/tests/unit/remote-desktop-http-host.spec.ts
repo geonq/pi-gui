@@ -237,6 +237,35 @@ test("SSE coalesces queued snapshots around transcript events without reordering
   expect(fake.unsubscribeCount).toBe(1);
 });
 
+test("the client hears each time its event stream reconnects to a restarted host", async () => {
+  const port = await freeLoopbackPort();
+  const token = randomBytes(32).toString("base64url");
+  const startHost = () =>
+    startRemoteDesktopHttpHost({
+      port,
+      allowedOrigins: ["file://"],
+      clients: [{ id: "mac-client", token, workspaceIds: ["workspace"] }],
+      brokers: new Map([["mac-client", createTestBroker(makeState(1)).broker]]),
+    });
+  let host = await startHost();
+  const client = new RemoteDesktopHttpClient({ version: 1, baseUrl: host.origin, origin: "file://", token });
+  let ready = 0;
+  client.onReady(() => {
+    ready += 1;
+  });
+
+  try {
+    client.startEvents();
+    await waitUntil(() => ready === 1, 5_000);
+    await host.close();
+    host = await startHost();
+    await waitUntil(() => ready === 2, 10_000);
+  } finally {
+    client.close();
+    await host.close();
+  }
+});
+
 test("disconnecting an SSE client frees its per-client stream slot", async () => {
   const port = await freeLoopbackPort();
   const token = randomBytes(32).toString("base64url");

@@ -1822,6 +1822,8 @@ app
           return remoteDesktopClientPreferences;
         },
       );
+      // A host that restarted may run a new build; the version banner should not wait hours for it.
+      remoteDesktopClient.onReady(() => void createAppUpdater().refreshHostVersion());
       remoteDesktopClient.subscribe((event: RemoteDesktopEvent) => {
         if (event.type === "stateChanged") {
           remoteNotifications?.publish({ ...event.state, ...remoteDesktopClientPreferences });
