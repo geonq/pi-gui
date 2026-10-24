@@ -13,6 +13,12 @@ const MAX_COMPLETED_RUN_KEYS = 500;
 // An extension that throws on a frequent event repeats the same error notice; notify once per window.
 const REPEATED_NOTICE_WINDOW_MS = 30_000;
 
+/** What notifications need from the app: its state, its session events, and opening a chat. */
+export type NotificationStore = Pick<
+  DesktopAppStore,
+  "subscribe" | "subscribeToSessionEvents" | "selectSession"
+>;
+
 export class NotificationManager {
   private readonly completedRunKeys = new Set<string>();
   private readonly activeBySession = new Map<string, Electron.Notification>();
@@ -25,7 +31,7 @@ export class NotificationManager {
   private permissionRequestPending = false;
 
   constructor(
-    private readonly store: DesktopAppStore,
+    private readonly store: NotificationStore,
     private readonly getWindow: () => BrowserWindow | null,
     private readonly notificationPermissionService: NotificationPermissionService,
     private readonly selectSessionInWindow?: (sessionRef: SessionRef) => Promise<void>,

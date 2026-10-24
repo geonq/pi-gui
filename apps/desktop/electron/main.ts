@@ -68,6 +68,7 @@ import { collectUsage } from "./usage/collect-usage";
 import { resolveExistingWorkspacePath } from "./platform/files/workspace-paths";
 import { MAIN_DEV_RELOAD_MARKER } from "./dev-reload-main-probe";
 import { NotificationManager } from "./platform/notification-manager";
+import { createRemoteNotificationStore } from "./platform/remote-notification-source";
 import { NotificationPermissionService } from "./platform/notification-permission";
 import { openReleasesPage } from "./platform/update-checker";
 import { AppUpdater } from "./platform/update-installer";
@@ -211,6 +212,7 @@ let mainWindow: BrowserWindow | null = null;
 // Windows-only frame shown before the store starts; it receives the content afterwards.
 let launchWindow: BrowserWindow | undefined;
 let notificationManager: NotificationManager | undefined;
+let remoteNotifications: ReturnType<typeof createRemoteNotificationStore> | undefined;
 let notificationPermissionService: NotificationPermissionService | undefined;
 let terminalService: TerminalService | undefined;
 let integratedTerminalShell = "";
@@ -1608,16 +1610,36 @@ app
         }
       }
     });
+    // A remote client runs no sessions: its notifications come from the host's snapshots, and
+    // clicking one opens the chat on the host.
+    remoteNotifications = remoteDesktopClient
+      ? createRemoteNotificationStore({
+          selectSession: async (target) => {
+            const state = (await remoteDesktopClient!.invoke("selectSession", [
+              target,
+            ])) as DesktopAppState;
+            const shown = { ...state, ...remoteDesktopClientPreferences };
+            for (const window of windowOwner.allWindows()) {
+              if (!window.isDestroyed() && !window.webContents.isDestroyed()) {
+                window.webContents.send(remoteClientIpc.stateChanged, shown);
+              }
+            }
+            return shown;
+          },
+        })
+      : undefined;
     notificationManager = new NotificationManager(
-      store,
+      remoteNotifications ?? store,
       () => mainWindow,
       notificationPermissionService,
-      async (sessionRef) => {
-        const window = windowOwner.foreground();
-        await runWindowScopedForWindow(window, () => store.selectSession(sessionRef), {
-          forceActiveWindow: true,
-        });
-      },
+      remoteNotifications
+        ? undefined
+        : async (sessionRef) => {
+            const window = windowOwner.foreground();
+            await runWindowScopedForWindow(window, () => store.selectSession(sessionRef), {
+              forceActiveWindow: true,
+            });
+          },
     );
     stopNotifications = notificationManager.start();
     if (!isDev) {
@@ -1801,6 +1823,9 @@ app
         },
       );
       remoteDesktopClient.subscribe((event: RemoteDesktopEvent) => {
+        if (event.type === "stateChanged") {
+          remoteNotifications?.publish({ ...event.state, ...remoteDesktopClientPreferences });
+        }
         for (const window of windowOwner.allWindows()) {
           if (window.isDestroyed() || window.webContents.isDestroyed()) continue;
           if (event.type === "stateChanged") {
