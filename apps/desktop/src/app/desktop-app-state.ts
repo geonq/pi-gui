@@ -6,7 +6,11 @@ import {
   type Dispatch,
   type SetStateAction,
 } from "react";
-import type { DesktopAppState, SelectedTranscriptRecord } from "../../contracts/desktop-state";
+import type {
+  AppView,
+  DesktopAppState,
+  SelectedTranscriptRecord,
+} from "../../contracts/desktop-state";
 import type { PiDesktopApi } from "../../contracts/ipc";
 
 export type HydrationOperation = "state" | "selected-transcript";
@@ -129,11 +133,24 @@ export function initialDesktopHydrationModel(): DesktopHydrationModel {
   };
 }
 
+/**
+ * The view the user switched to while main has not confirmed it yet. Snapshots that arrive in the
+ * meantime (a running chat publishes many) keep showing it instead of flicking back.
+ */
+let pendingActiveView: { readonly view: AppView; readonly id: number } | undefined;
+let nextPendingViewId = 0;
+
+function withPendingView(state: DesktopAppState): DesktopAppState {
+  return pendingActiveView && state.activeView !== pendingActiveView.view
+    ? { ...state, activeView: pendingActiveView.view }
+    : state;
+}
+
 function mergeLiveSnapshot(
   current: DesktopAppState | null,
   incoming: DesktopAppState,
 ): DesktopAppState {
-  return current && incoming.revision < current.revision ? current : incoming;
+  return current && incoming.revision < current.revision ? current : withPendingView(incoming);
 }
 
 function selectedSessionKey(snapshot: DesktopAppState | null): string {
@@ -491,7 +508,30 @@ export function applySnapshotIfNewer(
   setSnapshot: Dispatch<SetStateAction<DesktopAppState | null>>,
   incoming: DesktopAppState,
 ): void {
-  setSnapshot((current) => (current && incoming.revision < current.revision ? current : incoming));
+  setSnapshot((current) => mergeLiveSnapshot(current, incoming));
+}
+
+/**
+ * Shows `view` at once and lets main catch up. A view switch used to wait for main's reply, which
+ * for a remote client carries the whole app state over the network and took seconds.
+ */
+export function switchActiveView(
+  setSnapshot: Dispatch<SetStateAction<DesktopAppState | null>>,
+  action: () => Promise<DesktopAppState>,
+  view: AppView,
+) {
+  const id = ++nextPendingViewId;
+  pendingActiveView = { view, id };
+  setSnapshot((current) =>
+    current && current.activeView !== view
+      ? { ...current, activeView: view, lastError: undefined }
+      : current,
+  );
+  return updateSnapshot(setSnapshot, () =>
+    action().finally(() => {
+      if (pendingActiveView?.id === id) pendingActiveView = undefined;
+    }),
+  );
 }
 
 export function updateSnapshot(

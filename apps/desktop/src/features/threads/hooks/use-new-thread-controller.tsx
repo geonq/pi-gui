@@ -20,7 +20,7 @@ import {
   type WorkspaceRecord,
 } from "../../../../contracts/desktop-state";
 import { acceptComposerAttachments } from "../../../../contracts/composer-attachments";
-import { updateSnapshot } from "../../../app/desktop-app-state";
+import { switchActiveView, updateSnapshot } from "../../../app/desktop-app-state";
 import {
   extractFilesFromDataTransfer,
   extractImageFilesFromClipboardData,
@@ -196,11 +196,13 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
       resetSurface(workspaceId);
       openedInAppRef.current = true;
       if (api) {
-        void updateSnapshot(setSnapshot, () => api.setActiveView("new-thread")).catch(
-          (error: unknown) => {
-            console.error("[renderer] setActiveView failed", error);
-          },
-        );
+        void switchActiveView(
+          setSnapshot,
+          () => api.setActiveView("new-thread"),
+          "new-thread",
+        ).catch((error: unknown) => {
+          console.error("[renderer] setActiveView failed", error);
+        });
       }
     },
     [api, flushComposerDraft, resetSurface, setSnapshot],

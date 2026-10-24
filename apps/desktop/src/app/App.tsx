@@ -14,7 +14,7 @@ import {
   scheduledOriginsByMessageId,
 } from "../../contracts/scheduled-tasks";
 
-import { updateSnapshot, useDesktopAppState } from "./desktop-app-state";
+import { switchActiveView, updateSnapshot, useDesktopAppState } from "./desktop-app-state";
 
 import { DesktopStartupSurface, toStartupSurfaceState } from "./desktop-recovery";
 
@@ -757,7 +757,7 @@ export default function App() {
       setSettingsSection(section);
     }
 
-    void updateSnapshot(setSnapshot, () => api.setActiveView("settings")).catch(
+    void switchActiveView(setSnapshot, () => api.setActiveView("settings"), "settings").catch(
       (error: unknown) => {
         console.error("[renderer] setActiveView failed", error);
       },
@@ -1052,7 +1052,7 @@ export default function App() {
   const setActiveView = (view: AppView) => {
     if (!api) return;
 
-    void updateSnapshot(setSnapshot, () => api.setActiveView(view)).catch((error: unknown) => {
+    void switchActiveView(setSnapshot, () => api.setActiveView(view), view).catch((error: unknown) => {
       console.error("[renderer] setActiveView failed", error);
     });
   };
@@ -1263,7 +1263,7 @@ export default function App() {
   };
 
   const handleTrySkill = (command: string) => {
-    void updateSnapshot(setSnapshot, () => api.setActiveView("threads")).catch((error: unknown) => {
+    void switchActiveView(setSnapshot, () => api.setActiveView("threads"), "threads").catch((error: unknown) => {
       console.error("[renderer] setActiveView failed", error);
     });
 
