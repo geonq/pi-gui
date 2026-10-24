@@ -1117,7 +1117,7 @@ async function runManualUpdateCheck(): Promise<void> {
     const status = await (appUpdater ?? createAppUpdater()).check();
 
     if (status.phase === "available" && status.latestVersion) {
-      // The manual menu path always confirms with a dialog â€” a notification may
+      // The manual menu path always confirms with a dialog — a notification may
       // be silently suppressed if the OS permission is denied.
       const choice = await showDialog({
         type: "info",
@@ -1179,7 +1179,7 @@ function installApplicationMenu(): void {
         { type: "separator" },
         {
           id: CHECK_FOR_UPDATES_MENU_ITEM_ID,
-          label: "Check for Updatesâ€¦",
+          label: "Check for Updates…",
           click: () => {
             void runManualUpdateCheck().catch((error: unknown) => {
               console.error("[main] runManualUpdateCheck failed", error);
@@ -1218,7 +1218,7 @@ function installApplicationMenu(): void {
         { type: "separator" },
         {
           id: OPEN_FOLDER_MENU_ITEM_ID,
-          label: "Open Folderâ€¦",
+          label: "Open Folder…",
           accelerator: "Command+O",
           click: () => {
             void pickWorkspaceViaDialog(mainWindow).catch((error: unknown) => {
@@ -1650,7 +1650,7 @@ app
           notice.show();
         },
       );
-      // Plan limits hourly too, so "Limited until â€¦" shows everywhere without the Usage page open.
+      // Plan limits hourly too, so "Limited until …" shows everywhere without the Usage page open.
       const refreshLimits = () =>
         void readAccountLimits(path.join(piState, "claude")).catch(() => undefined);
       const firstLimits = setTimeout(refreshLimits, 25_000);
@@ -1994,7 +1994,7 @@ app.on("before-quit", (event) => {
     .catch((error: unknown) => {
       console.error("pi-gui: persistence flush failed during quit:", error);
     });
-  // Never let a hung flush block quit forever â€” quit after a bounded wait.
+  // Never let a hung flush block quit forever — quit after a bounded wait.
   const flushDeadline = new Promise<void>((resolve) => {
     setTimeout(() => {
       console.warn("pi-gui: persistence flush timed out during quit; quitting anyway.");

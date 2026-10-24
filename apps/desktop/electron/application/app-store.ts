@@ -578,7 +578,7 @@ export class DesktopAppStore {
     });
   }
 
-  /* â”€â”€ Lifecycle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Lifecycle ──────────────────────────────────────────── */
 
   async initialize(): Promise<void> {
     if (!this.initPromise) {
@@ -873,7 +873,7 @@ export class DesktopAppStore {
     };
   }
 
-  /* â”€â”€ Workspace methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Workspace methods (delegated) ─────────────────────── */
 
   async addWorkspace(path: string): Promise<DesktopAppState> {
     return this.workspaceOwner.addWorkspace(path);
@@ -1077,7 +1077,7 @@ export class DesktopAppStore {
     return this.workspaceOwner.syncCurrentWorkspace();
   }
 
-  /* â”€â”€ Worktree methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Worktree methods (delegated) ──────────────────────── */
 
   async createWorktree(input: CreateWorktreeInput): Promise<DesktopAppState> {
     return this.workspaceOwner.createWorktree(input);
@@ -1091,7 +1091,7 @@ export class DesktopAppStore {
     return this.workspaceOwner.removeWorktree(input);
   }
 
-  /* â”€â”€ Composer methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Composer methods (delegated) ──────────────────────── */
 
   async updateComposerDraft(
     sessionRef: SessionRef | undefined,
@@ -1222,7 +1222,7 @@ export class DesktopAppStore {
     };
   }
 
-  /* â”€â”€ Session / thread methods (delegated) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Session / thread methods (delegated) ───────────────── */
 
   async startThread(input: StartThreadInput): Promise<DesktopAppState> {
     return this.workspaceOwner.startThread(input);
@@ -1317,7 +1317,7 @@ export class DesktopAppStore {
     return result;
   }
 
-  /* â”€â”€ View / UI state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── View / UI state ───────────────────────────────────── */
 
   async setActiveView(activeView: AppView): Promise<DesktopAppState> {
     await this.initialize();
@@ -1510,7 +1510,7 @@ export class DesktopAppStore {
     return this.refreshState({ clearLastError: true });
   }
 
-  /* â”€â”€ Runtime / model / provider settings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Runtime / model / provider settings ───────────────── */
 
   async loadWorkspaceRuntime(
     workspaceId: string,
@@ -1814,7 +1814,7 @@ export class DesktopAppStore {
     if (builtinName) {
       return this.setBuiltinExtensionEnabled(workspaceId, builtinName, enabled);
     }
-    // pi's own add-ons (`builtin:mcp` â€¦) are switched in pi's global settings, so every
+    // pi's own add-ons (`builtin:mcp` …) are switched in pi's global settings, so every
     // workspace's runtime and threads pick the change up.
     const global = filePath.startsWith("builtin:");
     return this.withRuntimeUpdate(
@@ -1885,7 +1885,7 @@ export class DesktopAppStore {
     return failed.length === 0;
   }
 
-  /* â”€â”€ MCP servers (pi's mcp.json) and code mode â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── MCP servers (pi's mcp.json) and code mode ─────────── */
 
   async listMcpServers(workspaceId: string): Promise<McpServersSnapshot> {
     await this.initialize();
@@ -2085,7 +2085,7 @@ export class DesktopAppStore {
     });
   }
 
-  /* â”€â”€ Internal application infrastructure â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── Internal application infrastructure ──────────────── */
 
   private async initializeInternal(): Promise<void> {
     const startupDiagnostics: StartupDiagnostic[] = [];
@@ -2824,11 +2824,11 @@ export class DesktopAppStore {
     this.publishSelectedTranscriptFor(sessionRef);
   }
 
-  /* â”€â”€ CLI â†” GUI reconcile (startup / workspace switch / window focus) â”€â”€â”€â”€â”€â”€â”€ */
+  /* ── CLI ↔ GUI reconcile (startup / workspace switch / window focus) ─────── */
 
   /**
    * Reconcile the active workspace against pi's on-disk state when the window
-   * gains focus (the Codex-style sync model â€” no live filesystem watcher). Runs
+   * gains focus (the Codex-style sync model — no live filesystem watcher). Runs
    * through a per-workspace serial queue so focus bursts never overlap or race.
    * A rejection is logged and swallowed so it can't wedge the queue.
    */
@@ -3066,8 +3066,8 @@ export class DesktopAppStore {
    * synchronously but `handleSessionEvent` is async (it awaits refreshes,
    * persistence, listeners); firing each one with `void` let them interleave and
    * race the shared session state. A per-key FIFO queue runs them one at a time.
-   * The chained promise is error-recovering â€” mirroring the driver's
-   * `chainRecoveringEventQueue` shape â€” so a rejection is logged and swallowed
+   * The chained promise is error-recovering — mirroring the driver's
+   * `chainRecoveringEventQueue` shape — so a rejection is logged and swallowed
    * rather than leaving the tail rejected and freezing the queue for that session.
    */
   private enqueueSessionEvent(event: SessionDriverEvent, subscriptionKey: string): void {
@@ -3564,7 +3564,7 @@ export class DesktopAppStore {
         } else {
           // The compensating reload that would pull this unknown session into
           // state is skipped while a refresh is already unwinding, and
-          // applySessionEventState then silently no-ops for the missing session â€”
+          // applySessionEventState then silently no-ops for the missing session —
           // so the event (e.g. a rename) is dropped. Make that drop visible.
           console.warn(
             `[app-store] ${event.type} for unknown session ${key} skipped reload ` +
@@ -4255,7 +4255,7 @@ export class DesktopAppStore {
   emit(): DesktopAppState {
     // Revision must be monotonic across publishes: mutation sites bump it from
     // whatever state they captured, and long async builders (refreshState and
-    // friends) can capture before concurrent session events bump it further â€”
+    // friends) can capture before concurrent session events bump it further —
     // assigning a LOWER revision than one already pushed. The renderer drops
     // lower-revision snapshots, so a regression here freezes the UI until main
     // happens to climb back past the renderer's high-water mark. Stamp the
@@ -4289,7 +4289,7 @@ export class DesktopAppStore {
   handleWindowActivation(): void {
     // Reconcile the active workspace on focus so returning to the window always
     // reflects external CLI changes (new sessions, appended turns, edited
-    // settings) â€” the Codex-style sync model, with no live filesystem watcher.
+    // settings) — the Codex-style sync model, with no live filesystem watcher.
     const activeWorkspaceId = this.state.selectedWorkspaceId;
     if (activeWorkspaceId) {
       this.reconcileWorkspaceOnFocus(activeWorkspaceId);
@@ -4867,7 +4867,7 @@ export class DesktopAppStore {
   }
 }
 
-/* â”€â”€ Module-private free functions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Module-private free functions ───────────────────────── */
 
 function updateRecordValue<T>(
   record: Readonly<Record<string, T>>,
@@ -4918,7 +4918,7 @@ function applyModelSettingsSnapshot(
 /**
  * Convert an error into the message shown in `lastError`. A SessionLeasedError
  * means another live pi surface holds the session file, so binding a runtime is
- * refused to avoid forking the conversation â€” turn its raw internal string into
+ * refused to avoid forking the conversation — turn its raw internal string into
  * a user-readable explanation of who holds it and what to do.
  */
 function describeStoreError(error: unknown): string {
@@ -4959,7 +4959,7 @@ async function statMtimeMs(path: string): Promise<number | undefined> {
   }
 }
 
-/** Shows a path under the home directory as `~/â€¦`, the way pi's docs and terminal name it. */
+/** Shows a path under the home directory as `~/…`, the way pi's docs and terminal name it. */
 function withHomeAsTilde(path: string): string {
   const home = homedir();
   return path.startsWith(`${home}${sep}`) ? `~${path.slice(home.length)}` : path;

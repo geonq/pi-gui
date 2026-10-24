@@ -231,7 +231,7 @@ export function NewThreadView({
               textareaLabel="New thread prompt"
               textareaTestId="new-thread-composer"
               textareaClassName="new-thread__textarea"
-              textareaPlaceholder="Ask Pegasus anything, use / for commands and skillsâ€¦"
+              textareaPlaceholder="Ask Pegasus anything, use / for commands and skills…"
               footer={
                 <NewThreadComposerFooter
                   runtime={runtime}
