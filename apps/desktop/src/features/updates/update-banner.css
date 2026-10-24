@@ -1,0 +1,77 @@
+.update-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 12px 12px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line));
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+
+.update-banner--error {
+  border-color: color-mix(in srgb, var(--warning) 45%, var(--line));
+  background: color-mix(in srgb, var(--warning) 10%, var(--surface));
+}
+
+.update-banner__text {
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.update-banner__progress {
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.update-banner__progress > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  transition: width var(--motion-base) var(--ease-out);
+}
+
+.update-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.update-banner__action,
+.update-banner__later {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-size: 12px;
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+}
+
+.update-banner__action {
+  color: var(--link);
+}
+
+.update-banner__later {
+  color: var(--muted);
+}
+
+.update-banner__action:hover,
+.update-banner__later:hover {
+  text-decoration: underline;
+}
+
+.update-banner__action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.update-banner__action:focus-visible,
+.update-banner__later:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 3px;
+  border-radius: var(--radius-xs);
+}

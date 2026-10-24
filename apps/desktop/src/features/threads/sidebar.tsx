@@ -83,6 +83,7 @@ import {
 } from "./thread-groups";
 import { useThreadShortcutHintsVisible } from "./thread-shortcut-hints";
 import { useSignIns } from "../usage/account-state";
+import { UpdateBanner } from "../updates/update-banner";
 import type { Dispatch, SetStateAction } from "react";
 import type { DesktopAppState } from "../../../contracts/desktop-state";
 
@@ -715,6 +716,7 @@ export function Sidebar(props: SidebarProps) {
           </DndContext>
         )}
       </div>
+      <UpdateBanner api={api} />
     </aside>
   );
 }

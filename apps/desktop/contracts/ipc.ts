@@ -51,6 +51,7 @@ import type {
 } from "./desktop-state";
 import type { WorkspaceFolderAdapters } from "./workspace-folders";
 import type { SessionPermission } from "./session-permission";
+import type { UpdateStatus } from "./updates";
 
 export type DesktopNotificationPermissionStatus =
   "granted" | "denied" | "default" | "unsupported" | "unknown";
@@ -248,6 +249,11 @@ export const desktopIpc = {
   ping: "app:ping",
   openExternal: "app:open-external",
   relaunchApplication: "pi-gui:relaunch-application",
+  getAppVersion: "pi-gui:get-app-version",
+  getUpdateStatus: "pi-gui:get-update-status",
+  checkForAppUpdate: "pi-gui:check-for-app-update",
+  installAppUpdate: "pi-gui:install-app-update",
+  updateStatusChanged: "pi-gui:update-status-changed",
 } as const;
 
 export const desktopCommands = {
@@ -937,4 +943,11 @@ export interface PiDesktopApi {
   /** The window came back to the foreground, so outside changes (edits, git) may need rereading. */
   onWindowFocused(listener: () => void): () => void;
   relaunchApplication(): Promise<void>;
+  /** This app's version; the Mac client reads its Windows host's version through it. */
+  getAppVersion(): Promise<string>;
+  getUpdateStatus(): Promise<UpdateStatus>;
+  checkForAppUpdate(): Promise<UpdateStatus>;
+  /** Downloads, verifies and installs the available release; Pegasus restarts when it is done. */
+  installAppUpdate(): Promise<UpdateStatus>;
+  onUpdateStatus(listener: (status: UpdateStatus) => void): () => void;
 }

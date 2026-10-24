@@ -17,7 +17,7 @@ const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhi
 export type RemoteDesktopInvocation =
   | { readonly method: "sendText"; readonly args: readonly [string] }
   | {
-      readonly method: "getState" | "getSelectedTranscript" | "cancelCurrentRun";
+      readonly method: "getState" | "getAppVersion" | "getSelectedTranscript" | "cancelCurrentRun";
       readonly args: readonly [];
     }
   | {
@@ -112,6 +112,7 @@ export function validateRemoteDesktopInvocation(
   const allowedMethod = method as RemoteDesktopMethod;
   switch (allowedMethod) {
     case "getState":
+    case "getAppVersion":
     case "getSelectedTranscript":
     case "cancelCurrentRun": {
       expectArgs(args, 0);

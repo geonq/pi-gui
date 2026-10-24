@@ -69,7 +69,9 @@ import { resolveExistingWorkspacePath } from "./platform/files/workspace-paths";
 import { MAIN_DEV_RELOAD_MARKER } from "./dev-reload-main-probe";
 import { NotificationManager } from "./platform/notification-manager";
 import { NotificationPermissionService } from "./platform/notification-permission";
-import { checkForUpdate, initUpdateChecker, openReleasesPage } from "./platform/update-checker";
+import { openReleasesPage } from "./platform/update-checker";
+import { AppUpdater } from "./platform/update-installer";
+import { registerUpdateIpc } from "./platform/register-update-ipc";
 import { ThemeManager } from "./platform/theme-manager";
 import { windowBackgroundFor } from "../contracts/theme";
 import { TerminalService } from "./platform/terminal-service";
@@ -357,6 +359,7 @@ async function runScheduledTaskRuntimeToolForTest(
 
 let stopNotifications: (() => void) | undefined;
 let stopUpdateChecker: (() => void) | undefined;
+let appUpdater: AppUpdater | undefined;
 let signIns: ReturnType<typeof startSignInMonitor> | undefined;
 let stopLimitRefresh: (() => void) | undefined;
 let stopPruningTerminals: (() => void) | undefined;
@@ -1089,37 +1092,56 @@ async function pickWorkspaceViaDialog(
   return runWindowScopedForWindow(window, () => addPickedWorkspace(window, workspacePath));
 }
 
+/** One updater per app; the Mac client also learns its Windows host's version through it. */
+function createAppUpdater(): AppUpdater {
+  appUpdater ??= new AppUpdater({
+    canInstall: app.isPackaged && !isDev && process.env.PI_APP_TEST_MODE === undefined,
+    ...(remoteDesktopClientMode
+      ? {
+          getHostVersion: async () => {
+            const version = await remoteDesktopClient?.invoke("getAppVersion", []);
+            return typeof version === "string" ? version : undefined;
+          },
+        }
+      : {}),
+  });
+  return appUpdater;
+}
+
 async function runManualUpdateCheck(): Promise<void> {
   const window = mainWindow && canPublishToWindow(mainWindow) ? mainWindow : undefined;
   const showDialog = (options: MessageBoxOptions) =>
     window ? dialog.showMessageBox(window, options) : dialog.showMessageBox(options);
 
   try {
-    const result = await checkForUpdate();
+    const status = await (appUpdater ?? createAppUpdater()).check();
 
-    if (result.status === "update-available") {
+    if (status.phase === "available" && status.latestVersion) {
       // The manual menu path always confirms with a dialog â€” a notification may
       // be silently suppressed if the OS permission is denied.
       const choice = await showDialog({
         type: "info",
         title: "Pegasus",
-        message: `Version ${result.latestVersion} is available.`,
-        detail: `You have ${result.currentVersion}.`,
-        buttons: ["Download", "Later"],
+        message: `Version ${status.latestVersion} is available.`,
+        detail: status.canInstall
+          ? `You have ${status.currentVersion}. Pegasus restarts to finish the update.`
+          : `You have ${status.currentVersion}.`,
+        buttons: [status.canInstall ? "Update now" : "Download", "Later"],
         defaultId: 0,
         cancelId: 1,
       });
       if (choice.response === 0) {
-        await openReleasesPage(result.releaseUrl);
+        if (status.canInstall) await appUpdater?.install();
+        else if (status.releaseUrl) await openReleasesPage(status.releaseUrl);
       }
       return;
     }
 
-    if (result.status === "up-to-date") {
+    if (!status.message) {
       await showDialog({
         type: "info",
         title: "Pegasus",
-        message: `You're up to date on version ${result.currentVersion}.`,
+        message: `You're up to date on version ${status.currentVersion}.`,
         buttons: ["OK"],
       });
       return;
@@ -1129,7 +1151,7 @@ async function runManualUpdateCheck(): Promise<void> {
       type: "warning",
       title: "Pegasus",
       message: "Could not check for updates right now.",
-      detail: result.message,
+      detail: status.message,
       buttons: ["OK"],
     });
   } catch (error) {
@@ -1577,6 +1599,7 @@ app
         },
       });
     }
+    registerUpdateIpc(windowOwner, createAppUpdater());
     notificationPermissionService = new NotificationPermissionService(() => mainWindow);
     notificationPermissionService.subscribe((status) => {
       for (const window of windowOwner.allWindows()) {
@@ -1598,7 +1621,7 @@ app
     );
     stopNotifications = notificationManager.start();
     if (!isDev) {
-      stopUpdateChecker = initUpdateChecker();
+      stopUpdateChecker = createAppUpdater().start();
     }
     if (!remoteDesktopClientMode && !isDev && !process.env.PI_APP_TEST_MODE) {
       const piState = path.dirname(resolveAgentDir());

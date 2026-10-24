@@ -66,6 +66,12 @@ const LOCAL_METHODS = new Set<PropertyKey>([
   "toggleWindowMaximize",
   "openExternal",
   "relaunchApplication",
+  // Each app updates itself; the Mac reads its host's version in main, not through the renderer.
+  "getAppVersion",
+  "getUpdateStatus",
+  "checkForAppUpdate",
+  "installAppUpdate",
+  "onUpdateStatus",
   "getPathForFile",
   "readClipboardImage",
   "onPendingComposerDraftFlush",

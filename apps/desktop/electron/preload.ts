@@ -31,6 +31,7 @@ import {
 import type { ExtensionActionEffect, ExtensionActionRequest } from "../contracts/extension-actions";
 import type { ClipboardImageRead } from "../contracts/composer-attachments";
 import type { SessionPermission } from "../contracts/session-permission";
+import type { UpdateStatus } from "../contracts/updates";
 import type { AccountLimits, AccountStatus, SignInStatus, UsageReport } from "../contracts/usage";
 import type { SaveTaskWorkbenchTemplateInput, TaskWorkbenchTemplate } from "../contracts/workbench";
 import type {
@@ -657,6 +658,18 @@ const localPiDesktopApi = {
     };
   },
   relaunchApplication: () => ipcRenderer.invoke(desktopIpc.relaunchApplication) as Promise<void>,
+  getAppVersion: () => ipcRenderer.invoke(desktopIpc.getAppVersion) as Promise<string>,
+  getUpdateStatus: () => ipcRenderer.invoke(desktopIpc.getUpdateStatus) as Promise<UpdateStatus>,
+  checkForAppUpdate: () =>
+    ipcRenderer.invoke(desktopIpc.checkForAppUpdate) as Promise<UpdateStatus>,
+  installAppUpdate: () => ipcRenderer.invoke(desktopIpc.installAppUpdate) as Promise<UpdateStatus>,
+  onUpdateStatus: (listener: (status: UpdateStatus) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => listener(status);
+    ipcRenderer.on(desktopIpc.updateStatusChanged, handler);
+    return () => {
+      ipcRenderer.removeListener(desktopIpc.updateStatusChanged, handler);
+    };
+  },
 } satisfies PiDesktopApi;
 
 const piDesktopApi =

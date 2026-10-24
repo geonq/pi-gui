@@ -24,14 +24,40 @@ export type UpdateCheckResult =
       latestVersion: string;
 
       releaseUrl: string;
+
+      /** Downloadable files of that release (installers, SHA256SUMS.txt). */
+      assets: readonly ReleaseAsset[];
     }
   | { status: "error"; message: string };
+
+export interface ReleaseAsset {
+  readonly name: string;
+  readonly url: string;
+  readonly size: number;
+}
 
 export type GitHubRelease = {
   tag_name?: string;
 
   html_url?: string;
+
+  assets?: readonly { name?: unknown; browser_download_url?: unknown; size?: unknown }[];
 };
+
+/** Only assets served from this repository's own release downloads are used. */
+export function releaseAssets(release: GitHubRelease): readonly ReleaseAsset[] {
+  return (release.assets ?? []).flatMap((asset) => {
+    if (typeof asset.name !== "string" || typeof asset.browser_download_url !== "string") return [];
+    if (!asset.browser_download_url.startsWith(`${RELEASES_PAGE}/download/`)) return [];
+    return [
+      {
+        name: asset.name,
+        url: asset.browser_download_url,
+        size: typeof asset.size === "number" ? asset.size : 0,
+      },
+    ];
+  });
+}
 
 export function openReleasesPage(releaseUrl = RELEASES_PAGE): Promise<void> {
   return shell.openExternal(releaseUrl);
@@ -144,6 +170,8 @@ export async function checkForUpdate(): Promise<UpdateCheckResult> {
       latestVersion: latest,
 
       releaseUrl: releaseUrlFor(release),
+
+      assets: releaseAssets(release),
     };
   }
 

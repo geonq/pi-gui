@@ -3,6 +3,7 @@ import type { DesktopAppState, SelectedTranscriptRecord } from "../../contracts/
 /** Methods with safe, view-scoped public IPC handlers. Provider-secret methods stay excluded. */
 export const REMOTE_DESKTOP_PI_METHODS = [
   "getState",
+  "getAppVersion",
   "getSelectedTranscript",
   "getSignIns",
   "getAccountStates",
