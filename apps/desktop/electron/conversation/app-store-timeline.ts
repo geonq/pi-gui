@@ -214,6 +214,12 @@ export function applyTimelineEvent(
         const activity = makeActivityItem("Thinking…", { tone: "working" });
         state.activeWorkingActivityBySession.set(key, activity.id);
         transcript.push(activity);
+      } else if (event.snapshot.status !== "running" && state.runningSinceBySession.has(key)) {
+        // A run the owner stopped ends with this update alone: the driver sends no runCompleted
+        // or runFailed for a cancellation. Completion and failure arrive before their own update,
+        // so only a stopped run is still open here; without this its "Thinking…" stayed forever.
+        clearRunState(transcript, key, event.sessionRef, state);
+        transcript.push(makeActivityItem("Stopped", { metadata: relativeDetail(event.timestamp) }));
       }
       break;
     case "queuedMessageStarted":
