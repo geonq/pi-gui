@@ -629,10 +629,12 @@
   background: var(--line);
 }
 
+/* Centred with top/calc, not translateY: the shared button press scale replaces `transform`, and a
+   translate here made the chevron jump 8px on mouse-down, so a normal click landed on the row. */
 .session-row__fold {
   position: absolute;
   left: 8px;
-  top: 50%;
+  top: calc(50% - 8px);
   z-index: 1;
   width: 16px;
   height: 16px;
@@ -642,8 +644,9 @@
   border-radius: var(--radius-sm);
   color: var(--muted-strong);
   opacity: 0;
-  transform: translateY(-50%);
-  transition: opacity var(--motion-base) var(--ease-out);
+  transition:
+    opacity var(--motion-base) var(--ease-out),
+    background-color var(--motion-base) var(--ease-out);
 }
 
 .session-row__fold svg {
