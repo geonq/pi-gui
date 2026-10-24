@@ -37,9 +37,13 @@ export function registerWorkspaceFolderIpc(
           return result;
         });
       }
-      const result = await adapter.open(rootId, relativePath);
-      if (result.device !== "mac") throw new Error("Mac folder adapter result is invalid.");
-      return result;
+      // A Mac folder can register a Pi project, so it runs as a state action like Windows folders.
+      const { opened, state } = await windows.runStateResultAction(window, async () => {
+        const result = await adapter.open(rootId, relativePath);
+        if (result.device !== "mac") throw new Error("Mac folder adapter result is invalid.");
+        return { opened: result, state: result.state ?? (await windows.stateForWindow(window)) };
+      });
+      return opened.state ? { ...opened, state } : opened;
     },
   );
   handle(

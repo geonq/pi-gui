@@ -75,3 +75,65 @@ test("Windows folder service registers only contained folders and returns their 
     }
   }
 });
+
+test("Mac folders register their stand-in project folder only inside the Mac projects root", async () => {
+  const temporaryRoot = await realpath(
+    await mkdtemp(path.join(os.tmpdir(), "pi-workspace-folder-service-mac-")),
+  );
+  const macProjectsPath = path.join(temporaryRoot, "mac");
+  const standIn = path.join(macProjectsPath, "Homepage");
+  const outside = path.join(temporaryRoot, "elsewhere");
+  await mkdir(standIn, { recursive: true });
+  await mkdir(outside);
+  let projectPath = standIn;
+  const registeredPaths: string[] = [];
+  const macRoots = [{ id: "macFiles", label: "Mac", canCreate: true }];
+  const service = createWorkspaceFolderService({
+    windowsRoots: [],
+    macProjectsPath,
+    mac: {
+      listRoots: async () => macRoots,
+      list: async (rootId) => ({
+        rootId,
+        rootLabel: "Mac",
+        relativePath: "",
+        folders: [],
+        truncated: false,
+      }),
+      // The host module answers with its local stand-in path, which never reaches the renderer.
+      open: async () => ({ device: "mac", projectPath }) as never,
+      create: async () => ({ device: "mac", relativePath: "New" }),
+    },
+    addWorkspacePath: async (workspacePath) => {
+      registeredPaths.push(workspacePath);
+      const workspace = {
+        id: workspacePath,
+        name: path.basename(workspacePath),
+        path: workspacePath,
+        lastOpenedAt: "2026-10-24T00:00:00.000Z",
+        kind: "primary" as const,
+        sessions: [],
+      };
+      return {
+        ...createEmptyDesktopAppState(),
+        workspaces: [workspace],
+        selectedWorkspaceId: workspace.id,
+      };
+    },
+  });
+
+  try {
+    const opened = await service.adapters.mac!.open("macFiles", "Arbeit/Homepage");
+    expect(opened).toMatchObject({ device: "mac", workspaceId: standIn });
+    expect(opened).not.toHaveProperty("projectPath");
+    expect(registeredPaths).toEqual([standIn]);
+
+    projectPath = outside;
+    await expect(service.adapters.mac!.open("macFiles", "Other")).rejects.toThrow(
+      "outside its authorized root",
+    );
+    expect(registeredPaths).toEqual([standIn]);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+});

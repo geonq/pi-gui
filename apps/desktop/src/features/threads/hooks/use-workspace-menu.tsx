@@ -232,6 +232,13 @@ export function useWorkspaceMenu(params: UseWorkspaceMenuParams): WorkspaceMenuS
       return true;
     }
 
+    // A Mac folder opened as a Pi project arrives with the state that registered it.
+    if (result.state) {
+      const state = result.state;
+      await updateSnapshot(setSnapshot, async () => state);
+      return true;
+    }
+
     const workspaceId = result.workspaceId;
     if (api && workspaceId && workspaces.some((workspace) => workspace.id === workspaceId)) {
       await updateSnapshot(setSnapshot, () => api.selectWorkspace(workspaceId));

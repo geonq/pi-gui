@@ -54,6 +54,7 @@ export interface RemoteDesktopBrokerOptions {
     | "viewForWindow"
     | "isPassiveRemoteSender"
     | "runStateResultAction"
+    | "stateForWindow"
   >;
   /** Uses the host's no-attachment background-instruction path for an existing thread. */
   readonly sendText: (input: {
@@ -284,12 +285,26 @@ export class RemoteDesktopBroker {
     this.assertFolderRoot(device, rootId);
     const adapter = this.folderAdapter(device);
     if (device === "mac") {
-      const result = await adapter.open(rootId, relativePath);
-      if (result.device !== "mac") throw new Error("Mac folder adapter result is invalid.");
-      if (result.workspaceId && !this.workspaceIds.has(result.workspaceId)) {
+      const { opened, state } = await this.options.windows.runStateResultAction(
+        this.window,
+        async () => {
+          const result = await adapter.open(rootId, relativePath);
+          if (result.device !== "mac") throw new Error("Mac folder adapter result is invalid.");
+          return {
+            opened: result,
+            state: result.state ?? (await this.options.windows.stateForWindow(this.window)),
+          };
+        },
+      );
+      if (opened.state && opened.workspaceId) {
+        // The host folder service registered this Mac project inside its trusted stand-in root.
+        this.workspaceIds.add(opened.workspaceId);
+        return { ...opened, state: filterRemoteState(state, this.workspaceIds) };
+      }
+      if (opened.workspaceId && !this.workspaceIds.has(opened.workspaceId)) {
         throw new Error("This Mac folder is not mapped to an authorized workspace.");
       }
-      return result;
+      return opened;
     }
     const result = await this.options.windows.runStateResultAction(this.window, async () => {
       const opened = await adapter.open(rootId, relativePath);

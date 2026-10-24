@@ -180,7 +180,7 @@ export function WorkspaceFolderPicker({
       if (selected) onClose();
       else {
         setNotice(
-          "This Mac location is available for browsing, but it is not linked to an approved project and was not added to Chats.",
+          "Open a folder inside this location; the location itself cannot be a project.",
         );
       }
     } catch (cause) {
@@ -206,7 +206,7 @@ export function WorkspaceFolderPicker({
         setCreateMode(false);
         setFolderName("");
         setNotice(
-          "Folder created on Mac. It remains in this browser and was not registered as a Windows project.",
+          "Folder created on the Mac. Open it to make it a project.",
         );
       }
     } catch (cause) {
@@ -430,7 +430,7 @@ export function WorkspaceFolderPicker({
           <span className="workspace-folder-picker__muted">
             {device === "windows"
               ? "Windows folders become project folders; no chat is created."
-              : "Mac locations can be browsed without registering a Windows project."}
+              : "Mac folders become project folders; Pi works in them on the Mac."}
           </span>
           <div className="tree-modal__actions">
             {!createMode ? (

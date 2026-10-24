@@ -34,6 +34,8 @@ export type WorkspaceFolderOpenResult =
   | {
       readonly device: "mac";
       readonly workspaceId?: string;
+      /** Present when the Mac folder was registered as a Pi project (workspaceId is then set). */
+      readonly state?: DesktopAppState;
     };
 
 export type WorkspaceFolderCreateResult =

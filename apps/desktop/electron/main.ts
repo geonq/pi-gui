@@ -199,6 +199,8 @@ let remoteDesktopClient: RemoteDesktopHttpClient | undefined;
 let remoteDesktopHost: RemoteDesktopHttpHost | undefined;
 let remoteDesktopHostConfig: RemoteDesktopHostFileConfig | undefined;
 let macWorkspaceFolderAdapter: WorkspaceFolderAdapter | undefined;
+// Stand-ins for Mac folders opened as Pi projects (beside the Mac discovery file in .state).
+let macProjectsPath: string | undefined;
 let remoteDesktopClientPreferences: RemoteDesktopClientPreferences =
   DEFAULT_REMOTE_DESKTOP_CLIENT_PREFERENCES;
 const remoteDesktopBrokers = new Set<RemoteDesktopBroker>();
@@ -1423,6 +1425,11 @@ app
           remoteDesktopHostConfig.macFolders,
         );
         traceStartupDuration("Mac folder adapter", macFolderAdapterStarted);
+        macProjectsPath = path.join(
+          path.dirname(path.resolve(remoteDesktopHostConfig.macFolders.configPath)),
+          "workspaces",
+          "mac",
+        );
       }
 
       const createRootIds = new Set(
@@ -1436,7 +1443,7 @@ app
           new Set([...allWorkspaceIds, ...createRootIds]),
           createRootIds,
         ),
-        ...(macWorkspaceFolderAdapter ? { mac: macWorkspaceFolderAdapter } : {}),
+        ...(macWorkspaceFolderAdapter ? { mac: macWorkspaceFolderAdapter, macProjectsPath } : {}),
         addWorkspacePath: (workspacePath) => store.addWorkspace(workspacePath),
       });
       registerWorkspaceFolderIpc(windowOwner, localFolderService.adapters);
@@ -1799,7 +1806,9 @@ app
           const visibleRootIds = new Set([...client.workspaceIds, ...folderRootIds]);
           const clientFolderService = createWorkspaceFolderService({
             windowsRoots: createWindowsWorkspaceFolderRoots(store, visibleRootIds, folderRootIds),
-            ...(macWorkspaceFolderAdapter ? { mac: macWorkspaceFolderAdapter } : {}),
+            ...(macWorkspaceFolderAdapter
+              ? { mac: macWorkspaceFolderAdapter, macProjectsPath }
+              : {}),
             addWorkspacePath: (workspacePath) => store.addWorkspace(workspacePath),
           });
           const authorizedWorkspaceIds = new Set(client.workspaceIds);
@@ -1816,6 +1825,21 @@ app
                 }
               } catch {
                 // Missing and non-canonical paths are not eligible descendants of a trusted root.
+              }
+            }
+          }
+          // Mac projects opened earlier stay available to the Mac after a restart.
+          if (macProjectsPath && macWorkspaceFolderAdapter) {
+            const macProjects = createRemoteWorkspaceFolders(
+              new Map([["macProjects", macProjectsPath]]),
+            );
+            for (const record of store.getWorkspaceRecords()) {
+              try {
+                if (await macProjects.contains("macProjects", record.path)) {
+                  authorizedWorkspaceIds.add(record.id);
+                }
+              } catch {
+                // A removed stand-in folder is simply no longer a Mac project.
               }
             }
           }

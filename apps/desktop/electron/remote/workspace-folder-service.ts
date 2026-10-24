@@ -2,6 +2,7 @@ import type { DesktopAppState } from "../../contracts/desktop-state";
 import type {
   WorkspaceFolderAdapters,
   WorkspaceFolderListing,
+  WorkspaceFolderOpenResult,
   WorkspaceFolderRoot,
 } from "../../contracts/workspace-folders";
 import {
@@ -22,6 +23,8 @@ export interface WorkspaceFolderService {
 export function createWorkspaceFolderService(options: {
   readonly windowsRoots: readonly WindowsWorkspaceFolderRootConfig[];
   readonly mac?: WorkspaceFolderAdapters["mac"];
+  /** Local folder holding the stand-ins for Mac folders opened as Pi projects. */
+  readonly macProjectsPath?: string;
   readonly addWorkspacePath: (path: string) => Promise<DesktopAppState>;
 }): WorkspaceFolderService {
   const windowsRootPaths = new Map(options.windowsRoots.map((root) => [root.id, root.path]));
@@ -79,10 +82,47 @@ export function createWorkspaceFolderService(options: {
       };
     },
   };
+  const macProjects = options.macProjectsPath
+    ? createRemoteWorkspaceFolders(new Map([["macProjects", options.macProjectsPath]]))
+    : undefined;
+  const macAdapter = options.mac;
+  // The host Mac module answers a project folder with the path of its local stand-in; register
+  // that path as a workspace, and only when it is one of the Mac project stand-ins.
+  const mac: WorkspaceFolderAdapters["mac"] = macAdapter && {
+    listRoots: () => macAdapter.listRoots(),
+    list: (rootId, relativePath) => macAdapter.list(rootId, relativePath),
+    create: (rootId, parentRelativePath, name) =>
+      macAdapter.create(rootId, parentRelativePath, name),
+    async open(rootId, relativePath) {
+      const opened = (await macAdapter.open(rootId, relativePath)) as WorkspaceFolderOpenResult & {
+        readonly projectPath?: unknown;
+      };
+      if (opened.device !== "mac") throw new Error("Mac folder adapter result is invalid.");
+      if (opened.projectPath === undefined) {
+        return opened.workspaceId
+          ? { device: "mac", workspaceId: opened.workspaceId }
+          : { device: "mac" };
+      }
+      if (
+        typeof opened.projectPath !== "string" ||
+        !macProjects ||
+        !(await macProjects.contains("macProjects", opened.projectPath))
+      ) {
+        throw new RemoteWorkspaceFolderError(
+          "INVALID_PATH",
+          "The Mac project folder is outside its authorized root.",
+        );
+      }
+      const state = await options.addWorkspacePath(opened.projectPath);
+      const workspace = state.workspaces.find((entry) => entry.id === state.selectedWorkspaceId);
+      if (!workspace) throw new Error("The Mac project could not be registered.");
+      return { device: "mac", workspaceId: workspace.id, state };
+    },
+  };
   return {
     adapters: {
       windows,
-      ...(options.mac ? { mac: options.mac } : {}),
+      ...(mac ? { mac } : {}),
     },
     windowsRootPaths,
   };
