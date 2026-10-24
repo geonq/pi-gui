@@ -109,9 +109,13 @@ function rankBreakdowns(
     .slice(0, limit);
 }
 
+let lastUsageReport: UsageReport | null = null;
+
 /** Token usage per account and model across every saved session, drawn with Bklit UI charts. */
 export function UsageView({ workspaces }: { readonly workspaces: readonly WorkspaceRecord[] }) {
-  const [report, setReport] = useState<UsageReport | null>(null);
+  // The last report shows at once while the new one is read (every saved thread, over the network
+  // for the Mac), so going back to Usage no longer starts from an empty page.
+  const [report, setReport] = useState<UsageReport | null>(() => lastUsageReport);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   // Opens on the full history; shorter periods are one click away.
@@ -152,6 +156,7 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
     window.piApp
       ?.getUsageReport()
       .then((next) => {
+        lastUsageReport = next;
         setReport(next);
         setError("");
       })

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type {
   AccountLimits,
   AccountStatus,
@@ -93,28 +93,62 @@ export function providerStatuses(
 
 const snapshot = (value: unknown) => JSON.stringify(value instanceof Map ? [...value] : value);
 
-/** Re-reads on an interval but only re-renders when the answer actually changed. */
-function usePolled<T>(read: () => Promise<T> | undefined, initial: T, everyMs: number): T {
-  const [value, setValue] = useState<T>(initial);
-  useEffect(() => {
-    let live = true;
-    const load = () => {
-      read()
-        ?.then(
-          (next) =>
-            live &&
-            setValue((previous) => (snapshot(previous) === snapshot(next) ? previous : next)),
-        )
-        .catch(() => undefined);
-    };
-    load();
-    const timer = window.setInterval(load, everyMs);
+interface PolledStore<T> {
+  value: T;
+  readAt: number;
+  inFlight: boolean;
+  timer: number | undefined;
+  readonly listeners: Set<() => void>;
+}
+
+/**
+ * One poller per reader for the whole window, however many components show its answer: each used to
+ * poll on its own, and for the Mac every read is a round trip to Windows. The last answer outlives
+ * the components, so a page opened again shows it at once and re-reads only once it is stale.
+ */
+function polledStore<T>(read: () => Promise<T> | undefined, initial: T, everyMs: number) {
+  const store: PolledStore<T> = {
+    value: initial,
+    readAt: 0,
+    inFlight: false,
+    timer: undefined,
+    listeners: new Set(),
+  };
+  const load = () => {
+    if (store.inFlight) return;
+    const request = read();
+    if (!request) return;
+    store.inFlight = true;
+    request
+      .then((next) => {
+        store.readAt = Date.now();
+        if (snapshot(store.value) === snapshot(next)) return;
+        store.value = next;
+        for (const listener of store.listeners) listener();
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        store.inFlight = false;
+      });
+  };
+  const subscribe = (listener: () => void) => {
+    store.listeners.add(listener);
+    if (store.listeners.size === 1) {
+      if (Date.now() - store.readAt >= everyMs) load();
+      store.timer = window.setInterval(load, everyMs);
+    }
     return () => {
-      live = false;
-      window.clearInterval(timer);
+      store.listeners.delete(listener);
+      if (store.listeners.size === 0) {
+        window.clearInterval(store.timer);
+        store.timer = undefined;
+      }
     };
-  }, [read, everyMs]);
-  return value;
+  };
+  const getValue = () => store.value;
+  return function usePolledValue(): T {
+    return useSyncExternalStore(subscribe, getValue);
+  };
 }
 
 const readAccounts = () =>
@@ -128,10 +162,13 @@ const readSignIns = () => window.piApp?.getSignIns();
 const readCachedLimits = () => window.piApp?.getAccountLimits({ cachedOnly: true });
 const NO_ACCOUNTS: ReadonlyMap<string, AccountStatus> = new Map();
 const NONE: readonly never[] = [];
+const useAccounts = polledStore(readAccounts, NO_ACCOUNTS, 5_000);
+const useSignInList = polledStore<readonly SignInStatus[]>(readSignIns, NONE, 60_000);
+const useCachedLimits = polledStore<readonly AccountLimits[]>(readCachedLimits, NONE, 60_000);
 
 /** The hourly sign-in check (memory read in the main process). */
 export function useSignIns(): readonly SignInStatus[] {
-  return usePolled(readSignIns, NONE, 60_000);
+  return useSignInList();
 }
 
 /**
@@ -141,21 +178,24 @@ export function useSignIns(): readonly SignInStatus[] {
 export function useProviderStatuses(
   limits?: readonly AccountLimits[],
 ): ReadonlyMap<string, ProviderStatus> {
-  const accounts = usePolled(readAccounts, NO_ACCOUNTS, 5_000);
+  const accounts = useAccounts();
   const signIns = useSignIns();
-  const cached = usePolled(readCachedLimits, NONE, 60_000);
+  const cached = useCachedLimits();
   return useMemo(
     () => providerStatuses(accounts, signIns, limits ?? cached),
     [accounts, signIns, limits, cached],
   );
 }
 
+let lastReadLimits: readonly AccountLimits[] = [];
+
 /**
  * Plan windows per account: read when Usage opens and on refresh, never on a timer. The main
  * process answers from a 5-minute cache, so neither path can hammer the providers.
  */
 export function useAccountLimits() {
-  const [limits, setLimits] = useState<readonly AccountLimits[]>([]);
+  // Opens on the last reading (marked "Updating") instead of an empty card.
+  const [limits, setLimits] = useState<readonly AccountLimits[]>(() => lastReadLimits);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const requestId = useRef(0);
@@ -171,6 +211,7 @@ export function useAccountLimits() {
     }
     request
       .then((next) => {
+        lastReadLimits = next;
         if (id === requestId.current) setLimits(next);
       })
       .catch(() => {
