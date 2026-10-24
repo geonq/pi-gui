@@ -446,6 +446,24 @@ export function useNewThreadController(params: UseNewThreadControllerParams) {
     );
   }, [rootWorkspaceOptions]);
 
+  // A folder opened while New chat is on screen (Windows or Mac picker) is where the next chat
+  // starts; without this the composer kept pointing at the previously chosen folder.
+  const knownWorkspaceIdsRef = useRef<ReadonlySet<string> | undefined>(undefined);
+  useEffect(() => {
+    if (!snapshot) {
+      return;
+    }
+    const known = knownWorkspaceIdsRef.current;
+    knownWorkspaceIdsRef.current = new Set(snapshot.workspaces.map((workspace) => workspace.id));
+    if (!known || snapshot.activeView !== "new-thread") {
+      return;
+    }
+    const opened = snapshot.workspaces.find((workspace) => !known.has(workspace.id));
+    if (opened) {
+      setPendingWorkspaceId(opened.id);
+    }
+  }, [snapshot]);
+
   useEffect(() => {
     if (!snapshot || !pendingWorkspaceId) {
       return;

@@ -47,7 +47,65 @@ test("remote method policy scopes workspaces and rejects unsafe public methods a
       ],
       workspaceScope,
     ),
+  ).toThrow("Attachments cannot be sent from a remote client");
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "startThread",
+      [{ rootWorkspaceId: allowedWorkspaceId, environment: "local", hostPath: "D:\\" }],
+      workspaceScope,
+    ),
   ).toThrow("invalid fields");
+});
+
+test("remote new chats accept the composer's empty attachment list and extension flags", () => {
+  // Exactly what the Mac composer sends for a first prompt with nothing attached.
+  expect(
+    validateRemoteDesktopInvocation(
+      "startThread",
+      [
+        {
+          rootWorkspaceId: allowedWorkspaceId,
+          environment: "local",
+          prompt: "Reply with only the word ok.",
+          attachments: [],
+          provider: "openai",
+          modelId: "gpt-6-luna",
+          thinkingLevel: "max",
+          extensionFlags: { plan: false, persona: "luna" },
+        },
+      ],
+      workspaceScope,
+    ),
+  ).toEqual({
+    method: "startThread",
+    args: [
+      {
+        rootWorkspaceId: allowedWorkspaceId,
+        environment: "local",
+        prompt: "Reply with only the word ok.",
+        provider: "openai",
+        modelId: "gpt-6-luna",
+        thinkingLevel: "max",
+        extensionFlags: { plan: false, persona: "luna" },
+      },
+    ],
+  });
+  for (const extensionFlags of [{ plan: 1 }, { "": true }, { plan: "x".repeat(5000) }, []]) {
+    expect(() =>
+      validateRemoteDesktopInvocation(
+        "startThread",
+        [{ rootWorkspaceId: allowedWorkspaceId, environment: "local", extensionFlags }],
+        workspaceScope,
+      ),
+    ).toThrow();
+  }
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "startThread",
+      [{ rootWorkspaceId: allowedWorkspaceId, environment: "local", attachments: "none" }],
+      workspaceScope,
+    ),
+  ).toThrow("Attachments cannot be sent");
 });
 
 test("remote usage reads allow only the documented cachedOnly metadata option", () => {

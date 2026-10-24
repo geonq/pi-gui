@@ -7,7 +7,7 @@ import type {
 import type { WorkspaceFolderDevice } from "../../contracts/workspace-folders";
 import { isSessionPermission, type SessionPermission } from "../../contracts/session-permission";
 import { sessionKey, type HostUiResponse } from "@pi-gui/session-driver";
-import { expectHostUiResponse } from "../ipc/request-validation";
+import { expectExtensionFlags, expectHostUiResponse } from "../ipc/request-validation";
 import type { RemoteDesktopMethod, RemoteDesktopPiMethod } from "./remote-desktop-protocol";
 import { isRemoteDesktopPiMethod } from "./remote-desktop-protocol";
 
@@ -257,9 +257,32 @@ export function validateRemoteDesktopInvocation(
         "provider",
         "modelId",
         "thinkingLevel",
+        "attachments",
+        "extensionFlags",
       ]);
       if (input.environment !== "local" && input.environment !== "worktree") {
         throw new TypeError("Thread environment is invalid.");
+      }
+      // The composer always sends its attachment list. A remote client's files live on its own
+      // disk, so only the empty list is accepted, as sendText takes text alone.
+      if (
+        input.attachments !== undefined &&
+        (!Array.isArray(input.attachments) || input.attachments.length > 0)
+      ) {
+        throw new TypeError("Attachments cannot be sent from a remote client yet.");
+      }
+      const extensionFlags =
+        input.extensionFlags === undefined
+          ? undefined
+          : expectExtensionFlags(input.extensionFlags, "extensionFlags");
+      if (
+        extensionFlags &&
+        Object.entries(extensionFlags).some(
+          ([name, value]) =>
+            name.length > 128 || (typeof value === "string" && value.length > 4096),
+        )
+      ) {
+        throw new TypeError("Extension flags are too long.");
       }
       const prompt = optionalString(input.prompt, "prompt", MAX_TEXT_BYTES);
       const provider = optionalString(input.provider, "provider", 256);
@@ -273,6 +296,7 @@ export function validateRemoteDesktopInvocation(
         ...(provider === undefined ? {} : { provider }),
         ...(modelId === undefined ? {} : { modelId }),
         ...(thinkingLevel === undefined ? {} : { thinkingLevel }),
+        ...(extensionFlags === undefined ? {} : { extensionFlags }),
       };
       return { method: allowedMethod, args: [safeInput] };
     }

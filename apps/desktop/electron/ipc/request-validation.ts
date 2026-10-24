@@ -264,7 +264,7 @@ export function expectStartThreadInput(value: unknown): StartThreadInput {
 }
 
 /** Flag values keyed by flag name; which names and types are valid is checked against the runtime in main. */
-function expectExtensionFlags(value: unknown, label: string): ExtensionFlagValues {
+export function expectExtensionFlags(value: unknown, label: string): ExtensionFlagValues {
   return Object.fromEntries(
     Object.entries(expectRecord(value, label)).map(([name, flagValue]) => {
       if (!name.trim()) throw new TypeError(`${label} flag names must be non-empty`);
