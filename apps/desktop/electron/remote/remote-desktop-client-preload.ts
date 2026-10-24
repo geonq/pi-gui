@@ -55,6 +55,8 @@ const REMOTE_METHODS = new Set<PropertyKey>([
   "setThreadGrouping",
   "listWorkspaceFiles",
   "readWorkspaceFile",
+  "removeQueuedComposerMessage",
+  "steerQueuedComposerMessage",
 ]);
 
 const LOCAL_METHODS = new Set<PropertyKey>([
@@ -202,17 +204,41 @@ export function createRemoteDesktopClientApi(
             return (...args: unknown[]) => invokeRemote("listWorkspaceFiles", args);
           case "readWorkspaceFile":
             return (...args: unknown[]) => invokeRemote("readWorkspaceFile", args);
+          case "removeQueuedComposerMessage":
+          case "steerQueuedComposerMessage":
+            return (messageId: string) => runState(property, [messageId]);
         }
       }
       if (property === "submitComposer") {
         return async (text: string, options?: { readonly deliverAs?: "steer" | "followUp" }) => {
-          if (options?.deliverAs === "steer") {
-            throw new Error("Steering a running Windows thread is not available from this client.");
-          }
-          await invokeRemote("sendText", [text]);
+          await invokeRemote(
+            "sendText",
+            options?.deliverAs === "steer" ? [text, { deliverAs: "steer" }] : [text],
+          );
           localDraft = "";
           return getState();
         };
+      }
+      // This client keeps its draft locally, so editing a queued message brings its text back to
+      // the composer and takes it out of the queue; sending it again queues or sends it as usual.
+      if (property === "editQueuedComposerMessage") {
+        return async (messageId: string) => {
+          const queued = lastState?.queuedComposerMessages.find(
+            (message) => message.id === messageId,
+          );
+          if (!queued) return getState();
+          await invokeRemote("removeQueuedComposerMessage", [messageId]);
+          localDraft = queued.text;
+          const state = await getState();
+          lastState = overlayDraft({
+            ...state,
+            composerDraftSyncNonce: state.composerDraftSyncNonce + 1,
+          });
+          return lastState;
+        };
+      }
+      if (property === "cancelQueuedComposerEdit") {
+        return async () => (lastState ? lastState : getState());
       }
       if (property === "setEnableTransparency") {
         return (enabled: boolean) => updatePreferences({ enableTransparency: enabled });

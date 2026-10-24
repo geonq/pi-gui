@@ -31,6 +31,8 @@ export const REMOTE_DESKTOP_PI_METHODS = [
   "setThreadGrouping",
   "listWorkspaceFiles",
   "readWorkspaceFile",
+  "removeQueuedComposerMessage",
+  "steerQueuedComposerMessage",
 ] as const;
 
 export type RemoteDesktopPiMethod = (typeof REMOTE_DESKTOP_PI_METHODS)[number];

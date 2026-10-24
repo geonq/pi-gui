@@ -1123,9 +1123,13 @@ export class DesktopAppStore {
   }
 
   /** Sends remote text without reading or consuming this host window's composer draft/attachments. */
-  async deliverRemoteInstruction(sessionRef: SessionRef, text: string): Promise<void> {
+  async deliverRemoteInstruction(
+    sessionRef: SessionRef,
+    text: string,
+    deliverAs?: "steer",
+  ): Promise<void> {
     await this.initialize();
-    await this.conversationOwner.deliverBackgroundInstruction(sessionRef, text);
+    await this.conversationOwner.deliverBackgroundInstruction(sessionRef, text, deliverAs);
   }
 
   composerSubmitNeedsSenderView(sessionRef: SessionRef | undefined, textInput: string): boolean {

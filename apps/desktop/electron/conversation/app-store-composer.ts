@@ -189,7 +189,11 @@ export interface ConversationOwner {
     attachments: readonly ComposerAttachment[],
     options?: { readonly rollbackOptimisticMessageOnError?: boolean },
   ): Promise<void>;
-  deliverBackgroundInstruction(sessionRef: SessionRef, text: string): Promise<string | undefined>;
+  deliverBackgroundInstruction(
+    sessionRef: SessionRef,
+    text: string,
+    deliverAs?: "steer",
+  ): Promise<string | undefined>;
 }
 
 export function createConversationOwner(store: ConversationOwnerHost): ConversationOwner {
@@ -225,8 +229,8 @@ export function createConversationOwner(store: ConversationOwnerHost): Conversat
     cancelCurrentRun: (sessionRef) => cancelCurrentRun(store, sessionRef),
     sendMessageToSession: (sessionRef, text, attachments, options) =>
       sendMessageToSession(store, sessionRef, text, attachments, options),
-    deliverBackgroundInstruction: (sessionRef, text) =>
-      deliverBackgroundInstruction(store, sessionRef, text),
+    deliverBackgroundInstruction: (sessionRef, text, deliverAs) =>
+      deliverBackgroundInstruction(store, sessionRef, text, deliverAs),
   };
 }
 
@@ -743,6 +747,7 @@ async function deliverBackgroundInstruction(
   store: ComposerStore,
   sessionRef: SessionRef,
   text: string,
+  deliverAs?: "steer",
 ): Promise<string | undefined> {
   const instruction = text.trim();
   if (!instruction) {
@@ -763,13 +768,20 @@ async function deliverBackgroundInstruction(
     const nextMessage = buildQueuedComposerMessage({
       text: instruction,
       attachments: [],
-      mode: "followUp",
+      mode: deliverAs ?? "followUp",
     });
     const nextQueuedMessages = [...store.getQueuedComposerMessages(sessionRef), nextMessage];
-    await store.driver.replaceQueuedMessages(
-      sessionRef,
-      toSessionQueuedMessages(nextQueuedMessages),
-    );
+    const nextSessionQueuedMessages = toSessionQueuedMessages(nextQueuedMessages);
+    // A steer shows in the transcript at once, as one typed on this machine does.
+    const steer =
+      deliverAs === "steer"
+        ? nextSessionQueuedMessages.find((message) => message.id === nextMessage.id)
+        : undefined;
+    if (steer) {
+      appendQueuedUserMessage(store.conversationState.transcriptCache, sessionRef, steer);
+      store.publishSelectedTranscriptFor(sessionRef);
+    }
+    await store.driver.replaceQueuedMessages(sessionRef, nextSessionQueuedMessages);
     await store.refreshState({
       clearLastError: true,
       markSelectedSessionViewed: false,

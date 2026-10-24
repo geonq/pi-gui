@@ -15,7 +15,14 @@ const MAX_TEXT_BYTES = 128 * 1024;
 const THINKING_LEVELS = new Set(["off", "minimal", "low", "medium", "high", "xhigh", "max"]);
 
 export type RemoteDesktopInvocation =
-  | { readonly method: "sendText"; readonly args: readonly [string] }
+  | {
+      readonly method: "sendText";
+      readonly args: readonly [string] | readonly [string, { readonly deliverAs: "steer" }];
+    }
+  | {
+      readonly method: "removeQueuedComposerMessage" | "steerQueuedComposerMessage";
+      readonly args: readonly [string];
+    }
   | {
       readonly method: "getState" | "getAppVersion" | "getSelectedTranscript" | "cancelCurrentRun";
       readonly args: readonly [];
@@ -141,10 +148,22 @@ export function validateRemoteDesktopInvocation(
       return { method: allowedMethod, args: [expectFolderDevice(args[0])] };
     }
     case "sendText": {
-      expectArgs(args, 1);
+      if (args.length !== 1 && args.length !== 2) {
+        throw new TypeError("sendText expects the text and an optional delivery.");
+      }
       const text = expectString(args[0], "text", MAX_TEXT_BYTES);
       if (!text.trim()) throw new TypeError("Message text cannot be empty.");
-      return { method: allowedMethod, args: [text] };
+      if (args.length === 1) return { method: allowedMethod, args: [text] };
+      // Steering reaches a running chat's next turn; anything else stays a follow-up.
+      const options = expectRecord(args[1], ["deliverAs"]);
+      if (options.deliverAs !== "steer") throw new TypeError("Delivery must be steer.");
+      return { method: allowedMethod, args: [text, { deliverAs: "steer" }] };
+    }
+    case "removeQueuedComposerMessage":
+    case "steerQueuedComposerMessage": {
+      expectArgs(args, 1);
+      // The host applies it to the chat open in this client's own view, as it does for sendText.
+      return { method: allowedMethod, args: [expectString(args[0], "messageId", 256)] };
     }
     case "loadWorkspaceRuntime": {
       if (args.length !== 1 && args.length !== 2) {

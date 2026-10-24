@@ -250,3 +250,69 @@ test("remote client routes active-view changes through the passive Windows view"
   expect(invocations).toEqual([{ method: "setActiveView", args: ["skills"] }]);
   expect(localSetActiveViewCalls).toBe(0);
 });
+
+test("queued messages can be steered, removed and edited from the Mac, and a new message can steer", async () => {
+  const preferences: RemoteDesktopClientPreferences = {
+    enableTransparency: false,
+    themeMode: "light",
+    themePresetId: "default",
+  };
+  const queued = {
+    id: "q1",
+    mode: "followUp" as const,
+    text: "also add captions",
+    attachments: [],
+    createdAt: "",
+    updatedAt: "",
+  };
+  let hostQueue = [queued];
+  const invocations: Array<{ method: RemoteDesktopMethod; args: readonly unknown[] }> = [];
+  const api = createRemoteDesktopClientApi(
+    Object.fromEntries(
+      [
+        "getState",
+        "submitComposer",
+        "editQueuedComposerMessage",
+        "cancelQueuedComposerEdit",
+        "removeQueuedComposerMessage",
+        "steerQueuedComposerMessage",
+      ].map((name) => [name, async () => createEmptyDesktopAppState()]),
+    ) as unknown as PiDesktopApi,
+    async (method, args) => {
+      invocations.push({ method, args });
+      if (method === "removeQueuedComposerMessage") hostQueue = [];
+      return { ...createEmptyDesktopAppState(), queuedComposerMessages: hostQueue };
+    },
+    () => () => undefined,
+    async () => preferences,
+    async () => preferences,
+  );
+  await api.getState();
+
+  await api.steerQueuedComposerMessage("q1");
+  await api.submitComposer("stop and use Opus", { deliverAs: "steer" });
+  const edited = await api.editQueuedComposerMessage("q1");
+  // Editing brings the text back into the Mac's own composer and takes it out of the host queue.
+  expect(edited.composerDraft).toBe("also add captions");
+  expect(edited.queuedComposerMessages).toEqual([]);
+  await expect(api.cancelQueuedComposerEdit()).resolves.toBeTruthy();
+  expect(
+    invocations
+      .filter((entry) => entry.method !== "getState")
+      .map((entry) => [entry.method, ...entry.args]),
+  ).toEqual([
+    ["steerQueuedComposerMessage", "q1"],
+    ["sendText", "stop and use Opus", { deliverAs: "steer" }],
+    ["removeQueuedComposerMessage", "q1"],
+  ]);
+  // Each one passes the host's policy, which still refuses anything else.
+  for (const { method, args } of invocations) {
+    expect(() => validateRemoteDesktopInvocation(method, args, new Set())).not.toThrow();
+  }
+  expect(() =>
+    validateRemoteDesktopInvocation("sendText", ["x", { deliverAs: "now" }], new Set()),
+  ).toThrow();
+  expect(() =>
+    validateRemoteDesktopInvocation("removeQueuedComposerMessage", [42], new Set()),
+  ).toThrow();
+});

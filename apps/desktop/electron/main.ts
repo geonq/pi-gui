@@ -1908,7 +1908,8 @@ app
             preloadPath: path.join(__dirname, "..", "preload", "remote-broker-preload.js"),
             pageUrl,
             windows: windowOwner,
-            sendText: ({ sessionRef, text }) => store.deliverRemoteInstruction(sessionRef, text),
+            sendText: ({ sessionRef, text, deliverAs }) =>
+              store.deliverRemoteInstruction(sessionRef, text, deliverAs),
           });
           brokers.set(client.id, broker);
           remoteDesktopBrokers.add(broker);

@@ -61,6 +61,8 @@ export interface RemoteDesktopBrokerOptions {
     readonly clientId: string;
     readonly sessionRef: { readonly workspaceId: string; readonly sessionId: string };
     readonly text: string;
+    /** A running chat takes it at its next turn instead of after the run. */
+    readonly deliverAs?: "steer";
   }) => Promise<void>;
 }
 
@@ -248,6 +250,7 @@ export class RemoteDesktopBroker {
         clientId: this.options.clientId,
         sessionRef,
         text: invocation.args[0],
+        ...(invocation.args[1] ? { deliverAs: invocation.args[1].deliverAs } : {}),
       });
       return { accepted: true };
     }
