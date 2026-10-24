@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type { SessionExtensionUiStateRecord } from "../../../contracts/desktop-state";
 import {
   isSessionMode,
@@ -40,6 +41,18 @@ export function sessionModeFromUi(
   if (!status) return undefined;
   const text = status.text.trim();
   return isSessionMode(text) ? text : null;
+}
+
+/**
+ * A chat reports its mode once its Pi session has started (first message or first pick). Until
+ * then the picker still shows, as "Mode", when the folder's extensions provide `/mode`.
+ */
+export function runtimeHasModes(runtime: RuntimeSnapshot | undefined): boolean {
+  return Boolean(
+    runtime?.extensions.some(
+      (extension) => extension.enabled && extension.commands.includes("mode"),
+    ),
+  );
 }
 
 /** Switches a chat's mode; the new mode arrives with the next app state from main. */
