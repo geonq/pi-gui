@@ -5,6 +5,7 @@ import type {
   StartThreadInput,
 } from "../../contracts/desktop-state";
 import type { WorkspaceFolderDevice } from "../../contracts/workspace-folders";
+import { isSessionMode, type SessionMode } from "../../contracts/session-mode";
 import type { RemoteDesktopMethod, RemoteDesktopPiMethod } from "./remote-desktop-protocol";
 import { isRemoteDesktopPiMethod } from "./remote-desktop-protocol";
 
@@ -71,6 +72,7 @@ export type RemoteDesktopInvocation =
       readonly method: "setSessionThinkingLevel";
       readonly args: readonly [string, string, string];
     }
+  | { readonly method: "setSessionMode"; readonly args: readonly [string, string, SessionMode] }
   | {
       readonly method: "setDefaultThinkingLevel";
       readonly args: readonly [string] | readonly [string, string];
@@ -295,6 +297,18 @@ export function validateRemoteDesktopInvocation(
           expectAuthorizedWorkspace(args[0], workspaceIds),
           expectString(args[1], "sessionId", 256),
           expectThinkingLevel(args[2]),
+        ],
+      };
+    }
+    case "setSessionMode": {
+      expectArgs(args, 3);
+      if (!isSessionMode(args[2])) throw new TypeError("mode is not supported.");
+      return {
+        method: allowedMethod,
+        args: [
+          expectAuthorizedWorkspace(args[0], workspaceIds),
+          expectString(args[1], "sessionId", 256),
+          args[2],
         ],
       };
     }

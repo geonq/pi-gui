@@ -35,6 +35,8 @@ import type {
 } from "../settings/model-onboarding";
 import { ContextMeter } from "./context-meter";
 import { ModelSelector } from "./model-selector";
+import { ModeSelector } from "./mode-selector";
+import type { SessionMode } from "../../../contracts/session-mode";
 import { ExtensionNotices } from "../extensions/extension-notices";
 import { ExtensionFlagsBadge } from "../threads/extension-flags-selector";
 import type { ExtensionDockModel } from "../extensions/extension-session-ui";
@@ -79,6 +81,9 @@ interface ComposerPanelProps {
   readonly onSelectSlashOption: (option: ComposerSlashOption) => void;
   readonly onSetModel: (provider: string, modelId: string) => void;
   readonly onSetThinking: (level: string) => void;
+  /** The chat's Pi mode; `undefined` hides the picker (the folder has no Pi workflow). */
+  readonly mode?: SessionMode | null;
+  readonly onSetMode: (mode: SessionMode) => void;
   readonly modelOnboarding: ModelOnboardingState;
   readonly onOpenModelSettings: (section: ModelOnboardingSettingsSection) => void;
   readonly onSubmit: () => void;
@@ -138,6 +143,8 @@ export function ComposerPanel({
   onSelectSlashOption,
   onSetModel,
   onSetThinking,
+  mode,
+  onSetMode,
   modelOnboarding,
   onOpenModelSettings,
   onSubmit,
@@ -238,6 +245,9 @@ export function ComposerPanel({
                       onSetModel={onSetModel}
                       onSetThinking={onSetThinking}
                     />
+                    {mode !== undefined ? (
+                      <ModeSelector mode={mode} disabled={running} onSetMode={onSetMode} />
+                    ) : null}
                     <ExtensionFlagsBadge values={extensionFlags} />
                     <ContextMeter usage={usage} />
                   </div>

@@ -24,6 +24,7 @@ export const REMOTE_DESKTOP_PI_METHODS = [
   "setSessionModel",
   "setDefaultModel",
   "setSessionThinkingLevel",
+  "setSessionMode",
   "setDefaultThinkingLevel",
   "setThreadGrouping",
   "listWorkspaceFiles",

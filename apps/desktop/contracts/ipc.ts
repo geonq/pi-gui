@@ -50,6 +50,7 @@ import type {
   UpdateScheduledTaskInput,
 } from "./desktop-state";
 import type { WorkspaceFolderAdapters } from "./workspace-folders";
+import type { SessionMode } from "./session-mode";
 
 export type DesktopNotificationPermissionStatus =
   "granted" | "denied" | "default" | "unsupported" | "unknown";
@@ -165,6 +166,7 @@ export const desktopIpc = {
   setDefaultThinkingLevel: "pi-gui:set-default-thinking-level",
   setSessionModel: "pi-gui:set-session-model",
   setSessionThinkingLevel: "pi-gui:set-session-thinking-level",
+  setSessionMode: "pi-gui:set-session-mode",
   loginProvider: "pi-gui:login-provider",
   logoutProvider: "pi-gui:logout-provider",
   setProviderApiKey: "pi-gui:set-provider-api-key",
@@ -776,6 +778,11 @@ export interface PiDesktopApi {
     workspaceId: string,
     sessionId: string,
     thinkingLevel: NonNullable<RuntimeSettingsSnapshot["defaultThinkingLevel"]>,
+  ): Promise<DesktopAppState>;
+  setSessionMode(
+    workspaceId: string,
+    sessionId: string,
+    mode: SessionMode,
   ): Promise<DesktopAppState>;
   loginProvider(workspaceId: string, providerId: string): Promise<DesktopAppState>;
   logoutProvider(workspaceId: string, providerId: string): Promise<DesktopAppState>;

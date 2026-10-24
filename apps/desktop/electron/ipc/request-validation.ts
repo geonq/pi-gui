@@ -40,6 +40,7 @@ import {
   type UpdateScheduledTaskInput,
 } from "../../contracts/scheduled-tasks";
 import { assertComposerAttachmentsAccepted } from "../../contracts/composer-attachments";
+import { isSessionMode, type SessionMode } from "../../contracts/session-mode";
 import {
   decodeTaskWorkbenchTemplate,
   type SaveTaskWorkbenchTemplateInput,
@@ -192,6 +193,13 @@ export function expectThinkingLevel(
     value !== "max"
   ) {
     throw new TypeError(`${name} must be a supported thinking level`);
+  }
+  return value;
+}
+
+export function expectSessionMode(value: unknown, name = "mode"): SessionMode {
+  if (!isSessionMode(value)) {
+    throw new TypeError(`${name} must be planner, reviewer, implementer or orchestrator`);
   }
   return value;
 }
