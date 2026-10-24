@@ -127,7 +127,10 @@
   overflow: auto;
   /* Keeps the scrollbar clear of the resize handle on the right edge. */
   margin-right: 4px;
-  padding-right: 8px;
+  /* The scrollbar always keeps its lane, so opening a chat's subagents (which makes the list
+     scroll) no longer narrows the list and rewraps the header. The lane replaces the old padding. */
+  padding-right: max(0px, 8px - var(--scrollbar-size));
+  scrollbar-gutter: stable;
 }
 
 .section__head {
@@ -652,6 +655,59 @@
 .session-row__fold svg {
   width: 14px;
   height: 14px;
+  transition: rotate var(--motion-slow) var(--ease-out);
+}
+
+.session-row__fold[data-state="collapsed"] svg {
+  rotate: -90deg;
+}
+
+/* Subagent rows grow in and shrink away when their chat is unfolded or folded. Height, padding,
+   opacity and translate only, on a handful of rows, so the sidebar re-lays out a few hundred
+   pixels for a quarter second and nothing else on the page is touched. */
+.session-row--entering,
+.session-row--leaving {
+  interpolate-size: allow-keywords;
+  overflow: hidden;
+}
+
+.session-row--entering {
+  transition:
+    height var(--motion-slow) var(--ease-out),
+    min-height var(--motion-slow) var(--ease-out),
+    padding-block var(--motion-slow) var(--ease-out),
+    margin-block var(--motion-slow) var(--ease-out),
+    opacity var(--motion-slow) var(--ease-out),
+    translate var(--motion-slow) var(--ease-out);
+}
+
+@starting-style {
+  .session-row--entering {
+    height: 0;
+    min-height: 0;
+    padding-block: 0;
+    margin-block: -1px;
+    opacity: 0;
+    translate: 0 -4px;
+  }
+}
+
+.session-row--leaving {
+  height: 0;
+  min-height: 0;
+  padding-block: 0;
+  /* The list's 2px row gap closes with the row. */
+  margin-block: -1px;
+  opacity: 0;
+  translate: 0 -4px;
+  pointer-events: none;
+  transition:
+    height 160ms var(--ease-in-out),
+    min-height 160ms var(--ease-in-out),
+    padding-block 160ms var(--ease-in-out),
+    margin-block 160ms var(--ease-in-out),
+    opacity 120ms var(--ease-in-out),
+    translate 160ms var(--ease-in-out);
 }
 
 .session-row__fold:hover {

@@ -68,7 +68,7 @@ import { sessionLastInteractedAt } from "../../../contracts/thread-recency";
 import type { WorkspaceMenuState } from "./hooks/use-workspace-menu";
 import type { ThreadMenuState } from "./hooks/use-thread-actions";
 import { archiveThreadShortcut, ThreadActionsMenu } from "./thread-actions";
-import { useFoldedChatParents } from "./chat-fold";
+import { type ChatFoldMotion, useFoldedChatParents } from "./chat-fold";
 import {
   foldThreadSidebarModel,
   recencyHistoryExpansionKey,
@@ -142,6 +142,7 @@ const ThreadShortcutContext = createContext<ReadonlyMap<string, ThreadShortcutBa
 
 interface ChatFold {
   readonly folded: ReadonlySet<string>;
+  readonly motion: ChatFoldMotion;
   readonly setFolded: (parentKey: string, folded: boolean) => void;
 }
 
@@ -184,8 +185,12 @@ export function Sidebar(props: SidebarProps) {
     sidebarWidth === undefined ? undefined : { "--sidebar-width": `${sidebarWidth}px` };
   const [activeId, setActiveId] = useState<string | null>(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
-  const [foldedChatParents, setChatParentFolded] = useFoldedChatParents();
-  const chatFold: ChatFold = { folded: foldedChatParents, setFolded: setChatParentFolded };
+  const [foldedChatParents, setChatParentFolded, chatFoldMotion] = useFoldedChatParents();
+  const chatFold: ChatFold = {
+    folded: foldedChatParents,
+    motion: chatFoldMotion,
+    setFolded: setChatParentFolded,
+  };
   const threadSidebarModel = foldThreadSidebarModel(unfoldedSidebarModel, foldedChatParents);
   const [expandedHistory, setExpandedHistory] = useState<ReadonlySet<string>>(() => new Set());
   const commandHeld = useThreadShortcutHintsVisible(api.platform);
@@ -1463,7 +1468,10 @@ function ThreadSessionRow({
   const threadKey = sessionThreadKey(thread);
   const childCount = thread.childCount ?? 0;
   const foldable = childCount > 0 && chatFold !== undefined && !overlay;
-  const folded = foldable && chatFold.folded.has(threadKey);
+  // The chevron turns as soon as the user folds; the rows finish shrinking a moment later.
+  const folded =
+    foldable && (chatFold.folded.has(threadKey) || chatFold.motion.get(threadKey) === "closing");
+  const rowMotion = thread.parentKey ? chatFold?.motion.get(thread.parentKey) : undefined;
   const subagentLabel = `${childCount} subagent ${childCount === 1 ? "chat" : "chats"}`;
   const menuOpen =
     !overlay &&
@@ -1478,6 +1486,8 @@ function ThreadSessionRow({
     shortcutBadge ? "session-row--shortcut" : "",
     thread.depth ? "session-row--child" : "",
     foldable ? "session-row--parent" : "",
+    rowMotion === "opening" ? "session-row--entering" : "",
+    rowMotion === "closing" ? "session-row--leaving" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -1517,7 +1527,7 @@ function ThreadSessionRow({
               chatFold.setFolded(threadKey, !folded);
             }}
           >
-            {folded ? <ChevronRightIcon /> : <ChevronDownIcon />}
+            <ChevronDownIcon />
           </button>
         ) : null}
         <button
