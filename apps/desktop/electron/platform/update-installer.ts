@@ -183,27 +183,57 @@ async function fetchOk(url: string): Promise<Response> {
   return response;
 }
 
-/** Runs the NSIS installer silently into the current install folder once Pegasus has exited. */
+/**
+ * Runs the NSIS installer silently into the current install folder once Pegasus and its helper
+ * processes have exited, then starts the new version. Every step is logged next to the installer.
+ */
 async function installWindows(installer: string, directory: string): Promise<void> {
   const installDir = path.dirname(process.execPath);
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;
   const script = path.join(directory, "install-update.ps1");
+  const log = path.join(directory, "install-update.log");
   await writeFile(
     script,
     [
       "$ErrorActionPreference = 'Stop'",
-      `Wait-Process -Id ${process.pid} -Timeout 120 -ErrorAction SilentlyContinue`,
-      `$setup = Start-Process -FilePath ${quote(installer)} -ArgumentList '/S', ${quote(`/D=${installDir}`)} -Wait -PassThru`,
-      `Start-Process -FilePath ${quote(process.execPath)} -WorkingDirectory ${quote(installDir)}`,
-      "exit $setup.ExitCode",
+      `Start-Transcript -Path ${quote(log)} -Force | Out-Null`,
+      "try {",
+      `  Wait-Process -Id ${process.pid} -Timeout 120 -ErrorAction SilentlyContinue`,
+      // Renderer, GPU and agent processes run from the install folder too; NSIS cannot replace
+      // files they hold, so wait for them and stop what is left.
+      `  $folder = ${quote(`${installDir}\\`)}`,
+      "  $deadline = (Get-Date).AddSeconds(60)",
+      "  do {",
+      "    $left = @(Get-CimInstance Win32_Process | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($folder, [StringComparison]::OrdinalIgnoreCase) })",
+      "    if ($left.Count -eq 0) { break }",
+      "    Start-Sleep -Milliseconds 500",
+      "  } while ((Get-Date) -lt $deadline)",
+      "  $left | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }",
+      `  $setup = Start-Process -FilePath ${quote(installer)} -ArgumentList '/S', ${quote(`/D=${installDir}`)} -Wait -PassThru`,
+      "  Write-Output ('installer exit ' + $setup.ExitCode)",
+      "} finally {",
+      `  Start-Process -FilePath ${quote(process.execPath)} -WorkingDirectory ${quote(installDir)}`,
+      "  Stop-Transcript | Out-Null",
+      "}",
     ].join("\r\n"),
     "utf8",
   );
-  spawn(
+  // A child of Pegasus dies with it (Windows ends the app's whole process tree on quit), so the
+  // helper is created by WMI instead: it then outlives Pegasus. The launcher only waits for that.
+  const command = `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "${script}"`;
+  const { stdout } = await execFileAsync(
     "powershell.exe",
-    ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", script],
-    { detached: true, stdio: "ignore", windowsHide: true },
-  ).unref();
+    [
+      "-NoProfile",
+      "-NonInteractive",
+      "-Command",
+      `$startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{ ShowWindow = [uint16]0 }; ` +
+        `$result = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = ${quote(command)}; ProcessStartupInformation = $startup }; ` +
+        `Write-Output $result.ReturnValue`,
+    ],
+    { windowsHide: true },
+  );
+  if (stdout.trim() !== "0") throw new Error("The update installer could not be started.");
 }
 
 /**
