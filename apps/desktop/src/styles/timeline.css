@@ -343,6 +343,37 @@
   color: var(--muted-soft);
 }
 
+/* Working subagents: the pill, then their names in a quiet list joined by a guide line. */
+.timeline-activity-group {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.timeline-activity__entries {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  margin: 0 0 0 13px;
+  padding: 0 0 0 13px;
+  border-left: 1px solid var(--line);
+  list-style: none;
+  color: var(--muted-soft);
+  font-size: 12.5px;
+  line-height: 18px;
+}
+
+.timeline-activity__entries li {
+  max-width: min(100%, 64ch);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-activity__more {
+  color: var(--muted-subtle);
+}
+
 /* ---- Tool calls --------------------------------------------------------- */
 
 .timeline-tool {

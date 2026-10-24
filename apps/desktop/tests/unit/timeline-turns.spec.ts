@@ -151,5 +151,8 @@ test("a finished turn shows its subagents still working", () => {
   });
   const last = items.at(-1);
   expect(last).toMatchObject({ kind: "activity", label: "2 subagents working", tone: "working" });
+  // Names are listed one per line under the pill, not joined into it.
+  expect(last).toMatchObject({ entries: ["Planner", "Implementer"] });
+  expect(last).not.toHaveProperty("detail");
   expect(buildDisplayTimelineItems(transcript, { subagentsWorking: [] }).at(-1)?.id).toBe("a1");
 });

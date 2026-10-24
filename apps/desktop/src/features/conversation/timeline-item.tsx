@@ -250,7 +250,31 @@ function TimelineMessage({
   );
 }
 
+/** Subagent names shown under the working pill before the rest collapse into "and N more". */
+const ACTIVITY_ENTRY_LIMIT = 4;
+
 function TimelineActivityItem({ item }: { readonly item: TimelineActivity }) {
+  if (item.entries?.length) {
+    const shown = item.entries.slice(0, ACTIVITY_ENTRY_LIMIT);
+    const hidden = item.entries.length - shown.length;
+    // The pill stays one short line; the names sit under it, one per line, cut with an ellipsis.
+    return (
+      <div className="timeline-activity-group">
+        <div className={`timeline-activity timeline-activity--${item.tone ?? "neutral"}`}>
+          {item.tone === "working" ? <StateOrb state={item.activityState ?? "solving"} /> : null}
+          <span className="timeline-activity__label">{item.label}</span>
+        </div>
+        <ul className="timeline-activity__entries">
+          {shown.map((entry, index) => (
+            <li key={`${index}:${entry}`} title={entry}>
+              {entry}
+            </li>
+          ))}
+          {hidden > 0 ? <li className="timeline-activity__more">and {hidden} more</li> : null}
+        </ul>
+      </div>
+    );
+  }
   return (
     <div className={`timeline-activity timeline-activity--${item.tone ?? "neutral"}`}>
       {item.tone === "working" ? <StateOrb state={item.activityState ?? "solving"} /> : null}

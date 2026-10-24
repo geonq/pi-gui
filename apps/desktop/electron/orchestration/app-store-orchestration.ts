@@ -1062,7 +1062,9 @@ function projectOrchestrationChild(
   const transcript = toChildTranscript(rawTranscript, MAX_CHILD_TRANSCRIPT_MESSAGES);
   const latestTranscript = session?.preview || previewFromTranscript(rawTranscript) || child.goal;
   const updatedAt = latestSessionActivityAt(session?.updatedAt ?? child.updatedAt, rawTranscript);
-  const status = session ? toOrchestrationStatus(session.status, childRef, store) : child.status;
+  const status = session
+    ? toOrchestrationStatus(session.status, childRef, store, child.evidence)
+    : child.status;
 
   return {
     ...child,
@@ -2032,6 +2034,7 @@ function toOrchestrationStatus(
   status: string,
   sessionRef: SessionRef,
   store: OrchestrationOwnerHost,
+  evidence: readonly OrchestrationEvidenceRecord[] = [],
 ): OrchestrationChildThreadStatus {
   if (store.getQueuedComposerMessages(sessionRef).length > 0) {
     return "waiting";
@@ -2045,15 +2048,34 @@ function toOrchestrationStatus(
   // An idle session that has never produced a run is queued, not complete. The
   // child record is inserted before its prompt is void-fired, so without this a
   // never-started child would read "complete" and trigger a false parent wake.
-  if (!hasStartedRun(store, sessionRef)) {
+  if (!hasStartedRun(store, sessionRef, evidence)) {
     return "queued";
   }
   return "complete";
 }
 
-function hasStartedRun(store: OrchestrationOwnerHost, sessionRef: SessionRef): boolean {
-  const transcript = store.transcriptFor(sessionRef);
-  return transcript.some(isWorkerResponse);
+/**
+ * Whether the child has run at all. Its transcript is only in memory once the session was opened
+ * since launch, so after a restart every finished child read as never started ("queued") and its
+ * parent kept showing "N subagents working". Evidence taken from the child's own transcript
+ * (its replies and its commands) is saved with the child record and proves the run as well.
+ */
+function hasStartedRun(
+  store: OrchestrationOwnerHost,
+  sessionRef: SessionRef,
+  evidence: readonly OrchestrationEvidenceRecord[],
+): boolean {
+  return childHasRun(evidence, () => store.transcriptFor(sessionRef));
+}
+
+export function childHasRun(
+  evidence: readonly Pick<OrchestrationEvidenceRecord, "source">[],
+  transcript: () => readonly TranscriptMessage[],
+): boolean {
+  return (
+    evidence.some((record) => record.source === "worker-reported" || record.source === "command") ||
+    transcript().some(isWorkerResponse)
+  );
 }
 
 function toChildTranscript(

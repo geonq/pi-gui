@@ -139,7 +139,7 @@ function withSubagentsWorking(
       id: "subagents-working",
       createdAt: last.createdAt,
       label: titles.length === 1 ? "1 subagent working" : `${titles.length} subagents working`,
-      detail: titles.join(" · "),
+      entries: titles,
       tone: "working",
       activityState: "solving",
     },

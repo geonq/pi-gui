@@ -19,6 +19,8 @@ export interface TimelineActivity {
   readonly createdAt: string;
   readonly label: string;
   readonly detail?: string;
+  /** Names listed under the label, one per line (the subagents still working). */
+  readonly entries?: readonly string[];
   readonly metadata?: string;
   readonly tone?: TimelineTone;
   readonly activityState?: AgentActivityState;
