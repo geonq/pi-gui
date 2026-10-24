@@ -31,8 +31,10 @@ test("remote client keeps Mac presentation and draft local while actions target 
     sessions: 1,
     unreadable: 0,
   };
-  const hostState = {
+  let hostState = {
     ...createEmptyDesktopAppState(),
+    selectedWorkspaceId: "workspace",
+    selectedSessionId: "thread",
     composerDraft: "Windows draft must stay private",
     enableTransparency: true,
     themeMode: "dark" as const,
@@ -41,6 +43,7 @@ test("remote client keeps Mac presentation and draft local while actions target 
     {
       getState: async () => createEmptyDesktopAppState(),
       updateComposerDraft: async () => createEmptyDesktopAppState(),
+      persistComposerDraft: async () => undefined,
       submitComposer: async () => createEmptyDesktopAppState(),
       archiveSession: async () => createEmptyDesktopAppState(),
       unarchiveSession: async () => createEmptyDesktopAppState(),
@@ -86,6 +89,15 @@ test("remote client keeps Mac presentation and draft local while actions target 
   await api.submitComposer("Send this to Windows");
   expect(invocations).toContainEqual({ method: "sendText", args: ["Send this to Windows"] });
   expect((await api.getState()).composerDraft).toBe("");
+
+  // Drafts belong to their chat: the draft flushed for the chat being left (even text that was
+  // just sent) never shows up in the chat opened next, and comes back when its chat reopens.
+  await api.persistComposerDraft({ target: { workspaceId: "workspace", sessionId: "thread" }, draft: "Stay here" });
+  hostState = { ...hostState, selectedSessionId: "other-thread" };
+  expect((await api.getState()).composerDraft).toBe("");
+  hostState = { ...hostState, selectedSessionId: "thread" };
+  expect((await api.getState()).composerDraft).toBe("Stay here");
+  await api.updateComposerDraft("", { workspaceId: "workspace", sessionId: "thread" });
 
   const archiveTarget = { workspaceId: "windows-workspace", sessionId: "thread-archive" };
   await api.archiveSession(archiveTarget);

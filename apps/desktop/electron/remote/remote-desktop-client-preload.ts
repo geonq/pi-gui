@@ -89,7 +89,19 @@ export function createRemoteDesktopClientApi(
   getLocalPreferences: GetLocalPreferences,
   setLocalPreferences: SetLocalPreferences,
 ): PiDesktopApi {
-  let localDraft = "";
+  // Drafts stay on this client, one per chat like the host keeps them: the renderer flushes the
+  // draft of the chat it leaves, and a single shared draft carried that text into the next chat.
+  const localDrafts = new Map<string, string>();
+  const draftKey = (target: { readonly workspaceId: string; readonly sessionId: string }) =>
+    `${target.workspaceId}:${target.sessionId}`;
+  const setLocalDraft = (target: { readonly workspaceId: string; readonly sessionId: string }, draft: string) => {
+    if (draft) localDrafts.set(draftKey(target), draft);
+    else localDrafts.delete(draftKey(target));
+  };
+  const selectedTarget = (state: DesktopAppState) => ({
+    workspaceId: state.selectedWorkspaceId,
+    sessionId: state.selectedSessionId,
+  });
   let lastState: DesktopAppState | null = null;
   let localPreferences: RemoteDesktopClientPreferences | undefined;
   const preferencesReady = getLocalPreferences().then((preferences) => {
@@ -98,7 +110,7 @@ export function createRemoteDesktopClientApi(
   });
   const overlayDraft = (state: DesktopAppState): DesktopAppState => ({
     ...state,
-    composerDraft: localDraft,
+    composerDraft: localDrafts.get(draftKey(selectedTarget(state))) ?? "",
     composerDraftSyncSource: "state",
     composerAttachments: [],
     editingQueuedMessageId: undefined,
@@ -215,7 +227,7 @@ export function createRemoteDesktopClientApi(
             "sendText",
             options?.deliverAs === "steer" ? [text, { deliverAs: "steer" }] : [text],
           );
-          localDraft = "";
+          if (lastState) setLocalDraft(selectedTarget(lastState), "");
           return getState();
         };
       }
@@ -228,7 +240,7 @@ export function createRemoteDesktopClientApi(
           );
           if (!queued) return getState();
           await invokeRemote("removeQueuedComposerMessage", [messageId]);
-          localDraft = queued.text;
+          if (lastState) setLocalDraft(selectedTarget(lastState), queued.text);
           const state = await getState();
           lastState = overlayDraft({
             ...state,
@@ -252,8 +264,9 @@ export function createRemoteDesktopClientApi(
           updatePreferences({ themePresetId });
       }
       if (property === "updateComposerDraft") {
-        return async (draft: string) => {
-          localDraft = draft;
+        return async (draft: string, target?: { readonly workspaceId: string; readonly sessionId: string }) => {
+          const owner = target ?? (lastState ? selectedTarget(lastState) : undefined);
+          if (owner) setLocalDraft(owner, draft);
           if (!lastState) return getState();
           lastState = overlayDraft({
             ...lastState,
@@ -263,8 +276,11 @@ export function createRemoteDesktopClientApi(
         };
       }
       if (property === "persistComposerDraft") {
-        return async (input: { readonly draft: string }) => {
-          localDraft = input.draft;
+        return async (input: {
+          readonly target: { readonly workspaceId: string; readonly sessionId: string };
+          readonly draft: string;
+        }) => {
+          setLocalDraft(input.target, input.draft);
         };
       }
       if (LOCAL_METHODS.has(property)) {
