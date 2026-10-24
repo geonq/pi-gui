@@ -1585,7 +1585,7 @@ export default function App() {
                 />
               ) : (
                 <div className="chat-header__status" title="Ready for your next message">
-                  <StateOrb state="listening" />
+                  <StateOrb paused state="listening" />
                   Updated {formatRelativeTime(selectedSession.updatedAt)}
                 </div>
               )}

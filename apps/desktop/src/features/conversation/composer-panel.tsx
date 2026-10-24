@@ -7,7 +7,6 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
-import { BorderBeam } from "border-beam";
 import type { ExtensionFlagValues, SessionUsageSnapshot } from "@pi-gui/session-driver";
 import type { RuntimeSnapshot } from "@pi-gui/session-driver/runtime-types";
 import type {
@@ -18,7 +17,6 @@ import type {
 } from "../../../contracts/desktop-state";
 import type { MentionOption } from "./hooks/use-mention-menu";
 import { ArrowUpIcon, PlusIcon, StopSquareIcon } from "../../ui/icons";
-import { useActiveTheme } from "../../ui/active-theme";
 import type {
   ComposerSlashCommand,
   ComposerSlashCommandSection,
@@ -166,20 +164,14 @@ export function ComposerPanel({
     composerDraft.trim().length > 0 || attachments.length > 0 || annotations.list.length > 0;
   const running = selectedSession.status === "running";
   const primaryActionIsStop = running && !hasComposerInput;
-  const { variant } = useActiveTheme();
 
   return (
     <footer className="composer" aria-busy={preparingTaskDraft}>
       <div className="conversation conversation--composer" inert={preparingTaskDraft}>
         <ExtensionNotices notices={extensionNotices} />
-        {/* The libraries.dev beam travels around the composer while a request or task runs. */}
-        <BorderBeam
-          active={running || preparingTaskDraft}
-          className="composer__beam"
-          colorVariant="mono"
-          staticColors
-          theme={variant}
-        >
+        {/* No moving border while a run works: the working pill already says so, and the beam
+            alone kept a 120 Hz Mac's GPU near 100%. */}
+        <div className="composer__frame">
           <ComposerSurface
             lastError={lastError}
             activeSlashCommand={activeSlashCommand}
@@ -282,7 +274,7 @@ export function ComposerPanel({
               </div>
             }
           />
-        </BorderBeam>
+        </div>
       </div>
       {preparingTaskDraft ? (
         <div className="composer__footer-row">

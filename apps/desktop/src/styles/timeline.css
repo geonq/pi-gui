@@ -314,7 +314,8 @@
   background-clip: text;
   color: transparent;
   font-weight: var(--font-medium);
-  animation: thinking-shimmer 2.4s linear infinite;
+  /* Stepped (15 fps) so the browser skips the frames in between. */
+  animation: thinking-shimmer 2.4s steps(36) infinite;
 }
 
 @keyframes thinking-shimmer {
@@ -531,7 +532,7 @@
 
 .timeline-tool--running .timeline-tool__status-pip {
   background: var(--accent);
-  animation: timeline-pip-pulse 1.4s var(--ease-in-out) infinite;
+  animation: timeline-pip-pulse 1.4s steps(10) infinite;
 }
 
 @keyframes timeline-pip-pulse {
@@ -684,7 +685,7 @@
     var(--overlay-subtle) 100%
   );
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  animation: skeleton-shimmer 1.4s steps(20) infinite;
 }
 
 .skeleton-line--tool {

@@ -1,7 +1,5 @@
-import { ThinkingOrb } from "thinking-orbs";
 import type { DesktopAppState } from "../../../contracts/desktop-state";
-import { useSystemMotionPaused } from "../../app/activity-indicator";
-import { useActiveTheme } from "../../ui/active-theme";
+import { StateOrb } from "../../app/activity-indicator";
 
 interface SessionTarget {
   readonly workspaceId: string;
@@ -35,8 +33,6 @@ export function AgentsPanel({
   readonly snapshot: DesktopAppState;
   readonly onSelect: (target: SessionTarget) => void;
 }) {
-  const { variant } = useActiveTheme();
-  const paused = useSystemMotionPaused();
   const titles = new Map(
     snapshot.workspaces.flatMap((workspace) =>
       workspace.sessions.map((session) => [`${workspace.id}/${session.id}`, session.title]),
@@ -82,13 +78,7 @@ export function AgentsPanel({
               onClick={() => onSelect(row.target)}
             >
               {ACTIVE.has(row.status) ? (
-                <ThinkingOrb
-                  aria-hidden="true"
-                  paused={paused}
-                  size={20}
-                  state="working"
-                  theme={variant}
-                />
+                <StateOrb state="working" />
               ) : (
                 <span
                   aria-hidden="true"

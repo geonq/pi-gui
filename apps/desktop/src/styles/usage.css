@@ -250,7 +250,7 @@
   border-radius: 50%;
   background: #0253c4;
   content: "";
-  animation: usage-limits-pulse 1.2s ease-in-out infinite;
+  animation: usage-limits-pulse 1.2s steps(12) infinite;
 }
 
 .usage-limits__empty {
@@ -276,7 +276,7 @@
     var(--overlay-hover) 65%
   );
   background-size: 220% 100%;
-  animation: usage-limits-shimmer 1.4s ease-in-out infinite;
+  animation: usage-limits-shimmer 1.4s steps(20) infinite;
 }
 
 .usage-limits__skeleton-name {

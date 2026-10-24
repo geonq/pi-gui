@@ -120,6 +120,15 @@ button {
   border-radius: 999px;
 }
 
+/* About 15 fps (3.2 s per lap): the browser skips the frames between steps, so the beam no
+   longer repaints at the display rate (near a full core on a 120 Hz Mac). */
+.running-activity__beam,
+.running-activity__beam *,
+.running-activity__beam::before,
+.running-activity__beam::after {
+  animation-timing-function: steps(48) !important;
+}
+
 .running-activity__badge {
   display: inline-flex;
   align-items: center;
@@ -241,14 +250,8 @@ option:disabled {
   --titlebar-toggle-left: 12px;
 }
 
-/* The beam clips itself (clip-path); its wrapper must not clip the composer's menus.
-   Mono halves every beam layer and the strength prop stops at 1, so the
-   per-layer opacity hooks bring it back to a visible arc. */
-.composer__beam {
-  --beam-stroke-opacity: 2.4;
-  --beam-inner-opacity: 1.6;
-  --beam-bloom-opacity: 2;
-  overflow: visible !important;
+.composer__frame {
+  position: relative;
 }
 
 /* Mirrors a chevron into up/left without a second icon. */

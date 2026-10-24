@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BorderBeam } from "border-beam";
-import { ThinkingOrb } from "thinking-orbs";
+import { MODE_FRAMES, paintFrame, resolvePreset, type OrbState } from "thinking-orbs/engine";
 import { AnimatePresence, motion } from "motion/react";
 import type { AgentActivityState } from "../../contracts/agent-activity";
 import { useActiveTheme } from "../ui/active-theme";
@@ -27,13 +27,68 @@ export function useSystemMotionPaused(): boolean {
   return paused;
 }
 
+// Every orb paints from one shared 15 fps clock. The library's own loop painted each orb on every
+// display frame, which on a 120 Hz Mac kept the GPU busy for a 20 px dot.
+const ORB_FRAME_MS = 1000 / 15;
+const orbPainters = new Set<(seconds: number) => void>();
+let orbTimer = 0;
+
+function subscribeOrb(paint: (seconds: number) => void): () => void {
+  orbPainters.add(paint);
+  if (!orbTimer) {
+    orbTimer = window.setInterval(() => {
+      const seconds = performance.now() / 1000;
+      for (const painter of orbPainters) painter(seconds);
+    }, ORB_FRAME_MS);
+  }
+  return () => {
+    orbPainters.delete(paint);
+    if (orbPainters.size === 0) {
+      window.clearInterval(orbTimer);
+      orbTimer = 0;
+    }
+  };
+}
+
+function OrbCanvas({
+  state,
+  size,
+  paused,
+  dark,
+}: {
+  readonly state: OrbState;
+  readonly size: 20 | 64;
+  readonly paused: boolean;
+  readonly dark: boolean;
+}) {
+  const ref = useRef<HTMLCanvasElement>(null);
+  useEffect(() => {
+    const canvas = ref.current;
+    const context = canvas?.getContext("2d");
+    if (!canvas || !context) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = Math.round(size * dpr);
+    canvas.height = Math.round(size * dpr);
+    const { mode, speed, opts } = resolvePreset(state, size);
+    const frameAt = MODE_FRAMES[mode];
+    const paint = (seconds: number) => {
+      context.setTransform(dpr, 0, 0, dpr, 0, 0);
+      context.clearRect(0, 0, size, size);
+      paintFrame(context, frameAt(size, seconds * speed, opts), dark);
+    };
+    paint(performance.now() / 1000);
+    return paused ? undefined : subscribeOrb(paint);
+  }, [state, size, paused, dark]);
+  return <canvas ref={ref} style={{ display: "block", width: size, height: size }} />;
+}
+
 /** Fixed canvas bounds and a short crossfade keep state changes from flashing or shifting text. */
 export function StateOrb({
   state,
   size = 20,
   paused: requestedPause = false,
 }: {
-  readonly state: AgentActivityState;
+  readonly state: OrbState;
   readonly size?: 20 | 64;
   readonly paused?: boolean;
 }) {
@@ -54,7 +109,7 @@ export function StateOrb({
           exit={{ opacity: 0 }}
           transition={{ duration: paused ? 0 : 0.2 }}
         >
-          <ThinkingOrb paused={paused} size={size} state={state} theme={variant} />
+          <OrbCanvas dark={variant === "dark"} paused={paused} size={size} state={state} />
         </motion.span>
       </AnimatePresence>
     </span>
