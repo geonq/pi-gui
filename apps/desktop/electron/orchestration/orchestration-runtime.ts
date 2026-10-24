@@ -112,6 +112,7 @@ function createCreateChildThreadTool(
     promptGuidelines: [
       "Use create_child_thread when the user asks you to spin up, delegate to, or run a separate child thread.",
       "Keep the child prompt concrete and self-contained so the user can inspect the resulting thread.",
+      "When the user names a model or effort for the child, pass them as model and thinkingLevel; never substitute another model.",
     ],
     parameters: {
       type: "object",
@@ -119,6 +120,16 @@ function createCreateChildThreadTool(
         prompt: {
           type: "string",
           description: "Concrete instructions for the child thread.",
+        },
+        model: {
+          type: "string",
+          description:
+            'Model for the child, as "provider/model-id" or "model-id" (e.g. "openai/gpt-6.1-sol"). Omit to use the role default.',
+        },
+        thinkingLevel: {
+          type: "string",
+          enum: ["off", "minimal", "low", "medium", "high", "xhigh", "max"],
+          description: "Effort for the child. Omit to keep the default.",
         },
       },
       required: ["prompt"],
