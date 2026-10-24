@@ -6,9 +6,15 @@ export const NEW_THREAD_PLACEHOLDER_TITLE = "New thread";
  * at a word boundary. Used for subagent chats and whenever a model-generated title is unavailable.
  */
 export function promptTitle(prompt: string, limit = 48): string {
-  const text = prompt
-    .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
-    .replace(/\[[A-Z][A-Z0-9_]*=[^\]\s]*\]/g, " ")
+  // The first paragraph only: a task without a full stop must not run into the next one.
+  const firstParagraph =
+    prompt
+      .replace(/<!--[\s\S]*?(?:-->|$)/g, " ")
+      .replace(/\[[A-Z][A-Z0-9_]*=[^\]\s]*\]/g, " ")
+      .split(/\n\s*\n/)
+      .map((paragraph) => paragraph.trim())
+      .find(Boolean) ?? "";
+  const text = firstParagraph
     .replace(/https?:\/\/\S+/g, " ")
     .replace(/[`*_#>|]+/g, " ")
     .replace(/\s+/g, " ")

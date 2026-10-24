@@ -8,6 +8,11 @@ test("prompt titles read like the task, without machine markup", () => {
     ),
   ).toBe("Audit preparation coverage for the Berlin…");
   expect(promptTitle("[PI_CHILD_ROLE=reviewer]\nReview this change.")).toBe("Review this change");
+  expect(
+    promptTitle(
+      "Reply with only the exact word: ok\n\nYou are assigned the reviewer role; Pi has activated it.",
+    ),
+  ).toBe("Reply with only the exact word: ok");
   expect(promptTitle("<!-- HERMES_NATIVE_CHILD role=planner task=a lease=b")).toBe("New thread");
   expect(promptTitle("fix the **login** bug in `auth.ts`")).toBe("Fix the login bug in auth.ts");
 });
