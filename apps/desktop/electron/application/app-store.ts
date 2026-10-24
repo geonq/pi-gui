@@ -1122,14 +1122,40 @@ export class DesktopAppStore {
     return this.conversationOwner.submitComposer(sessionRef, textInput, options);
   }
 
-  /** Sends remote text without reading or consuming this host window's composer draft/attachments. */
+  /**
+   * Sends remote text without reading or consuming this host window's composer draft/attachments.
+   * Resolves once the message is queued or its run has started, not when the run ends: a run
+   * outlasts the remote request's timeout, and a timed-out send made the Mac hand the sent text
+   * back as a draft. A failure after the run started shows in the thread itself.
+   */
   async deliverRemoteInstruction(
     sessionRef: SessionRef,
     text: string,
     deliverAs?: "steer",
   ): Promise<void> {
     await this.initialize();
-    await this.conversationOwner.deliverBackgroundInstruction(sessionRef, text, deliverAs);
+    const wasRunning = this.sessionFromState(sessionRef)?.status === "running";
+    const sending = this.conversationOwner.deliverBackgroundInstruction(sessionRef, text, deliverAs);
+    if (wasRunning) {
+      await sending;
+      return;
+    }
+    let started = false;
+    void sending.catch((error: unknown) => {
+      if (started) console.warn("[app-store] a remote message failed after its run started", error);
+    });
+    let unsubscribe = () => {};
+    const runStarted = new Promise<void>((resolve) => {
+      unsubscribe = this.subscribe(() => {
+        if (this.sessionFromState(sessionRef)?.status === "running") resolve();
+      });
+    });
+    try {
+      await Promise.race([sending, runStarted]);
+      started = true;
+    } finally {
+      unsubscribe();
+    }
   }
 
   composerSubmitNeedsSenderView(sessionRef: SessionRef | undefined, textInput: string): boolean {
