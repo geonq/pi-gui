@@ -40,7 +40,7 @@ import {
   type UpdateScheduledTaskInput,
 } from "../../contracts/scheduled-tasks";
 import { assertComposerAttachmentsAccepted } from "../../contracts/composer-attachments";
-import { isSessionMode, type SessionMode } from "../../contracts/session-mode";
+import { isSessionPermission, type SessionPermission } from "../../contracts/session-permission";
 import {
   decodeTaskWorkbenchTemplate,
   type SaveTaskWorkbenchTemplateInput,
@@ -197,9 +197,9 @@ export function expectThinkingLevel(
   return value;
 }
 
-export function expectSessionMode(value: unknown, name = "mode"): SessionMode {
-  if (!isSessionMode(value)) {
-    throw new TypeError(`${name} must be planner, reviewer, implementer or orchestrator`);
+export function expectSessionPermission(value: unknown, name = "permission"): SessionPermission {
+  if (!isSessionPermission(value)) {
+    throw new TypeError(`${name} must be plan, ask, edits or full`);
   }
   return value;
 }

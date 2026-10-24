@@ -39,7 +39,7 @@ import { restoreTopmostDialogFocus } from "../ui/dialog-focus";
 import { MoreIcon, SidePanelIcon } from "../ui/icons";
 
 import { ComposerPanel } from "../features/conversation/composer-panel";
-import { sessionModeFromUi, sessionModeSetter } from "../features/conversation/mode-selector";
+import { sessionPermissionFromUi, sessionPermissionSetter } from "../features/conversation/permission-selector";
 
 import { DiffPanel } from "../features/workbench/diff-panel";
 
@@ -1926,8 +1926,8 @@ export default function App() {
                 onSetModel={handleSetSessionModel}
 
                 onSetThinking={handleSetSessionThinking}
-                mode={sessionModeFromUi(selectedExtensionUi)}
-                onSetMode={sessionModeSetter(selectedWorkspace?.id, selectedSession.id)}
+                permission={sessionPermissionFromUi(selectedExtensionUi)}
+                onSetPermission={sessionPermissionSetter(selectedWorkspace?.id, selectedSession.id)}
 
                 modelOnboarding={selectedSessionModelOnboarding}
 

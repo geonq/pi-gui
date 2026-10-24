@@ -30,7 +30,7 @@ import {
 } from "../contracts/ipc";
 import type { ExtensionActionEffect, ExtensionActionRequest } from "../contracts/extension-actions";
 import type { ClipboardImageRead } from "../contracts/composer-attachments";
-import type { SessionMode } from "../contracts/session-mode";
+import type { SessionPermission } from "../contracts/session-permission";
 import type { AccountLimits, AccountStatus, SignInStatus, UsageReport } from "../contracts/usage";
 import type { SaveTaskWorkbenchTemplateInput, TaskWorkbenchTemplate } from "../contracts/workbench";
 import type {
@@ -358,12 +358,12 @@ const localPiDesktopApi = {
       sessionId,
       thinkingLevel,
     ) as Promise<DesktopAppState>,
-  setSessionMode: (workspaceId: string, sessionId: string, mode: SessionMode) =>
+  setSessionPermission: (workspaceId: string, sessionId: string, permission: SessionPermission) =>
     ipcRenderer.invoke(
-      desktopIpc.setSessionMode,
+      desktopIpc.setSessionPermission,
       workspaceId,
       sessionId,
-      mode,
+      permission,
     ) as Promise<DesktopAppState>,
   loginProvider: (workspaceId: string, providerId: string) =>
     ipcRenderer.invoke(

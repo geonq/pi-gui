@@ -35,8 +35,8 @@ import type {
 } from "../settings/model-onboarding";
 import { ContextMeter } from "./context-meter";
 import { ModelSelector } from "./model-selector";
-import { ModeSelector, runtimeHasModes } from "./mode-selector";
-import type { SessionMode } from "../../../contracts/session-mode";
+import { PermissionSelector, runtimeHasPermissions } from "./permission-selector";
+import type { SessionPermission } from "../../../contracts/session-permission";
 import { ExtensionNotices } from "../extensions/extension-notices";
 import { ExtensionFlagsBadge } from "../threads/extension-flags-selector";
 import type { ExtensionDockModel } from "../extensions/extension-session-ui";
@@ -81,9 +81,9 @@ interface ComposerPanelProps {
   readonly onSelectSlashOption: (option: ComposerSlashOption) => void;
   readonly onSetModel: (provider: string, modelId: string) => void;
   readonly onSetThinking: (level: string) => void;
-  /** The chat's reported Pi mode; `null` while none is active, `undefined` before it reports one. */
-  readonly mode?: SessionMode | null;
-  readonly onSetMode: (mode: SessionMode) => void;
+  /** The chat's reported Pi permission; `null` if unrecognized, `undefined` before it reports one. */
+  readonly permission?: SessionPermission | null;
+  readonly onSetPermission: (permission: SessionPermission) => void;
   readonly modelOnboarding: ModelOnboardingState;
   readonly onOpenModelSettings: (section: ModelOnboardingSettingsSection) => void;
   readonly onSubmit: () => void;
@@ -143,8 +143,8 @@ export function ComposerPanel({
   onSelectSlashOption,
   onSetModel,
   onSetThinking,
-  mode,
-  onSetMode,
+  permission,
+  onSetPermission,
   modelOnboarding,
   onOpenModelSettings,
   onSubmit,
@@ -245,8 +245,12 @@ export function ComposerPanel({
                       onSetModel={onSetModel}
                       onSetThinking={onSetThinking}
                     />
-                    {mode !== undefined || runtimeHasModes(runtime) ? (
-                      <ModeSelector mode={mode ?? null} disabled={running} onSetMode={onSetMode} />
+                    {permission !== undefined || runtimeHasPermissions(runtime) ? (
+                      <PermissionSelector
+                        permission={permission ?? null}
+                        disabled={running}
+                        onSetPermission={onSetPermission}
+                      />
                     ) : null}
                     <ExtensionFlagsBadge values={extensionFlags} />
                     <ContextMeter usage={usage} />

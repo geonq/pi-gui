@@ -5,8 +5,9 @@ import type {
   StartThreadInput,
 } from "../../contracts/desktop-state";
 import type { WorkspaceFolderDevice } from "../../contracts/workspace-folders";
-import { isSessionMode, type SessionMode } from "../../contracts/session-mode";
-import { sessionKey } from "@pi-gui/session-driver";
+import { isSessionPermission, type SessionPermission } from "../../contracts/session-permission";
+import { sessionKey, type HostUiResponse } from "@pi-gui/session-driver";
+import { expectHostUiResponse } from "../ipc/request-validation";
 import type { RemoteDesktopMethod, RemoteDesktopPiMethod } from "./remote-desktop-protocol";
 import { isRemoteDesktopPiMethod } from "./remote-desktop-protocol";
 
@@ -73,7 +74,14 @@ export type RemoteDesktopInvocation =
       readonly method: "setSessionThinkingLevel";
       readonly args: readonly [string, string, string];
     }
-  | { readonly method: "setSessionMode"; readonly args: readonly [string, string, SessionMode] }
+  | {
+      readonly method: "setSessionPermission";
+      readonly args: readonly [string, string, SessionPermission];
+    }
+  | {
+      readonly method: "respondToHostUiRequest";
+      readonly args: readonly [string, string, HostUiResponse];
+    }
   | {
       readonly method: "setDefaultThinkingLevel";
       readonly args: readonly [string] | readonly [string, string];
@@ -301,15 +309,27 @@ export function validateRemoteDesktopInvocation(
         ],
       };
     }
-    case "setSessionMode": {
+    case "setSessionPermission": {
       expectArgs(args, 3);
-      if (!isSessionMode(args[2])) throw new TypeError("mode is not supported.");
+      if (!isSessionPermission(args[2])) throw new TypeError("permission is not supported.");
       return {
         method: allowedMethod,
         args: [
           expectAuthorizedWorkspace(args[0], workspaceIds),
           expectString(args[1], "sessionId", 256),
           args[2],
+        ],
+      };
+    }
+    case "respondToHostUiRequest": {
+      // Answers a pending approval or input dialog in an authorized chat.
+      expectArgs(args, 3);
+      return {
+        method: allowedMethod,
+        args: [
+          expectAuthorizedWorkspace(args[0], workspaceIds),
+          expectString(args[1], "sessionId", 256),
+          expectHostUiResponse(args[2]),
         ],
       };
     }

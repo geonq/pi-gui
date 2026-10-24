@@ -69,7 +69,7 @@ import {
   expectThemePresetId,
   expectThreadGrouping,
   expectThinkingLevel,
-  expectSessionMode,
+  expectSessionPermission,
   expectWorkspaceFileListOptions,
   expectExtensionActionRequest,
 } from "./request-validation";
@@ -525,15 +525,15 @@ export function registerDesktopIpc({
       ),
   );
   ipcMain.handle(
-    desktopIpc.setSessionMode,
-    (event, rawWorkspaceId: unknown, rawSessionId: unknown, mode: unknown) =>
+    desktopIpc.setSessionPermission,
+    (event, rawWorkspaceId: unknown, rawSessionId: unknown, permission: unknown) =>
       run(event, () =>
         owners.conversation.runExtensionCommand(
           {
             workspaceId: expectNonEmptyString(rawWorkspaceId, "workspaceId"),
             sessionId: expectNonEmptyString(rawSessionId, "sessionId"),
           },
-          `/mode ${expectSessionMode(mode)}`,
+          `/permissions ${expectSessionPermission(permission)}`,
         ),
       ),
   );

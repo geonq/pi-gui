@@ -7,7 +7,7 @@ import type {
   SessionExtensionDialogRecord,
   SessionExtensionUiStateRecord,
 } from "../../../contracts/desktop-state";
-import { sessionModeStatusKey } from "../../../contracts/session-mode";
+import { sessionPermissionStatusKey } from "../../../contracts/session-permission";
 
 const ANSI_ESCAPE_PATTERN = /\u001B\[[0-?]*[ -/]*[@-~]/g;
 const DOCK_SEGMENT_SEPARATOR = "--------------------";
@@ -35,7 +35,7 @@ export function hasExtensionDockContent(uiState?: SessionExtensionUiStateRecord)
 
 /** The chat mode has its own picker in the composer, so the dock leaves it out. */
 function dockStatuses(uiState?: SessionExtensionUiStateRecord) {
-  return (uiState?.statuses ?? []).filter((status) => status.key !== sessionModeStatusKey);
+  return (uiState?.statuses ?? []).filter((status) => status.key !== sessionPermissionStatusKey);
 }
 
 export function buildExtensionDockModel(

@@ -170,6 +170,46 @@ test("remote archive actions authorize the workspace and validate the exact sess
   }
 });
 
+test("remote permission changes and dialog answers stay inside authorized chats", () => {
+  expect(
+    validateRemoteDesktopInvocation(
+      "setSessionPermission",
+      [allowedWorkspaceId, "thread-a", "ask"],
+      workspaceScope,
+    ),
+  ).toEqual({ method: "setSessionPermission", args: [allowedWorkspaceId, "thread-a", "ask"] });
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "setSessionPermission",
+      [allowedWorkspaceId, "thread-a", "implementer"],
+      workspaceScope,
+    ),
+  ).toThrow("permission is not supported");
+
+  const answer = { requestId: "dialog-1", confirmed: true };
+  expect(
+    validateRemoteDesktopInvocation(
+      "respondToHostUiRequest",
+      [allowedWorkspaceId, "thread-a", answer],
+      workspaceScope,
+    ),
+  ).toEqual({ method: "respondToHostUiRequest", args: [allowedWorkspaceId, "thread-a", answer] });
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "respondToHostUiRequest",
+      [deniedWorkspaceId, "private-thread", answer],
+      workspaceScope,
+    ),
+  ).toThrow("not authorized");
+  expect(() =>
+    validateRemoteDesktopInvocation(
+      "respondToHostUiRequest",
+      [allowedWorkspaceId, "thread-a", { requestId: "dialog-1", confirmed: true, value: "x" }],
+      workspaceScope,
+    ),
+  ).toThrow("exactly one");
+});
+
 test("remote state projection removes unauthorized projects and their selection", () => {
   const workspace = (id: string): WorkspaceRecord => ({
     id,
