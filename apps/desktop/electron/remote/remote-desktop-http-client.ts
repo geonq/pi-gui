@@ -1,4 +1,7 @@
 import http, { type ClientRequest, type IncomingMessage } from "node:http";
+import type { Readable } from "node:stream";
+import { StringDecoder } from "node:string_decoder";
+import { createBrotliDecompress } from "node:zlib";
 import type { RemoteDesktopClientFileConfig } from "./remote-desktop-config";
 import { assertRemoteJsonSize } from "./remote-desktop-policy";
 import {
@@ -53,6 +56,8 @@ export class RemoteDesktopHttpClient {
         return;
       }
       this.eventRequest = request;
+      const body = decodedBody(response);
+      const text = new StringDecoder("utf8");
       let buffer = "";
       let eventName = "";
       const data: string[] = [];
@@ -70,9 +75,10 @@ export class RemoteDesktopHttpClient {
         if (field === "event") eventName = value;
         else if (field === "data") data.push(value);
       };
-      response.on("data", (chunk: Buffer | string) => {
+      body.on("data", (chunk: Buffer | string) => {
         if (this.closed) return;
-        buffer += Buffer.isBuffer(chunk) ? chunk.toString("utf8") : chunk;
+        // A character split across two chunks stays whole: the decoder holds its first bytes.
+        buffer += Buffer.isBuffer(chunk) ? text.write(chunk) : chunk;
         if (Buffer.byteLength(buffer, "utf8") > MAX_RESPONSE_BYTES) {
           request.destroy();
           return;
@@ -84,8 +90,11 @@ export class RemoteDesktopHttpClient {
           newline = buffer.indexOf("\n");
         }
       });
-      response.once("end", () => this.scheduleReconnect());
-      response.once("error", () => this.scheduleReconnect());
+      body.once("end", () => this.scheduleReconnect());
+      body.once("error", () => {
+        request.destroy();
+        this.scheduleReconnect();
+      });
     });
     this.eventRequest = request;
     request.on("error", () => this.scheduleReconnect());
@@ -121,6 +130,7 @@ export class RemoteDesktopHttpClient {
           method,
           headers: {
             ...this.authHeaders(),
+            "Accept-Encoding": "br",
             ...(body === undefined
               ? { Accept: "application/json" }
               : {
@@ -149,16 +159,19 @@ export class RemoteDesktopHttpClient {
   ): void {
     const chunks: Buffer[] = [];
     let size = 0;
-    response.on("data", (chunk: Buffer | string) => {
+    const body = decodedBody(response);
+    body.on("data", (chunk: Buffer | string) => {
       const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       size += bytes.byteLength;
+      // Counted after decompression, so a small compressed reply cannot unpack past the limit.
       if (size > MAX_RESPONSE_BYTES) {
-        response.destroy(new Error("The Windows response exceeds its size limit."));
+        body.destroy(new Error("The Windows response exceeds its size limit."));
+        response.destroy();
       } else {
         chunks.push(bytes);
       }
     });
-    response.once("end", () => {
+    body.once("end", () => {
       const raw = Buffer.concat(chunks, size).toString("utf8");
       let value: unknown;
       try {
@@ -173,14 +186,15 @@ export class RemoteDesktopHttpClient {
       }
       resolve(value);
     });
-    response.once("error", reject);
+    body.once("error", reject);
+    if (body !== response) response.once("error", reject);
   }
 
   private eventOptions() {
     return {
       ...this.baseOptions("/v1/events"),
       method: "GET" as const,
-      headers: { ...this.authHeaders(), Accept: "text/event-stream" },
+      headers: { ...this.authHeaders(), Accept: "text/event-stream", "Accept-Encoding": "br" },
     };
   }
 
@@ -228,6 +242,19 @@ export class RemoteDesktopHttpClient {
     }, RECONNECT_DELAY_MS);
     this.reconnectTimer.unref?.();
   }
+}
+
+/** The response body as sent, decompressed when the host answered with Brotli. */
+function decodedBody(response: IncomingMessage): Readable {
+  const encoding = response.headers["content-encoding"]?.trim().toLowerCase();
+  if (!encoding || encoding === "identity") return response;
+  if (encoding !== "br") {
+    response.destroy(new Error("The Windows backend used an unsupported encoding."));
+    return response;
+  }
+  const decoder = createBrotliDecompress();
+  response.on("error", (error) => decoder.destroy(error));
+  return response.pipe(decoder);
 }
 
 function responseError(value: unknown): string {

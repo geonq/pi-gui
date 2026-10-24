@@ -422,3 +422,132 @@ test("loopback host validates and dispatches active-view protocol requests", asy
     await host.close();
   }
 });
+
+test("clients that accept Brotli get compressed replies and a stream whose small updates stay small", async () => {
+  const { createBrotliDecompress } = await import("node:zlib");
+  const port = await freeLoopbackPort();
+  const token = randomBytes(32).toString("base64url");
+  // About 1 MB of model-list-like JSON, the shape that makes the real state 2 MB.
+  const padding = Array.from(
+    { length: 40_000 },
+    (_, index) => `model-${index}-${(index * 7919) % 997}`,
+  ).join(",");
+  const fake = createTestBroker(makeState(1, padding));
+  const host = await startRemoteDesktopHttpHost({
+    port,
+    allowedOrigins: ["file://"],
+    clients: [{ id: "mac-client", token, workspaceIds: ["workspace"] }],
+    brokers: new Map([["mac-client", fake.broker]]),
+  });
+  const client = new RemoteDesktopHttpClient({
+    version: 1,
+    baseUrl: host.origin,
+    origin: "file://",
+    token,
+  });
+  const events: RemoteDesktopEvent[] = [];
+  client.subscribe((event) => events.push(event));
+  let raw: http.ClientRequest | undefined;
+  try {
+    // The real client asks for Brotli and decodes it.
+    expect(await client.invoke("getState", [])).toEqual(makeState(1, padding));
+
+    // On the wire the reply is compressed and far smaller.
+    const reply = await new Promise<{ encoding?: string; bytes: number }>((resolve, reject) => {
+      const body = Buffer.from(JSON.stringify({ method: "getState", args: [] }));
+      const request = http.request(
+        {
+          hostname: "127.0.0.1",
+          port,
+          path: "/v1/invoke",
+          method: "POST",
+          headers: {
+            Origin: "file://",
+            Authorization: `Bearer ${token}`,
+            "Accept-Encoding": "gzip, br",
+            "Content-Type": "application/json",
+            "Content-Length": String(body.byteLength),
+          },
+        },
+        (response) => {
+          let bytes = 0;
+          response.on("data", (chunk: Buffer) => (bytes += chunk.byteLength));
+          response.once("end", () =>
+            resolve({ encoding: response.headers["content-encoding"], bytes }),
+          );
+        },
+      );
+      request.once("error", reject);
+      request.end(body);
+    });
+    expect(reply.encoding).toBe("br");
+    expect(reply.bytes).toBeLessThan(padding.length / 5);
+
+    // Event stream: the first state costs its compressed size, a near-identical one almost nothing.
+    let wireBytes = 0;
+    let decoded = "";
+    raw = http.request({
+      hostname: "127.0.0.1",
+      port,
+      path: "/v1/events",
+      method: "GET",
+      headers: {
+        Origin: "file://",
+        Authorization: `Bearer ${token}`,
+        Accept: "text/event-stream",
+        "Accept-Encoding": "br",
+      },
+    });
+    raw.on("response", (response) => {
+      expect(response.headers["content-encoding"]).toBe("br");
+      response.on("data", (chunk: Buffer) => (wireBytes += chunk.byteLength));
+      response
+        .pipe(createBrotliDecompress())
+        .on("data", (chunk: Buffer) => (decoded += chunk.toString("utf8")));
+    });
+    raw.end();
+    await waitUntil(() => decoded.includes('"revision":1'), 5_000);
+    await waitUntil(() => decoded.includes("selectedTranscriptChanged"), 5_000);
+    const afterBootstrap = wireBytes;
+    fake.emit({
+      type: "stateChanged",
+      state: { ...makeState(2, padding), activeView: "usage" },
+    } as never);
+    await waitUntil(() => decoded.includes('"revision":2'), 5_000);
+    expect(wireBytes - afterBootstrap).toBeLessThan(2_000);
+
+    // The real client's stream decodes the same frames.
+    client.startEvents();
+    // A new stream starts from the broker's current state, which this fake keeps at revision 1.
+    await waitUntil(() => events.some((event) => eventLabel(event) === "state:1"), 5_000);
+    fake.emit({ type: "stateChanged", state: makeState(3, padding) } as never);
+    await waitUntil(() => events.some((event) => eventLabel(event) === "state:3"), 5_000);
+  } finally {
+    raw?.destroy();
+    client.close();
+    await host.close();
+  }
+});
+
+test("a client that does not ask for Brotli still gets plain JSON", async () => {
+  const port = await freeLoopbackPort();
+  const token = randomBytes(32).toString("base64url");
+  const fake = createTestBroker(makeState(4, "y".repeat(50_000)));
+  const host = await startRemoteDesktopHttpHost({
+    port,
+    allowedOrigins: ["file://"],
+    clients: [{ id: "mac-client", token, workspaceIds: ["workspace"] }],
+    brokers: new Map([["mac-client", fake.broker]]),
+  });
+  try {
+    const plain = await sendRequest(port, {
+      pathname: "/v1/invoke",
+      token,
+      body: Buffer.from(JSON.stringify({ method: "getState", args: [] })),
+    });
+    expect(plain.status).toBe(200);
+    expect(JSON.parse(plain.body.toString("utf8")).result.revision).toBe(4);
+  } finally {
+    await host.close();
+  }
+});

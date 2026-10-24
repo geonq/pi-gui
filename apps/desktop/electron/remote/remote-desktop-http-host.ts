@@ -1,6 +1,9 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
+import { pipeline, type Writable } from "node:stream";
+import { promisify } from "node:util";
+import { brotliCompress, constants as zlibConstants, createBrotliCompress } from "node:zlib";
 import type { RemoteDesktopBroker } from "./remote-desktop-broker";
 import {
   isRemoteDesktopEvent,
@@ -19,6 +22,23 @@ const MAX_SSE_BUFFER_BYTES = 24 * 1024 * 1024;
 const MAX_SSE_QUEUED_EVENTS = 64;
 const MAX_SSE_QUEUED_FRAMES = MAX_SSE_QUEUED_EVENTS + 2;
 const SSE_HEARTBEAT_FRAME = ": keep-alive\n\n";
+/** Responses under this size go out as they are; compressing them saves nothing worth the work. */
+const MIN_COMPRESSED_BYTES = 2048;
+const brotliCompressAsync = promisify(brotliCompress);
+
+/**
+ * The Mac reaches this host through an SSH tunnel that may run over a relayed Tailscale path, and
+ * the app state is about 2 MB of JSON. Clients that send `Accept-Encoding: br` get Brotli: a reply
+ * shrinks about 25x, and on the event stream a 16 MB window lets each state reference the previous
+ * one, so an update that changes one field costs bytes instead of the whole state again.
+ */
+function acceptsBrotli(request: IncomingMessage): boolean {
+  const header = request.headers["accept-encoding"];
+  return (
+    typeof header === "string" &&
+    header.split(",").some((value) => value.split(";", 1)[0]?.trim().toLowerCase() === "br")
+  );
+}
 
 export interface RemoteDesktopHostClient {
   readonly id: string;
@@ -49,7 +69,10 @@ interface ClientRecord {
 
 interface SseConnection {
   readonly clientId: string;
-  readonly response: ServerResponse;
+  /** The HTTP response, or the Brotli encoder in front of it when the client accepts `br`. */
+  readonly response: Writable;
+  /** Pushes what the encoder holds onto the wire, so each frame arrives as soon as it is written. */
+  readonly flush?: () => void;
   readonly heartbeat: ReturnType<typeof setInterval>;
   initializing: boolean;
   readonly queuedEvents: SerializedSseFrame[];
@@ -169,7 +192,7 @@ function authenticate(
   return authenticated;
 }
 
-function writeJson(response: ServerResponse, status: number, value: unknown): void {
+function serializeJson(value: unknown): Buffer {
   let body: Buffer;
   try {
     const serialized = JSON.stringify(value);
@@ -185,13 +208,49 @@ function writeJson(response: ServerResponse, status: number, value: unknown): vo
   if (body.byteLength > MAX_RESPONSE_BYTES) {
     throw new HttpError(413, "response_too_large", "The remote response exceeds its size limit.");
   }
+  return body;
+}
+
+function sendJsonBody(
+  response: ServerResponse,
+  status: number,
+  body: Buffer,
+  encoding?: "br",
+): void {
   response.writeHead(status, {
     "Cache-Control": "no-store",
+    ...(encoding ? { "Content-Encoding": encoding, Vary: "Origin, Accept-Encoding" } : {}),
     "Content-Length": String(body.byteLength),
     "Content-Type": "application/json; charset=utf-8",
     "X-Content-Type-Options": "nosniff",
   });
   response.end(body);
+}
+
+function writeJson(response: ServerResponse, status: number, value: unknown): void {
+  sendJsonBody(response, status, serializeJson(value));
+}
+
+/** Like writeJson, compressed with Brotli for a client that accepts it; off the main thread. */
+async function writeJsonEncoded(
+  request: IncomingMessage,
+  response: ServerResponse,
+  status: number,
+  value: unknown,
+): Promise<void> {
+  const body = serializeJson(value);
+  if (!acceptsBrotli(request) || body.byteLength < MIN_COMPRESSED_BYTES) {
+    sendJsonBody(response, status, body);
+    return;
+  }
+  const encoded = await brotliCompressAsync(body, {
+    params: {
+      [zlibConstants.BROTLI_PARAM_QUALITY]: 5,
+      [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
+      [zlibConstants.BROTLI_PARAM_SIZE_HINT]: body.byteLength,
+    },
+  });
+  if (!response.writableEnded && !response.destroyed) sendJsonBody(response, status, encoded, "br");
 }
 
 function writeError(response: ServerResponse, error: unknown): void {
@@ -344,6 +403,7 @@ export async function startRemoteDesktopHttpHost(
     }
     try {
       const accepted = stream.response.write(frame.text);
+      stream.flush?.();
       if (frame.type === "stateChanged") stream.lastSentStateRevision = frame.revision;
       if (!accepted) waitForDrain(stream);
       return true;
@@ -507,7 +567,7 @@ export async function startRemoteDesktopHttpHost(
           throw new HttpError(400, "invalid_request", "The remote method request is invalid.");
         }
         const result = await client.broker.invoke(body.method, body.args);
-        writeJson(response, 200, { version: 1, result });
+        await writeJsonEncoded(request, response, 200, { version: 1, result });
       } catch (error) {
         if (error instanceof HttpError) {
           writeError(response, error);
@@ -567,22 +627,41 @@ export async function startRemoteDesktopHttpHost(
         );
         return;
       }
+      const brotli = acceptsBrotli(request);
       response.writeHead(200, {
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
+        ...(brotli ? { "Content-Encoding": "br", Vary: "Origin, Accept-Encoding" } : {}),
         "Content-Type": "text/event-stream; charset=utf-8",
         "X-Accel-Buffering": "no",
       });
-      response.write(`id: ${eventSequence++}\nevent: ready\ndata: {"version":1}\n\n`);
+      // Quality 4 with a 16 MB window: about 35 ms for the first full state, then a few ms and a
+      // few dozen bytes for each state that differs only slightly from the one before it.
+      const encoder = brotli
+        ? createBrotliCompress({
+            params: {
+              [zlibConstants.BROTLI_PARAM_QUALITY]: 4,
+              [zlibConstants.BROTLI_PARAM_LGWIN]: 24,
+              [zlibConstants.BROTLI_PARAM_MODE]: zlibConstants.BROTLI_MODE_TEXT,
+            },
+          })
+        : undefined;
+      // A closed response ends the encoder too; the response's own close/error events clean up.
+      if (encoder) pipeline(encoder, response, () => undefined);
+      const sink: Writable = encoder ?? response;
+      const flush = encoder ? () => encoder.flush(zlibConstants.BROTLI_OPERATION_FLUSH) : undefined;
+      sink.write(`id: ${eventSequence++}\nevent: ready\ndata: {"version":1}\n\n`);
+      flush?.();
       const stream: SseConnection = {
         clientId: client.config.id,
-        response,
+        response: sink,
+        ...(flush ? { flush } : {}),
         initializing: true,
         queuedEvents: [],
         queuedBytes: 0,
         waitingForDrain: false,
         heartbeat: setInterval(() => {
-          if (response.writableEnded || response.destroyed) {
+          if (sink.writableEnded || sink.destroyed) {
             removeStream(stream);
             return;
           }
@@ -590,14 +669,16 @@ export async function startRemoteDesktopHttpHost(
             return;
           }
           if (
-            response.writableLength + Buffer.byteLength(SSE_HEARTBEAT_FRAME, "utf8") >
+            sink.writableLength + Buffer.byteLength(SSE_HEARTBEAT_FRAME, "utf8") >
             MAX_SSE_BUFFER_BYTES
           ) {
             destroyStream(stream);
             return;
           }
           try {
-            if (!response.write(SSE_HEARTBEAT_FRAME)) waitForDrain(stream);
+            const accepted = sink.write(SSE_HEARTBEAT_FRAME);
+            flush?.();
+            if (!accepted) waitForDrain(stream);
           } catch {
             destroyStream(stream);
           }
@@ -610,7 +691,7 @@ export async function startRemoteDesktopHttpHost(
       try {
         const state = await client.broker.invoke("getState", []);
         const transcript = await client.broker.invoke("getSelectedTranscript", []);
-        if (closed || response.writableEnded || response.destroyed) return;
+        if (closed || sink.writableEnded || sink.destroyed) return;
         const initialFrames: SerializedSseFrame[] = [];
         if (isRecord(state) && Array.isArray(state.workspaces)) {
           const stateFrame = serializeSseEvent({ type: "stateChanged", state: state as never });
