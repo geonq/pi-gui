@@ -1086,8 +1086,8 @@
    screen. */
 .queued-composer-messages {
   display: grid;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 2px;
+  margin-bottom: 6px;
   max-height: min(40vh, 360px);
   overflow-y: auto;
 }
@@ -1118,18 +1118,42 @@
   cursor: pointer;
 }
 
+.queued-composer-message__actions button {
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--radius-lg);
+  font-size: 12px;
+}
+
 .queued-composer-messages__editing button:hover,
 .queued-composer-message__actions button:hover {
   color: var(--text-strong);
 }
 
+.queued-composer-message__actions button:hover {
+  background: var(--line);
+}
+
+/* A waiting message is a quiet row inside the composer, not a second card: the text leads and
+   its actions stay dim until the row is hovered or focused. */
 .queued-composer-message {
   display: grid;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: var(--radius-3xl);
-  border: 1px solid var(--line);
-  background: linear-gradient(180deg, var(--main) 0%, var(--surface-muted) 100%);
+  gap: 6px;
+  padding: 4px 4px 4px 10px;
+  border-radius: var(--radius-xl);
+  border: 1px solid transparent;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.queued-composer-message:hover,
+.queued-composer-message:focus-within {
+  background: var(--surface-muted);
+}
+
+.queued-composer-message:hover .queued-composer-message__actions,
+.queued-composer-message:focus-within .queued-composer-message__actions {
+  opacity: 1;
 }
 
 .queued-composer-message--editing {
@@ -1147,10 +1171,12 @@
 .queued-composer-message__actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 2px;
   flex-shrink: 0;
   flex-wrap: nowrap;
   justify-content: flex-end;
+  opacity: 0.55;
+  transition: opacity 120ms ease;
 }
 
 /* A queued message is a short preview: two lines, the full text in the tooltip and in Edit. */
@@ -1161,7 +1187,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  color: var(--text);
+  color: var(--muted-strong);
   font-size: 13px;
   line-height: 1.45;
   overflow-wrap: anywhere;
