@@ -253,6 +253,20 @@ function TimelineMessage({
 /** Subagent names shown under the working pill before the rest collapse into "and N more". */
 const ACTIVITY_ENTRY_LIMIT = 4;
 
+/** A working label carries a hidden bright copy for its shimmer (see timeline.css). */
+function ActivityLabel({ label, working }: { readonly label: string; readonly working: boolean }) {
+  return (
+    <span className="timeline-activity__label">
+      {label}
+      {working ? (
+        <span aria-hidden="true" className="timeline-activity__shine">
+          <span>{label}</span>
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
 function TimelineActivityItem({ item }: { readonly item: TimelineActivity }) {
   if (item.entries?.length) {
     const shown = item.entries.slice(0, ACTIVITY_ENTRY_LIMIT);
@@ -262,7 +276,7 @@ function TimelineActivityItem({ item }: { readonly item: TimelineActivity }) {
       <div className="timeline-activity-group">
         <div className={`timeline-activity timeline-activity--${item.tone ?? "neutral"}`}>
           {item.tone === "working" ? <StateOrb state={item.activityState ?? "solving"} /> : null}
-          <span className="timeline-activity__label">{item.label}</span>
+          <ActivityLabel label={item.label} working={item.tone === "working"} />
         </div>
         <ul className="timeline-activity__entries">
           {shown.map((entry, index) => (
@@ -278,7 +292,7 @@ function TimelineActivityItem({ item }: { readonly item: TimelineActivity }) {
   return (
     <div className={`timeline-activity timeline-activity--${item.tone ?? "neutral"}`}>
       {item.tone === "working" ? <StateOrb state={item.activityState ?? "solving"} /> : null}
-      <span className="timeline-activity__label">{item.label}</span>
+      <ActivityLabel label={item.label} working={item.tone === "working"} />
       {item.detail ? <span className="timeline-activity__detail">{item.detail}</span> : null}
       {item.metadata ? <span className="timeline-activity__meta">{item.metadata}</span> : null}
     </div>

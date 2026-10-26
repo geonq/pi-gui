@@ -1,0 +1,36 @@
+/* The libraries.dev border beam, drawn on a canvas over its box (see ui/activity-beam.tsx). */
+.activity-beam {
+  position: relative;
+}
+
+.activity-beam__canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  animation: activity-beam-in 600ms ease forwards;
+}
+
+.activity-beam__canvas--fading {
+  animation: activity-beam-out 500ms ease forwards;
+}
+
+@keyframes activity-beam-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes activity-beam-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-beam__canvas {
+    display: none;
+  }
+}

@@ -17,6 +17,7 @@ import type {
 } from "../../../contracts/desktop-state";
 import type { MentionOption } from "./hooks/use-mention-menu";
 import { ArrowUpIcon, PlusIcon, StopSquareIcon } from "../../ui/icons";
+import { ActivityBeam } from "../../ui/activity-beam";
 import type {
   ComposerSlashCommand,
   ComposerSlashCommandSection,
@@ -169,9 +170,12 @@ export function ComposerPanel({
     <footer className="composer" aria-busy={preparingTaskDraft}>
       <div className="conversation conversation--composer" inert={preparingTaskDraft}>
         <ExtensionNotices notices={extensionNotices} />
-        {/* No moving border while a run works: the working pill already says so, and the beam
-            alone kept a 120 Hz Mac's GPU near 100%. */}
-        <div className="composer__frame">
+        {/* The libraries.dev beam travels around the composer while a request or task runs. */}
+        <ActivityBeam
+          active={running || preparingTaskDraft}
+          className="composer__beam"
+          preset="composer"
+        >
           <ComposerSurface
             lastError={lastError}
             activeSlashCommand={activeSlashCommand}
@@ -274,7 +278,7 @@ export function ComposerPanel({
               </div>
             }
           />
-        </div>
+        </ActivityBeam>
       </div>
       {preparingTaskDraft ? (
         <div className="composer__footer-row">

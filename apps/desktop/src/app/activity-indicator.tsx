@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { BorderBeam } from "border-beam";
 import { MODE_FRAMES, paintFrame, resolvePreset, type OrbState } from "thinking-orbs/engine";
 import { AnimatePresence, motion } from "motion/react";
 import type { AgentActivityState } from "../../contracts/agent-activity";
+import { ActivityBeam } from "../ui/activity-beam";
 import { useActiveTheme } from "../ui/active-theme";
+import { subscribeMotion } from "../ui/motion-clock";
 
 interface ActivityIndicatorProps {
   readonly label: string;
@@ -25,29 +26,6 @@ export function useSystemMotionPaused(): boolean {
     };
   }, []);
   return paused;
-}
-
-// Every orb paints from one shared 15 fps clock. The library's own loop painted each orb on every
-// display frame, which on a 120 Hz Mac kept the GPU busy for a 20 px dot.
-const ORB_FRAME_MS = 1000 / 15;
-const orbPainters = new Set<(seconds: number) => void>();
-let orbTimer = 0;
-
-function subscribeOrb(paint: (seconds: number) => void): () => void {
-  orbPainters.add(paint);
-  if (!orbTimer) {
-    orbTimer = window.setInterval(() => {
-      const seconds = performance.now() / 1000;
-      for (const painter of orbPainters) painter(seconds);
-    }, ORB_FRAME_MS);
-  }
-  return () => {
-    orbPainters.delete(paint);
-    if (orbPainters.size === 0) {
-      window.clearInterval(orbTimer);
-      orbTimer = 0;
-    }
-  };
 }
 
 function OrbCanvas({
@@ -77,7 +55,7 @@ function OrbCanvas({
       paintFrame(context, frameAt(size, seconds * speed, opts), dark);
     };
     paint(performance.now() / 1000);
-    return paused ? undefined : subscribeOrb(paint);
+    return paused ? undefined : subscribeMotion(paint);
   }, [state, size, paused, dark]);
   return <canvas ref={ref} style={{ display: "block", width: size, height: size }} />;
 }
@@ -117,7 +95,6 @@ export function StateOrb({
 }
 
 export function ActivityIndicator({ label, state = "solving" }: ActivityIndicatorProps) {
-  const { variant } = useActiveTheme();
   const systemPaused = useSystemMotionPaused();
   const [manuallyPaused, setManuallyPaused] = useState(false);
   const [longRunning, setLongRunning] = useState(false);
@@ -131,19 +108,7 @@ export function ActivityIndicator({ label, state = "solving" }: ActivityIndicato
 
   return (
     <div className="running-activity">
-      <BorderBeam
-        active={!paused}
-        brightness={0.8}
-        className="running-activity__beam"
-        colorVariant="mono"
-        duration={3.2}
-        glowSize={0.55}
-        saturation={0.75}
-        size="sm"
-        staticColors
-        strength={0.5}
-        theme={variant}
-      >
+      <ActivityBeam active={!paused} className="running-activity__beam" preset="pill">
         <span className="running-activity__badge">
           <StateOrb paused={paused} state={state} />
           <span aria-hidden="true">{label}</span>
@@ -151,7 +116,7 @@ export function ActivityIndicator({ label, state = "solving" }: ActivityIndicato
             Agent working
           </span>
         </span>
-      </BorderBeam>
+      </ActivityBeam>
       {longRunning && !systemPaused ? (
         <button
           aria-label={manuallyPaused ? "Resume activity animation" : "Pause activity animation"}

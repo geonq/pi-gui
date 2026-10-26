@@ -304,26 +304,52 @@
 }
 
 .timeline-activity--working .timeline-activity__label {
-  background: linear-gradient(
-      90deg,
-      var(--muted-soft) 30%,
-      var(--text-strong) 50%,
-      var(--muted-soft) 70%
-    )
-    0 0 / 300% 100%;
-  background-clip: text;
-  color: transparent;
+  position: relative;
+  overflow: clip;
+  color: var(--muted-soft);
   font-weight: var(--font-medium);
-  /* Stepped (15 fps) so the browser skips the frames in between. */
-  animation: thinking-shimmer 2.4s steps(36) infinite;
 }
 
-@keyframes thinking-shimmer {
+/* The shimmer: a bright copy of the label seen through a band that sweeps left to right. The band
+   (three label widths, 30-50-70% ramp) slides by transform and the copy slides back just as far,
+   so the text stays put and nothing repaints; blending the copy over the muted text gives the same
+   colours a moving 300% background gradient would. */
+.timeline-activity__shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 300%;
+  height: 100%;
+  mask-image: linear-gradient(90deg, transparent 30%, #000 50%, transparent 70%);
+  pointer-events: none;
+  user-select: none;
+  animation: thinking-shine-band 2.4s linear infinite;
+}
+
+.timeline-activity__shine > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: calc(100% / 3);
+  color: var(--text-strong);
+  animation: thinking-shine-text 2.4s linear infinite;
+}
+
+@keyframes thinking-shine-band {
   from {
-    background-position: 100% 0;
+    transform: translateX(-66.6667%);
   }
   to {
-    background-position: 0 0;
+    transform: translateX(0);
+  }
+}
+
+@keyframes thinking-shine-text {
+  from {
+    transform: translateX(200%);
+  }
+  to {
+    transform: translateX(0);
   }
 }
 
@@ -532,7 +558,7 @@
 
 .timeline-tool--running .timeline-tool__status-pip {
   background: var(--accent);
-  animation: timeline-pip-pulse 1.4s steps(10) infinite;
+  animation: timeline-pip-pulse 1.4s var(--ease-in-out) infinite;
 }
 
 @keyframes timeline-pip-pulse {

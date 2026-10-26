@@ -120,15 +120,6 @@ button {
   border-radius: 999px;
 }
 
-/* About 15 fps (3.2 s per lap): the browser skips the frames between steps, so the beam no
-   longer repaints at the display rate (near a full core on a 120 Hz Mac). */
-.running-activity__beam,
-.running-activity__beam *,
-.running-activity__beam::before,
-.running-activity__beam::after {
-  animation-timing-function: steps(48) !important;
-}
-
 .running-activity__badge {
   display: inline-flex;
   align-items: center;
@@ -250,8 +241,9 @@ option:disabled {
   --titlebar-toggle-left: 12px;
 }
 
-.composer__frame {
-  position: relative;
+/* The beam's layers clip themselves; the wrapper must not clip the composer's menus. */
+.composer__beam {
+  overflow: visible;
 }
 
 /* Mirrors a chevron into up/left without a second icon. */

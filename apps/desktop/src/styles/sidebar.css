@@ -814,8 +814,8 @@
   border: 2px solid var(--border-heavy);
   border-top-color: var(--status-running);
   border-right-color: var(--status-running);
-  /* Stepped (~13 fps) so the browser skips the frames in between. */
-  animation: session-row-spin 900ms steps(12) infinite;
+  /* A transform only: the compositor turns it at the display rate without repainting. */
+  animation: session-row-spin 900ms linear infinite;
 }
 
 .session-row__status--failed {
