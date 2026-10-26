@@ -7,6 +7,7 @@ import type { SessionRef } from "@pi-gui/session-driver";
 import {
   createNamedThread,
   getDesktopState,
+  getMainOrchestrationChildren,
   launchDesktop,
   makeUserDataDir,
   makeWorkspace,
@@ -181,8 +182,7 @@ test("create_child_thread surfaces deterministic initial-prompt delivery failure
       }),
     ).rejects.toThrow(/API key|authentication|credential/i);
 
-    const state = await getDesktopState(window);
-    const matchingChildren = state.orchestrationChildren.filter(
+    const matchingChildren = (await getMainOrchestrationChildren(harness)).filter(
       (entry) => entry.sourceToolCallId === "create-child-delivery-failure",
     );
     expect(matchingChildren).toHaveLength(1);

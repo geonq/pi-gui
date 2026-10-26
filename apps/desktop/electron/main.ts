@@ -1571,6 +1571,8 @@ app
             promptForText(mainWindow, message, placeholder ?? "", allowEmpty ?? false),
           runOrchestrationRuntimeTool: (input: OrchestrationRuntimeToolTestInput) =>
             runOrchestrationRuntimeToolForTest(orchestrationRuntimeBridge, input),
+          // Windows get child threads without goal, transcript and evidence (see forWindow).
+          orchestrationChildren: () => store.snapshot().orchestrationChildren,
           runScheduledTaskRuntimeTool: (input: ScheduledTaskRuntimeToolTestInput) =>
             runScheduledTaskRuntimeToolForTest(scheduledTaskRuntimeBridge, input),
           fireDueScheduledTasks: (nowIso?: string) =>

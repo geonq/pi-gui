@@ -9,6 +9,53 @@ import type { SessionDriverEvent, SessionRef } from "@pi-gui/session-driver";
 export const STREAMING_UI_PUBLISH_INTERVAL_MS = 50;
 
 /**
+ * While a reply streams, the transcript is published every interval above, but a tick changes
+ * nothing else in app state except the sidebar preview and timestamps. A full DesktopAppState
+ * snapshot (hundreds of KB: model catalogs, subagent records) on every tick kept main and the
+ * renderer busy cloning it ~14 times a second, so streaming ticks publish app state at this pace.
+ */
+export const STREAMING_STATE_PUBLISH_INTERVAL_MS = 500;
+
+/** Runs `publish` at most once per interval; a call inside the interval runs once at its end. */
+export class TrailingThrottle {
+  private last = 0;
+  private timer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor(
+    private readonly publish: () => void,
+    private readonly intervalMs: number = STREAMING_STATE_PUBLISH_INTERVAL_MS,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  request(): void {
+    if (this.timer) return;
+    const wait = this.last + this.intervalMs - this.now();
+    if (wait <= 0) {
+      this.run();
+      return;
+    }
+    this.timer = setTimeout(() => this.run(), wait);
+  }
+
+  /** A full publish just happened elsewhere, so nothing is owed until the next interval. */
+  published(): void {
+    this.cancel();
+    this.last = this.now();
+  }
+
+  cancel(): void {
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = undefined;
+  }
+
+  private run(): void {
+    this.timer = undefined;
+    this.last = this.now();
+    this.publish();
+  }
+}
+
+/**
  * Token-level `assistantDelta` always arrives with a redundant `sessionUpdated`
  * (preview/timestamp). Publishing full app state for each pair was the leftover
  * #93 CPU path after #114. Defer those two; flush immediately on discrete events.

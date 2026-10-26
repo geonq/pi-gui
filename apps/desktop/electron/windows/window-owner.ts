@@ -4,10 +4,35 @@ import type {
   AppView,
   DesktopAppState,
   DesktopAppViewState,
+  OrchestrationChildThread,
   SelectedTranscriptRecord,
 } from "../../contracts/desktop-state";
 import { desktopIpc } from "../../contracts/ipc";
 import { SerializedActionQueue } from "./action-queue";
+
+// A window shows a child thread by its title, status and the threads it links; its goal, transcript
+// and evidence stay in main (orchestration reads them there). Sending them made every state publish
+// carry ~0.5 MB for 25 finished subagents, about 14 times a second while a reply streamed.
+const windowChildren = new WeakMap<
+  readonly OrchestrationChildThread[],
+  readonly OrchestrationChildThread[]
+>();
+
+export function forWindow(state: DesktopAppState): DesktopAppState {
+  const children = state.orchestrationChildren;
+  let light = windowChildren.get(children);
+  if (!light) {
+    light = children.map((child) => ({
+      ...child,
+      goal: "",
+      latestTranscript: "",
+      transcript: [],
+      evidence: [],
+    }));
+    windowChildren.set(children, light);
+  }
+  return { ...state, orchestrationChildren: light };
+}
 
 interface WindowViewState {
   readonly selectedWorkspaceId: string;
@@ -232,9 +257,9 @@ export class WindowOwner {
 
   async stateForWindow(window?: BrowserWindow | null): Promise<DesktopAppState> {
     if (window && canPublishToWindow(window)) {
-      return this.stateOwner.getStateForView(this.viewForWindow(window));
+      return forWindow(await this.stateOwner.getStateForView(this.viewForWindow(window)));
     }
-    return this.stateOwner.getState();
+    return forWindow(await this.stateOwner.getState());
   }
 
   isSessionVisibleInAnotherWindow(sessionRef: SessionRef): boolean {
@@ -364,7 +389,7 @@ export class WindowOwner {
     view: WindowViewState = this.views.get(webContentsId) ?? viewFromState(state),
     previousView: WindowViewState | undefined = this.views.get(webContentsId),
   ): DesktopAppState {
-    const projected = this.stateOwner.projectStateForView(view, state, previousView);
+    const projected = forWindow(this.stateOwner.projectStateForView(view, state, previousView));
     if (
       projected.composerDraftSyncSource === "persist" &&
       this.composerDraftPersistOriginWebContentsId !== undefined &&

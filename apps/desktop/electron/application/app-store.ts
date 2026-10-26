@@ -81,7 +81,7 @@ import {
   applySessionEventState,
   updateSessionRecord,
 } from "../conversation/app-store-session-state";
-import { StreamingUiPublisher } from "../conversation/streaming-ui-publisher";
+import { StreamingUiPublisher, TrailingThrottle } from "../conversation/streaming-ui-publisher";
 import type { RefreshStateOptions } from "./refresh-state-options";
 import {
   readPersistedUiState,
@@ -228,9 +228,11 @@ export class DesktopAppStore {
    * the renderer does not apply a full DesktopAppState snapshot per token.
    */
   private readonly streamingUiPublisher = new StreamingUiPublisher((sessionRef) => {
-    this.emit();
+    this.streamingStatePublisher.request();
     this.publishSelectedTranscriptFor(sessionRef);
   });
+  /** App state for streaming ticks: the sidebar preview, at STREAMING_STATE_PUBLISH_INTERVAL_MS. */
+  private readonly streamingStatePublisher = new TrailingThrottle(() => this.emit());
   /** Per-workspace serial queue so focus reconciles never overlap or race. */
   private readonly externalChangeQueues = new Map<string, Promise<void>>();
   /**
@@ -750,6 +752,7 @@ export class DesktopAppStore {
 
   async flushPersistence(): Promise<void> {
     this.streamingUiPublisher.clear();
+    this.streamingStatePublisher.cancel();
     await this.initialize();
     if (this.persistUiStateTimer) {
       clearTimeout(this.persistUiStateTimer);
@@ -1135,7 +1138,11 @@ export class DesktopAppStore {
   ): Promise<void> {
     await this.initialize();
     const wasRunning = this.sessionFromState(sessionRef)?.status === "running";
-    const sending = this.conversationOwner.deliverBackgroundInstruction(sessionRef, text, deliverAs);
+    const sending = this.conversationOwner.deliverBackgroundInstruction(
+      sessionRef,
+      text,
+      deliverAs,
+    );
     if (wasRunning) {
       await sending;
       return;
@@ -4292,6 +4299,7 @@ export class DesktopAppStore {
     // revision at the publish point instead of trusting the mutation sites.
     this.publishRevision = Math.max(this.publishRevision, this.state.revision) + 1;
     this.state = { ...this.state, revision: this.publishRevision };
+    this.streamingStatePublisher.published();
     // Same reasoning as projectStateForView: listeners only read the snapshot or
     // send it over IPC, so it does not need a defensive deep copy.
     const snapshot = this.state;

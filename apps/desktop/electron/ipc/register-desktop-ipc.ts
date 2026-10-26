@@ -26,7 +26,7 @@ import type { DesktopAppStore } from "../application/app-store";
 import type { NotificationPermissionService } from "../platform/notification-permission";
 import type { TerminalService } from "../platform/terminal-service";
 import type { ThemeManager } from "../platform/theme-manager";
-import type { WindowOwner } from "../windows/window-owner";
+import { forWindow, type WindowOwner } from "../windows/window-owner";
 import type { PendingComposerDraftFlusher } from "../windows/pending-draft-flush";
 import { WorkbenchRequests, type WorkbenchOwner } from "./workbench-requests";
 import type { DesktopExtensionViewOwner } from "../extensions/extension-view-owner";
@@ -323,8 +323,8 @@ export function registerDesktopIpc({
     windows.windowForSender(event.sender);
     capabilities.relaunchApplication();
   });
-  ipcMain.handle(desktopIpc.stateRequest, (event) =>
-    owners.state.getStateForView(windows.viewForSender(event.sender)),
+  ipcMain.handle(desktopIpc.stateRequest, async (event) =>
+    forWindow(await owners.state.getStateForView(windows.viewForSender(event.sender))),
   );
   ipcMain.handle(desktopIpc.selectedTranscriptRequest, (event) =>
     owners.state.getSelectedTranscriptForView(windows.viewForSender(event.sender)),

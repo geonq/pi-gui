@@ -1315,6 +1315,26 @@ export async function runOrchestrationRuntimeTool(
   }, input);
 }
 
+/** Child threads as main keeps them; windows receive them without goal, transcript and evidence. */
+export async function getMainOrchestrationChildren(
+  harness: DesktopHarness,
+): Promise<DesktopAppState["orchestrationChildren"]> {
+  await harness.firstWindow();
+  return harness.electronApp.evaluate(() => {
+    const hooks = (
+      globalThis as {
+        __PI_APP_TEST_HOOKS?: {
+          orchestrationChildren?: () => DesktopAppState["orchestrationChildren"];
+        };
+      }
+    ).__PI_APP_TEST_HOOKS;
+    if (!hooks?.orchestrationChildren) {
+      throw new Error("Orchestration children hook is unavailable");
+    }
+    return hooks.orchestrationChildren();
+  });
+}
+
 export async function runScheduledTaskRuntimeTool(
   harness: DesktopHarness,
   input: OrchestrationRuntimeToolTestInput,

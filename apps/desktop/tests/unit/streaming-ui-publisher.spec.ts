@@ -3,6 +3,7 @@ import type { SessionDriverEvent, SessionRef } from "@pi-gui/session-driver";
 import {
   STREAMING_UI_PUBLISH_INTERVAL_MS,
   StreamingUiPublisher,
+  TrailingThrottle,
   shouldDeferStreamingUiPublish,
 } from "../../electron/conversation/streaming-ui-publisher";
 
@@ -104,4 +105,40 @@ test("cancel drops a pending flush so a discrete emit can publish itself", async
   });
   expect(published).toEqual([]);
   expect(STREAMING_UI_PUBLISH_INTERVAL_MS).toBe(50);
+});
+
+test("streaming app state publishes at most once per interval and always ends with a trailing one", () => {
+  let now = 1_000;
+  const timers: Array<() => void> = [];
+  const realSetTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = ((fn: () => void) => {
+    timers.push(fn);
+    return timers.length as unknown as ReturnType<typeof setTimeout>;
+  }) as typeof setTimeout;
+  try {
+    let publishes = 0;
+    const throttle = new TrailingThrottle(
+      () => publishes++,
+      500,
+      () => now,
+    );
+    throttle.request();
+    expect(publishes).toBe(1);
+    now += 50;
+    throttle.request();
+    now += 50;
+    throttle.request();
+    expect(publishes).toBe(1);
+    expect(timers).toHaveLength(1);
+    now += 400;
+    timers.shift()!();
+    expect(publishes).toBe(2);
+    // A full publish elsewhere settles what was owed: no extra trailing publish.
+    now += 100;
+    throttle.request();
+    throttle.published();
+    expect(publishes).toBe(2);
+  } finally {
+    globalThis.setTimeout = realSetTimeout;
+  }
 });
