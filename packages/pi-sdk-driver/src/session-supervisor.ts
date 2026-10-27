@@ -2837,6 +2837,18 @@ export class SessionSupervisor {
               record,
             );
           }
+          const thinking = event.assistantMessageEvent.delta;
+          if (typeof thinking === "string" && thinking.length > 0) {
+            return toDriverEvents(
+              {
+                type: "assistantThinkingDelta" as const,
+                sessionRef: record.ref,
+                timestamp,
+                text: thinking,
+              },
+              record,
+            );
+          }
         }
         if (
           event.message.role === "assistant" &&

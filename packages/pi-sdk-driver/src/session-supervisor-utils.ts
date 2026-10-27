@@ -19,6 +19,7 @@ import type {
   SessionTranscriptAttachment,
   SessionTranscriptCard,
   SessionTranscriptCustomMessage,
+  SessionTranscriptThinking,
   SessionTranscriptItem,
   SessionTranscriptPin,
   SessionUsageSnapshot,
@@ -354,6 +355,15 @@ function transcriptFromSources(
 
     const text = messageText(message);
     const attachments = messageAttachments(message);
+    if (role === "assistant") {
+      transcript.push(
+        ...thinkingItems(
+          message,
+          typeof message.id === "string" ? message.id : `${role}-${index}`,
+          createdAt,
+        ),
+      );
+    }
     if (text || attachments.length > 0) {
       transcript.push({
         kind: "message",
@@ -372,6 +382,23 @@ function transcriptFromSources(
   }
 
   return transcript;
+}
+
+/** One thinking item per non-blank thinking part, in part order. */
+function thinkingItems(
+  message: Record<string, unknown>,
+  id: string,
+  createdAt: string,
+): SessionTranscriptThinking[] {
+  const { content } = message;
+  if (!Array.isArray(content)) return [];
+  return content.flatMap((part, partIndex) => {
+    if (!isRecord(part) || part.type !== "thinking" || typeof part.thinking !== "string") return [];
+    const text = part.thinking.trim();
+    return text
+      ? [{ kind: "thinking" as const, id: `${id}:thinking:${partIndex}`, createdAt, text }]
+      : [];
+  });
 }
 
 /**

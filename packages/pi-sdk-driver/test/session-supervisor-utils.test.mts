@@ -143,3 +143,33 @@ await test("transcriptFromMessages shows displayed custom messages the way termi
     },
   ]);
 });
+
+await test("transcriptFromMessages keeps non-blank thinking before the reply and its tool calls", () => {
+  const timestamp = Date.parse("2026-09-30T00:00:00.000Z");
+  const transcript = transcriptFromMessages([
+    { role: "user", id: "u1", content: "go", timestamp },
+    {
+      role: "assistant",
+      id: "a1",
+      timestamp,
+      content: [
+        { type: "thinking", thinking: "  Plan the edit.  ", thinkingSignature: "sig" },
+        { type: "thinking", thinking: "", thinkingSignature: "only-a-signature" },
+        { type: "thinking", thinking: "   " },
+        { type: "text", text: "Reading the file." },
+        { type: "toolCall", id: "call-1", name: "read", arguments: { path: "a.ts" } },
+      ],
+    },
+  ]);
+
+  assert.deepEqual(
+    transcript.map((item) => [item.kind, item.id]),
+    [
+      ["message", "u1"],
+      ["thinking", "a1:thinking:0"],
+      ["message", "a1"],
+      ["tool", "call-1"],
+    ],
+  );
+  assert.equal(transcript[1]?.kind === "thinking" && transcript[1].text, "Plan the edit.");
+});

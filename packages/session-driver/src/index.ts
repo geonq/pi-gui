@@ -1,5 +1,6 @@
 export type {
   AssistantDeltaEvent,
+  AssistantThinkingDeltaEvent,
   AssistantMessageEndedEvent,
   AssistantMessagePersistedEvent,
   TranscriptItemAppendedEvent,
@@ -76,6 +77,7 @@ export type {
   ExtensionCardTone,
   SessionTranscriptCard,
   SessionTranscriptCustomMessage,
+  SessionTranscriptThinking,
   SessionTranscriptImageAttachment,
   SessionTranscriptFileAttachment,
   SessionTranscriptAttachment,

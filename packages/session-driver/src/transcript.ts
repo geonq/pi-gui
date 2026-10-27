@@ -116,8 +116,21 @@ export interface SessionTranscriptPin {
   readonly card: ExtensionCard | null;
 }
 
+/**
+ * The model's reasoning text between tool calls or replies. Empty reasoning (providers that
+ * only keep a signature) never becomes an item.
+ */
+export interface SessionTranscriptThinking {
+  readonly kind: "thinking";
+  /** `<entry id>:thinking:<part index>` from history, so a reload replaces the live row. */
+  readonly id: string;
+  readonly createdAt: string;
+  readonly text: string;
+}
+
 export type SessionTranscriptItem =
   | SessionTranscriptMessage
+  | SessionTranscriptThinking
   | SessionTranscriptToolCall
   | SessionTranscriptCustomMessage
   | SessionTranscriptCard

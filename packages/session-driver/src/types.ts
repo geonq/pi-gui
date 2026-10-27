@@ -202,6 +202,12 @@ export interface AssistantDeltaEvent extends SessionEventBase {
   readonly text: string;
 }
 
+/** A streamed piece of the model's reasoning; appended to the open thinking row. */
+export interface AssistantThinkingDeltaEvent extends SessionEventBase {
+  readonly type: "assistantThinkingDelta";
+  readonly text: string;
+}
+
 /** Finalizes one assistant message while the containing run may continue. */
 export interface AssistantMessageEndedEvent extends SessionEventBase {
   readonly type: "assistantMessageEnded";
@@ -375,6 +381,7 @@ export type SessionDriverEvent =
   | SessionOpenedEvent
   | SessionUpdatedEvent
   | AssistantDeltaEvent
+  | AssistantThinkingDeltaEvent
   | AssistantActivityEvent
   | AssistantMessageEndedEvent
   | AssistantMessagePersistedEvent
