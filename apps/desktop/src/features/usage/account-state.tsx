@@ -6,6 +6,7 @@ import type {
   SignInStatus,
 } from "../../../contracts/usage";
 import { ProviderIcon } from "../../ui/icons";
+import { providerColor } from "./brand-color";
 
 const LABELS: Record<ProviderState, string> = {
   ready: "Ready",
@@ -299,6 +300,7 @@ export function AccountLimitsCard({
               </div>
               {account.windows.map((window) => {
                 const remaining = Math.max(0, Math.min(100, 100 - window.usedPercent));
+                const brand = providerColor(account.id);
                 return (
                   <div className="usage-limits__window" key={window.label}>
                     <span className="usage-limits__label">{window.label}</span>
@@ -313,7 +315,7 @@ export function AccountLimitsCard({
                       <span
                         style={{
                           width: `${remaining}%`,
-                          backgroundColor: `color-mix(in srgb, #0253c4 ${remaining}%, #a9ccf1)`,
+                          backgroundColor: `color-mix(in srgb, ${brand} ${remaining}%, color-mix(in srgb, ${brand} 35%, white))`,
                         }}
                       />
                     </div>

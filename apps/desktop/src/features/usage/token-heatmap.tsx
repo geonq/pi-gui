@@ -11,6 +11,7 @@ import {
 } from "@/components/charts/heatmap/heatmap-context";
 import { HeatmapTooltip } from "@/components/charts/heatmap/heatmap-tooltip";
 import { HeatmapXAxis } from "@/components/charts/heatmap/heatmap-x-axis";
+import { mixBrands, type Brand, type BrandWeights } from "./brand-color";
 
 const DAY = 86_400_000;
 const WEEKS = 53;
@@ -22,14 +23,18 @@ const MODES = [
 type Mode = (typeof MODES)[number]["id"];
 
 const compact = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 });
-/** Empty dot, then four blues from faint to the full accent. */
-const LEVELS = [
+/** Empty dot, then four steps from faint to the full color of whatever was used that day. */
+const levelsOf = (color: string) => [
   "var(--overlay-hover)",
-  "color-mix(in srgb, #0253c4 30%, transparent)",
-  "color-mix(in srgb, #0253c4 55%, transparent)",
-  "#0253c4",
-  "color-mix(in srgb, #0253c4 60%, white)",
+  `color-mix(in srgb, ${color} 30%, transparent)`,
+  `color-mix(in srgb, ${color} 55%, transparent)`,
+  color,
+  `color-mix(in srgb, ${color} 60%, white)`,
 ];
+const sumWeights = (into: BrandWeights, from: BrandWeights | undefined) => {
+  for (const brand of Object.keys(from ?? {}) as Brand[])
+    into[brand] = (into[brand] ?? 0) + (from?.[brand] ?? 0);
+};
 
 const days = (count: number) => `${count} ${count === 1 ? "day" : "days"}`;
 
@@ -43,8 +48,11 @@ function mondayOf(time: number): number {
 /** A year of daily tokens as a dot grid (like a profile activity chart), drawn with Bklit's heatmap. */
 export function TokenHeatmap({
   tokensByDay,
+  brandsByDay,
 }: {
   readonly tokensByDay: ReadonlyMap<number, number>;
+  /** Tokens per brand for each day, which tints that day's dot. */
+  readonly brandsByDay: ReadonlyMap<number, BrandWeights>;
 }) {
   const [mode, setMode] = useState<Mode>("daily");
 
@@ -72,11 +80,26 @@ export function TokenHeatmap({
     const cut = (q: number) =>
       sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] ?? 0;
     const thresholds = [cut(0.25), cut(0.5), cut(0.75)];
-    // Days still to come are -1: drawn blank.
+    // Each dot leans toward the brand used most in its day, week or running total.
+    const runningBrands = {} as BrandWeights;
+    const fills = days.map((day, index) => {
+      const value = values[index];
+      const weights = {} as BrandWeights;
+      if (mode === "daily") sumWeights(weights, brandsByDay.get(day));
+      else if (mode === "weekly") {
+        const week = Math.floor(index / 7) * 7;
+        for (const member of days.slice(week, week + 7)) sumWeights(weights, brandsByDay.get(member));
+      } else {
+        sumWeights(runningBrands, brandsByDay.get(day));
+        sumWeights(weights, runningBrands);
+      }
+      // Days still to come are null: drawn blank.
+      if (value === null || value === undefined) return "transparent";
+      const levels = levelsOf(mixBrands(weights));
+      return levels[value <= 0 ? 0 : 1 + thresholds.filter((limit) => value > limit).length]!;
+    });
     const colorScale = (count: number | null | undefined) =>
-      count === null || count === undefined || count < 0
-        ? "transparent"
-        : LEVELS[count <= 0 ? 0 : 1 + thresholds.filter((limit) => count > limit).length]!;
+      count === null || count === undefined || count < 0 ? "transparent" : "var(--overlay-hover)";
 
     const data = Array.from({ length: WEEKS }, (_, week) => ({
       bin: week,
@@ -101,12 +124,13 @@ export function TokenHeatmap({
     return {
       data,
       colorScale,
+      fills,
       total: known.reduce((sum, value) => sum + value, 0),
       peak: Math.max(0, ...known),
       longest,
       current,
     };
-  }, [tokensByDay, mode]);
+  }, [tokensByDay, brandsByDay, mode]);
 
   return (
     <section className="usage-card usage-heatmap">
@@ -139,7 +163,7 @@ export function TokenHeatmap({
             gap={3}
             margin={{ top: 22, right: 0, bottom: 0, left: 0 }}
           >
-            <UsageCells />
+            <UsageCells fills={view.fills} />
             <HeatmapXAxis />
             <HeatmapTooltip
               formatLabel={(count) => (count < 0 ? "Not yet" : `${compact.format(count)} tokens`)}
@@ -156,7 +180,7 @@ export function TokenHeatmap({
  * all 371 cells on every hovered day. The dots are built once per data change; hover is CSS, and
  * one delegated handler updates only the tooltip.
  */
-function UsageCells() {
+function UsageCells({ fills }: { readonly fills: readonly string[] }) {
   const { data, binWidth, binHeight, gap, margin, xScale, yScale, fillScale } = useHeatmap();
   const { setTooltipData } = useHeatmapInteraction();
 
@@ -181,7 +205,7 @@ function UsageCells() {
                 className="usage-heatmap__cell"
                 data-column={cell.column}
                 data-row={cell.row}
-                fill={cell.color}
+                fill={fills[cell.column * 7 + cell.row] ?? cell.color}
                 height={cell.height}
                 key={`${cell.column}-${cell.row}`}
                 rx={6}
@@ -193,7 +217,7 @@ function UsageCells() {
         }
       </HeatmapRect>
     ),
-    [binHeight, binWidth, data, fillScale, gap, xScale, yScale],
+    [binHeight, binWidth, data, fills, fillScale, gap, xScale, yScale],
   );
 
   const showDay = (event: PointerEvent<SVGGElement>) => {

@@ -20,6 +20,17 @@ import {
   useProviderStatuses,
   useSignIns,
 } from "./account-state";
+import {
+  addWeight,
+  BRAND_LABEL,
+  brandOf,
+  mixBrands,
+  OTHER_LABEL,
+  providerColor,
+  providerColors,
+  seriesColor,
+  type BrandWeights,
+} from "./brand-color";
 import { TokenHeatmap } from "./token-heatmap";
 import { ProviderIcon, RefreshIcon } from "../../ui/icons";
 
@@ -193,6 +204,18 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
       for (const [key, value] of Object.entries(day.byModel))
         modelTotals.set(key, (modelTotals.get(key) ?? 0) + value);
     }
+    // Brand colors by usage: every chart leans toward the provider that was used most.
+    const brandsByDay = new Map<number, BrandWeights>();
+    for (const day of report.days) {
+      const weights: BrandWeights = {};
+      for (const [key, value] of Object.entries(day.byModel))
+        if (inAccount(key)) addWeight(weights, providerOf(key), value);
+      brandsByDay.set(day.dayStart, weights);
+    }
+    const periodWeights: BrandWeights = {};
+    for (const [key, value] of modelTotals)
+      if (inAccount(key)) addWeight(periodWeights, providerOf(key), value);
+    const tint = mixBrands(periodWeights);
     const accountTotals = new Map<string, number>();
     for (const [key, value] of modelTotals)
       accountTotals.set(providerOf(key), (accountTotals.get(providerOf(key)) ?? 0) + value);
@@ -228,8 +251,22 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
         .filter((entry) => entry.amount > 0)
         .sort((a, b) => b.amount - a.amount)
         .slice(0, limit);
+    const shareColors = providerColors(share.map((entry) => entry.provider));
+    const labelOf = (key: string) => {
+      const brand = brandOf(providerOf(key));
+      return brand ? BRAND_LABEL[brand] : OTHER_LABEL;
+    };
+    const topModels = ranked.slice(0, 6);
+    const modelBars = {
+      rows: topModels.map(([key, tokens]) => ({ model: names.get(key) ?? shortName(key), [labelOf(key)]: tokens })),
+      series: [...new Set(topModels.map(([key]) => labelOf(key)))],
+    };
     return {
+      modelBars,
       series,
+      brandsByDay,
+      tint,
+      shareColors,
       accounts,
       ranked,
       total,
@@ -334,6 +371,11 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
                 aria-pressed={account === provider}
                 className="usage-account"
                 key={provider}
+                style={
+                  provider === ALL
+                    ? undefined
+                    : ({ "--brand": providerColor(provider) } as React.CSSProperties)
+                }
                 onClick={() => setAccount(provider)}
                 type="button"
               >
@@ -377,7 +419,7 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
             <Stat label="Requests, all time" value={compact.format(view.requests)} />
           </section>
 
-          <TokenHeatmap tokensByDay={view.tokensByDay} />
+          <TokenHeatmap brandsByDay={view.brandsByDay} tokensByDay={view.tokensByDay} />
 
           <section className="usage-card">
             <h3>Tokens per day</h3>
@@ -385,9 +427,9 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
               <Grid horizontal />
               <Area
                 dataKey="tokens"
-                fill="var(--chart-1)"
+                fill={view.tint}
                 fillOpacity={0.35}
-                stroke="var(--chart-1)"
+                stroke={view.tint}
                 strokeWidth={2}
               />
               <XAxis />
@@ -400,9 +442,9 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
               <section className="usage-card">
                 <h3>By model</h3>
                 <BarChart
-                  data={view.ranked
-                    .slice(0, 6)
-                    .map(([key, tokens]) => ({ model: view.name(key), tokens }))}
+                  // One series per brand, stacked: each model keeps its own provider's color.
+                  data={view.modelBars.rows}
+                  stacked
                   xDataKey="model"
                   aspectRatio="4 / 3"
                   // Horizontal bars keep long model names readable on the left.
@@ -410,7 +452,9 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
                   orientation="horizontal"
                 >
                   <Grid vertical />
-                  <Bar dataKey="tokens" fill="var(--chart-1)" lineCap="round" />
+                  {view.modelBars.series.map((label) => (
+                    <Bar dataKey={label} fill={seriesColor(label)} key={label} lineCap="round" />
+                  ))}
                   <BarYAxis />
                   <ChartTooltip />
                 </BarChart>
@@ -426,7 +470,7 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
                   size={180}
                 >
                   {view.share.map((entry, index) => (
-                    <Ring index={index} key={entry.key} />
+                    <Ring color={view.shareColors[index]} index={index} key={entry.key} />
                   ))}
                   {/* Compact, so billions fit inside the innermost ring. */}
                   <RingCenter
@@ -439,7 +483,7 @@ export function UsageView({ workspaces }: { readonly workspaces: readonly Worksp
                     <li key={entry.key}>
                       <span
                         className="usage-list__swatch"
-                        style={{ background: `var(--chart-${index + 1})` }}
+                        style={{ background: view.shareColors[index] }}
                       />
                       <ProviderIcon providerId={entry.provider} />
                       <span className="usage-list__label">{entry.label}</span>

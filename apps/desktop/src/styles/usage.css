@@ -37,14 +37,18 @@
   height: 14px;
 }
 
+.usage-account svg {
+  color: var(--brand, currentColor);
+}
+
 .usage-account:hover {
   background: var(--overlay-hover);
   color: var(--text-strong);
 }
 
 .usage-account[aria-pressed="true"] {
-  border-color: var(--accent);
-  background: var(--accent-tint-bg);
+  border-color: var(--brand, var(--accent));
+  background: color-mix(in srgb, var(--brand, var(--accent)) 12%, transparent);
   color: var(--text-strong);
 }
 
