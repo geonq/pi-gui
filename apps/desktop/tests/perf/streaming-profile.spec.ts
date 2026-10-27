@@ -567,6 +567,32 @@ test("typing in the composer during a growing answer", async ({}, info) => {
     });
     await patchMain(h);
     await startMainSample(h);
+    // Real keystrokes pass through the main thread; record every block there and what ran during it.
+    await h.electronApp.evaluate(async () => {
+      const g = globalThis as unknown as Record<string, unknown>;
+      const { Session } = process.getBuiltinModule(
+        "node:inspector",
+      ) as typeof import("node:inspector");
+      const session = new Session();
+      session.connect();
+      const post = (method: string, params?: object) =>
+        new Promise<unknown>((resolve, reject) =>
+          session.post(method, params ?? {}, (error, result) =>
+            error ? reject(error) : resolve(result),
+          ),
+        );
+      await post("Profiler.enable");
+      await post("Profiler.setSamplingInterval", { interval: 500 });
+      await post("Profiler.start");
+      const stalls: Array<{ at: number; ms: number }> = [];
+      let expected = performance.now() + 20;
+      const timer = setInterval(() => {
+        const now = performance.now();
+        if (now - expected > 100) stalls.push({ at: now, ms: now - expected });
+        expected = now + 20;
+      }, 20);
+      g.__mainStallProbe = { session, post, stalls, timer };
+    });
     let streaming = true;
     let eventCount = 0;
     // Time for the renderer to accept each key, seen from outside it: what a person feels.
@@ -627,6 +653,58 @@ test("typing in the composer during a growing answer", async ({}, info) => {
       })(),
     ]);
     const main = await stopMainSample(h);
+    const mainStalls = await h.electronApp.evaluate(async () => {
+      const probe = (globalThis as unknown as Record<string, unknown>).__mainStallProbe as {
+        post: (method: string, params?: object) => Promise<unknown>;
+        stalls: Array<{ at: number; ms: number }>;
+        timer: ReturnType<typeof setInterval>;
+      };
+      clearInterval(probe.timer);
+      const { profile } = (await probe.post("Profiler.stop")) as {
+        profile: {
+          nodes: Array<{
+            id: number;
+            parent?: number;
+            children?: number[];
+            callFrame: { functionName: string; url: string; lineNumber: number };
+          }>;
+          samples: number[];
+          timeDeltas: number[];
+        };
+      };
+      const parent = new Map<number, number>();
+      for (const node of profile.nodes)
+        for (const child of node.children ?? []) parent.set(child, node.id);
+      const byId = new Map(profile.nodes.map((node) => [node.id, node]));
+      const label = (id: number) => {
+        const frame = byId.get(id)!.callFrame;
+        return `${frame.functionName || "(anon)"} ${frame.url.split(/[\\/]/).at(-1)}:${frame.lineNumber + 1}`;
+      };
+      const total = new Map<string, number>();
+      const self = new Map<string, number>();
+      profile.samples.forEach((sample, index) => {
+        const ms = (profile.timeDeltas[index] ?? 0) / 1000;
+        self.set(label(sample), (self.get(label(sample)) ?? 0) + ms);
+        const seen = new Set<string>();
+        for (let id: number | undefined = sample; id !== undefined; id = parent.get(id)) {
+          const name = label(id);
+          if (!seen.has(name)) total.set(name, (total.get(name) ?? 0) + ms);
+          seen.add(name);
+        }
+      });
+      const top = (map: Map<string, number>, count: number) =>
+        [...map.entries()]
+          .filter(([name]) => !/^\((root|idle|program|garbage collector)\)/.test(name))
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, count)
+          .map(([name, ms]) => `${Math.round(ms)}ms ${name}`);
+      return {
+        stalls: probe.stalls.map((stall) => Math.round(stall.ms)),
+        topSelf: top(self, 15),
+        topTotal: top(total, 30),
+      };
+    });
+    console.log("MAIN_STALLS " + JSON.stringify(mainStalls, null, 1));
     await expect(composer).toHaveValue(text);
     const sample = await p.evaluate(() =>
       (
