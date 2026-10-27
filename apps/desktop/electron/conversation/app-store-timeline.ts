@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { activityForTool } from "../../contracts/agent-activity";
 import { isCardEntryItem, sessionKey } from "@pi-gui/session-driver";
 import type { SessionTranscriptItem, SessionTranscriptPin } from "@pi-gui/session-driver";
@@ -149,6 +150,32 @@ export function appendAssistantDelta(
     activeAssistantMessageBySession.set(key, message.id);
   }
 
+  transcriptCache.set(key, transcript);
+}
+
+/**
+ * Reasoning streams into the last row when that row is already thinking; any reply text, tool
+ * row or other item after it closes the block, so the next delta opens a new row in order.
+ */
+export function appendThinkingDelta(
+  transcriptCache: Map<string, readonly TranscriptMessage[]>,
+  sessionRef: SessionRef,
+  text: string,
+): void {
+  if (!text) return;
+  const key = sessionKey(sessionRef);
+  const transcript = [...(transcriptCache.get(key) ?? [])];
+  const last = transcript[transcript.length - 1];
+  if (last?.kind === "thinking") {
+    transcript[transcript.length - 1] = { ...last, text: `${last.text}${text}` };
+  } else if (text.trim()) {
+    transcript.push({
+      kind: "thinking",
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+      text,
+    });
+  }
   transcriptCache.set(key, transcript);
 }
 

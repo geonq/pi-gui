@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { StateOrb } from "../../app/activity-indicator";
 import { activityForTool } from "../../../contracts/agent-activity";
 import type {
@@ -104,6 +104,8 @@ export function TimelineItem({
       return <TimelineCustomMessage item={item} />;
     case "card":
       return <ExtensionCardItem card={item.card} onAction={onExtensionAction} />;
+    case "thinking":
+      return <TimelineThinking text={item.text} />;
     default:
       return unhandledTimelineItem(item);
   }
@@ -112,6 +114,33 @@ export function TimelineItem({
 function unhandledTimelineItem(item: never): null {
   console.warn("[timeline] unhandled item kind", item);
   return null;
+}
+
+/** The model's reasoning: one quiet "Thinking" line, collapsed until the reader opens it. */
+function TimelineThinking({ text }: { readonly text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <article className="timeline-thinking" data-testid="timeline-thinking">
+      <button
+        className="timeline-thinking__header"
+        type="button"
+        aria-expanded={expanded}
+        onClick={() => setExpanded((open) => !open)}
+      >
+        <span
+          className={`timeline-thinking__chevron ${expanded ? "timeline-thinking__chevron--expanded" : ""}`}
+        >
+          <ChevronRightIcon />
+        </span>
+        <span className="timeline-thinking__label">Thinking</span>
+      </button>
+      {expanded ? (
+        <p className="timeline-thinking__body" data-testid="timeline-thinking-body">
+          {text}
+        </p>
+      ) : null}
+    </article>
+  );
 }
 
 /** An extension message, drawn like terminal pi: its customType labels the markdown. */

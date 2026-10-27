@@ -1192,3 +1192,59 @@
 .timeline-tool__image img {
   object-fit: contain;
 }
+
+/* ---- Thinking ----------------------------------------------------------- */
+
+.timeline-thinking {
+  max-width: 100%;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.timeline-thinking__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: var(--muted-soft);
+}
+
+.timeline-thinking__header:hover {
+  color: var(--text-strong);
+}
+
+.timeline-thinking__chevron {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  transition: transform var(--motion-base) var(--ease-out);
+}
+
+.timeline-thinking__chevron--expanded {
+  transform: rotate(90deg);
+}
+
+.timeline-thinking__label {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.timeline-thinking__body {
+  margin: 0 0 0 20px;
+  color: var(--muted-strong);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

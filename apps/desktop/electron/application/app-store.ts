@@ -74,6 +74,7 @@ import {
 import {
   applyTimelineEvent,
   appendAssistantDelta,
+  appendThinkingDelta,
   clearActiveAssistantMessage,
   timelineFromDriverTranscript,
 } from "../conversation/app-store-timeline";
@@ -3622,6 +3623,9 @@ export class DesktopAppStore {
             event.sessionRef,
             event.text,
           );
+          break;
+        case "assistantThinkingDelta":
+          appendThinkingDelta(this.sessionState.transcriptCache, event.sessionRef, event.text);
           break;
         case "sessionOpened":
         case "runCompleted":

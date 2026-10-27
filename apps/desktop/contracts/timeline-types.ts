@@ -4,6 +4,7 @@ import type {
   SessionTranscriptMessage,
   SessionTranscriptPin,
   SessionTranscriptRole,
+  SessionTranscriptThinking,
 } from "@pi-gui/session-driver";
 import type { TurnChangeSummary } from "./review";
 import type { AgentActivityState } from "./agent-activity";
@@ -52,6 +53,7 @@ export interface TimelineSummary {
 export type TranscriptMessage =
   | SessionTranscriptMessage
   | SessionTranscriptCustomMessage
+  | SessionTranscriptThinking
   | SessionTranscriptCard
   | SessionTranscriptPin
   | TimelineActivity

@@ -2126,6 +2126,8 @@ function transcriptText(message: TranscriptMessage): string {
       return message.metadata ? `${message.label}: ${message.metadata}` : message.label;
     // A pin is extension state above the composer, not something the thread said.
     case "pin":
+    // Reasoning is private to the thread, not something it said.
+    case "thinking":
       return "";
     default: {
       const unhandled: never = message;
