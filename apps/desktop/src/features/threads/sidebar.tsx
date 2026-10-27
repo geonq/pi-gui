@@ -1,5 +1,6 @@
 import {
   createContext,
+  memo,
   use,
   useEffect,
   useLayoutEffect,
@@ -62,6 +63,7 @@ import {
   type PiDesktopApi,
 } from "../../../contracts/ipc";
 import { formatRelativeTime } from "../../lib/string-utils";
+import { useStableHandlers } from "../../lib/use-stable-handlers";
 import { PaneResizeHandle, type PaneWidthBounds } from "../../ui/pane-resize-handle";
 import { usePersistedPaneWidth } from "../../ui/use-persisted-pane-width";
 import { sessionLastInteractedAt } from "../../../contracts/thread-recency";
@@ -148,7 +150,17 @@ interface ChatFold {
 
 const ChatFoldContext = createContext<ChatFold | undefined>(undefined);
 
+/**
+ * App re-renders on every composer keystroke and stream update and hands over fresh closures
+ * each time; the thread list only needs to render again when its data changes.
+ */
 export function Sidebar(props: SidebarProps) {
+  const wsMenu = useStableHandlers(props.wsMenu);
+  const threadMenu = useStableHandlers(props.threadMenu);
+  return <SidebarContent {...useStableHandlers({ ...props, wsMenu, threadMenu })} />;
+}
+
+const SidebarContent = memo(function SidebarContent(props: SidebarProps) {
   const signInNeedsOwner = useSignIns().some((signIn) => signIn.state !== "ok");
   const {
     activeView,
@@ -724,7 +736,7 @@ export function Sidebar(props: SidebarProps) {
       <UpdateBanner api={api} />
     </aside>
   );
-}
+});
 
 /* ── Sortable workspace folder ─────────────────────────── */
 

@@ -55,7 +55,8 @@ interface ConversationTimelineProps {
   readonly platform: NodeJS.Platform;
 }
 const NO_MARKERS: readonly AnnotationMarker[] = [];
-export function ConversationTimeline({
+// Memoized: App re-renders on every composer keystroke, and the transcript only changes with its data.
+export const ConversationTimeline = memo(function ConversationTimeline({
   transcript,
   isTranscriptLoading,
   transcriptFailed = null,
@@ -210,7 +211,7 @@ export function ConversationTimeline({
       </div>
     </ExtensionToolLabelsContext.Provider>
   );
-}
+});
 
 function TranscriptSkeleton() {
   return (

@@ -71,7 +71,8 @@ export function useTimelineViewport({
     expectedScrollTop: null as number | null,
     pendingNavigation: true,
   });
-  const [, setVersion] = useState(0);
+  // Bumped by this hook's own re-render requests; each one must re-run the layout effect.
+  const [version, setVersion] = useState(0);
   const [pane, setPane] = useState<HTMLDivElement | null>(null);
   const [searchMode, setSearchMode] = useState(false);
   const [showJumpToLatest, setShowJumpToLatest] = useState(false);
@@ -165,7 +166,13 @@ export function useTimelineViewport({
     position.kind === "following"
       ? Math.max(0, totalHeight - current.height)
       : (resolveAnchor(layout, position.anchor) ?? 0);
-  const placements = searchMode ? layout : visibleRows(layout, target, current.height || 800);
+  // Same rows, same array: a composer keystroke must not re-run the layout effect below, which
+  // reads scrollHeight and forces a synchronous reflow of the whole transcript.
+  const viewHeight = current.height || 800;
+  const placements = useMemo(
+    () => (searchMode ? layout : visibleRows(layout, target, viewHeight)),
+    [searchMode, layout, target, viewHeight],
+  );
   const placedFromEstimates = placements.some((row) => !current.heights.has(row.item.id));
 
   useLayoutEffect(() => {
@@ -292,6 +299,7 @@ export function useTimelineViewport({
     current.activityMarker = marker;
     setShowJumpToLatest(current.newActivity);
   }, [
+    version,
     active,
     transcriptReady,
     pane,
@@ -422,17 +430,31 @@ export function useTimelineViewport({
     },
     [paneRef, schedule],
   );
-  return {
-    totalHeight,
-    visibleRows: placements,
-    layoutGeneration: current.generation,
-    showJumpToLatest,
-    attachPane,
-    measureRow,
-    savePosition,
-    jumpToLatest,
-    navigateToElement,
-    setSearchMode,
-  };
+  const layoutGeneration = current.generation;
+  return useMemo(
+    () => ({
+      totalHeight,
+      visibleRows: placements,
+      layoutGeneration,
+      showJumpToLatest,
+      attachPane,
+      measureRow,
+      savePosition,
+      jumpToLatest,
+      navigateToElement,
+      setSearchMode,
+    }),
+    [
+      totalHeight,
+      placements,
+      layoutGeneration,
+      showJumpToLatest,
+      attachPane,
+      measureRow,
+      savePosition,
+      jumpToLatest,
+      navigateToElement,
+    ],
+  );
 }
 export type TimelineViewport = ReturnType<typeof useTimelineViewport>;

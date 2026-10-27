@@ -441,7 +441,7 @@ export default function App() {
   const pins = usePinnedCards(selectedSessionKey, activeTranscript);
 
   const scheduledOrigins = useMemo(() => {
-    if (!snapshot || !selectedWorkspace || !selectedSession) {
+    if (!snapshot?.scheduledTasks || !selectedWorkspace || !selectedSession) {
       return new Map();
     }
 
@@ -454,7 +454,7 @@ export default function App() {
 
       pins.timeline,
     );
-  }, [pins.timeline, selectedSession, selectedWorkspace, snapshot]);
+  }, [pins.timeline, selectedSession, selectedWorkspace, snapshot?.scheduledTasks]);
 
   const scheduledBinding = selectedSession
     ? nonCompletedBindingForSession(snapshot?.scheduledTasks ?? [], selectedSession.id)
