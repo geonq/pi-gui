@@ -430,12 +430,40 @@ export async function createGitReview(
   try {
     if (scope.kind !== "turn") {
       const topLevel = (await gitText(checkoutPath, ["rev-parse", "--show-toplevel"])).trim();
-      if ((await realpath(checkoutPath)) !== (await realpath(topLevel)))
-        return issue(
-          "unavailable",
-          "nested-workspace",
-          "Git review requires the checkout root. Open the repository root to review its changes.",
-        );
+      const [checkout, root] = await Promise.all([realpath(checkoutPath), realpath(topLevel)]);
+      if (checkout !== root) {
+        // A folder the enclosing repository ignores (D:/Pi ignores /projects/) has no history
+        // there; sending the owner to that repository's root would review the wrong project.
+        const folder = `${relative(root, checkout).split(sep).join("/")}/`;
+        // check-ignore refuses the literal pathspecs every call here uses; status reports an
+        // ignored directory as one "!! dir/" entry for the folder or an ancestor of it.
+        const ignored = (
+          await gitText(root, [
+            "status",
+            "--porcelain=v1",
+            "-z",
+            "--ignored=matching",
+            "--",
+            folder,
+          ])
+        )
+          .split("\0")
+          .some(
+            (entry) =>
+              entry.startsWith("!! ") && entry.endsWith("/") && folder.startsWith(entry.slice(3)),
+          );
+        return ignored
+          ? issue(
+              "unavailable",
+              "not-a-repository",
+              "This folder is not a Git repository. Run git init in it to review its changes.",
+            )
+          : issue(
+              "unavailable",
+              "nested-workspace",
+              "Git review requires the checkout root. Open the repository root to review its changes.",
+            );
+      }
     }
     if (isWorkingReviewScope(scope)) {
       const deadline = Date.now() + PREPARATION_MS;

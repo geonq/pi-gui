@@ -376,6 +376,16 @@ test("rejects nested workspace roots and labels raw-byte conversion coverage", a
   expect(review.coverage.notes.join(" ")).toContain("raw working bytes");
 });
 
+test("treats a folder its enclosing repository ignores as not a repository", async () => {
+  const cwd = await repository();
+  await writeFile(join(cwd, ".gitignore"), "/projects/\n");
+  await mkdir(join(cwd, "projects", "design"), { recursive: true });
+  const review = await createGitReview(join(cwd, "projects", "design"), { kind: "uncommitted" });
+  expect(review).toMatchObject({ state: "unavailable", code: "not-a-repository" });
+  if (review.state === "available") throw new Error("expected an issue");
+  expect(review.message).not.toContain("repository root");
+});
+
 test("bounds snapshot hashing and labels a truncated patch rather than a complete result", async () => {
   const cwd = await repository();
   await writeFile(join(cwd, "patch.txt"), "new line\n".repeat(140_000));
