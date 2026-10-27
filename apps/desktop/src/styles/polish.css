@@ -284,6 +284,21 @@ option:disabled {
     var(--liquid-lift);
 }
 
+/* Floating overlays sit over text. On the Windows glass window the backdrop blur does not reach
+   the transcript, so at 72-80% glass the text behind read straight through menus and tooltips.
+   They take the solid main fill instead (even 6% show-through left ghost text). */
+.enable-transparency
+  :is(
+    .slash-menu,
+    .mention-menu,
+    .model-selector__dropdown,
+    .workspace-menu,
+    .shortcut-tooltip,
+    .context-meter__card
+  ) {
+  background: var(--main);
+}
+
 /* Shared activity canvases crossfade in fixed bounds, never remount the surrounding status row. */
 .state-orb {
   display: inline-block;
