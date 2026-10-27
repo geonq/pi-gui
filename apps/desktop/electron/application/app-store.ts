@@ -633,6 +633,10 @@ export class DesktopAppStore {
     return structuredClone(this.state);
   }
 
+  readState(): Readonly<DesktopAppState> {
+    return this.state;
+  }
+
   applyView(view: DesktopAppViewState): DesktopAppState {
     this.state = this.projectStateForView(view);
     return structuredClone(this.state);

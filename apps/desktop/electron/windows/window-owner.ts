@@ -43,6 +43,11 @@ interface WindowViewState {
 
 export interface WindowStateOwner {
   snapshot(): DesktopAppState;
+  /**
+   * The live state without a copy. State is replaced, never mutated, so reading it is safe; a
+   * deep copy here ran on every streamed token and froze the main thread (and typing) on big states.
+   */
+  readState(): Readonly<DesktopAppState>;
   applyView(view: DesktopAppViewState): DesktopAppState;
   projectStateForView(
     view: DesktopAppViewState,
@@ -245,7 +250,7 @@ export class WindowOwner {
   }
 
   viewForWindow(window: BrowserWindow): DesktopAppViewState {
-    return this.views.get(window.webContents.id) ?? viewFromState(this.stateOwner.snapshot());
+    return this.views.get(window.webContents.id) ?? viewFromState(this.stateOwner.readState());
   }
 
   targetForSender(sender: WebContents): SessionRef | undefined {
@@ -377,7 +382,7 @@ export class WindowOwner {
   }
 
   private resolveView(sourceView?: DesktopAppViewState): WindowViewState {
-    const state = this.stateOwner.snapshot();
+    const state = this.stateOwner.readState();
     return viewFromState(
       this.stateOwner.projectStateForView({ ...viewFromState(state), ...sourceView }, state),
     );
@@ -385,7 +390,7 @@ export class WindowOwner {
 
   private projectState(
     webContentsId: number,
-    state: DesktopAppState = this.stateOwner.snapshot(),
+    state: DesktopAppState = this.stateOwner.readState(),
     view: WindowViewState = this.views.get(webContentsId) ?? viewFromState(state),
     previousView: WindowViewState | undefined = this.views.get(webContentsId),
   ): DesktopAppState {
@@ -408,7 +413,7 @@ export class WindowOwner {
 
   private publishState(
     window: BrowserWindow,
-    state: DesktopAppState = this.stateOwner.snapshot(),
+    state: DesktopAppState = this.stateOwner.readState(),
   ): void {
     if (!canPublishToWindow(window)) {
       return;
@@ -478,7 +483,7 @@ export class WindowOwner {
   }
 
   private applyViewToStateOwner(webContentsId: number): void {
-    const view = this.views.get(webContentsId) ?? viewFromState(this.stateOwner.snapshot());
+    const view = this.views.get(webContentsId) ?? viewFromState(this.stateOwner.readState());
     this.stateOwner.applyView(view);
   }
 
@@ -486,7 +491,7 @@ export class WindowOwner {
     this.setActiveWindow(window);
     this.applyViewToStateOwner(window.webContents.id);
     this.stateOwner.handleWindowActivation();
-    this.views.set(window.webContents.id, viewFromState(this.stateOwner.snapshot()));
+    this.views.set(window.webContents.id, viewFromState(this.stateOwner.readState()));
   }
 
   private applyDeferredActivation(): boolean {
