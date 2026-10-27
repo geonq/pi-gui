@@ -26,3 +26,19 @@ The original intermittent freeze was not reproduced with its original component 
 Startup still has a measurable import/platform cost. Ecosystem wrappers now import the public event-stream module rather than the SDK-wide export, but the extension still loads the coding-agent SDK and Electron has its own startup work. No claim of eliminated launch pauses is made.
 
 Memory changes live in the separate ecosystem repository: full-content term indexing, compact returned cards, worker-based tool requests, and unchanged-cache reuse. Curated notes do not need generated summaries. The existing 80-question v2 retrieval benchmark improved R@1 from 68.8% to 70.0%; ecosystem tests passed 209 with 3 existing skips. Native extension changes and their dependencies were saved in focused local Git commits.
+
+## Follow-up: packaged startup and responsiveness (2026-10-28)
+
+Build 057380c adds a script-free, restrictive-CSP loading shell on Windows. The shell paints before extension initialization and keeps the main chat unavailable until its runtime is ready. A deterministic test holds an extension at a file gate and confirms the visible startup status before releasing it. This improves startup feedback; it does not remove the extension import CPU cost. Inactive workspaces continue to load on selection rather than all being preloaded.
+
+The final packaged binary passed all 11 real OpenAI checkpoints, including minimize/restore during a running tool, complete typing during output growth, Stop, archive/unarchive and both conversations after restart. Both owned processes exited. The final frame sample had 310 intervals, p95 17.2 ms, maximum 18.7 ms and none above 33 ms. Evidence: .artifacts/verify-pi-gui/run-final-package-20261028/. Final packaged runtime dependencies, typechecking, affected-file lint and architecture guards passed. Ten focused startup/viewport/thinking regressions and a separate Windows native minimize test passed.
+
+Expanded real OpenAI thinking was inspected in the earlier packaged candidate's thinking-expanded.png. The final provider run returned no displayable reasoning text; the observation is recorded explicitly, and the product correctly showed no empty thinking row. That provider difference does not establish a renderer failure.
+
+Startup profiling measured approximately 1.86 seconds without the managed extension and 2.95 seconds with it in one warm-machine comparison, with a 682 ms JavaScript stall attributed to extension import. A separate confirmed-active Node compile-cache experiment did not improve latency or stalls, so it was not enabled. Cold binary launches varied more and are not represented by that warm sample.
+
+Mac native minimization remains unverified: both the app window and plain diagnostic Electron windows ignored minimization on this macOS 27.0.1 host. Changing focus/setup and using the OS accessibility control did not establish a successful minimize. The user was informed and foreground Mac runs were stopped. Earlier fixture-backed Mac checks remain distinct from this failed native lane.
+
+The coding-principles skill now includes first-principles performance diagnosis, token/keystroke hot paths, staged warmup budgets and truthful evidence requirements. The verification skill now covers responsiveness, exact packaged identity, empty provider reasoning, bounded native diagnostics and safe activation. Both skills validate.
+
+Activation is pending the owner's restart choice after Pegasus was reopened during the swap. The update guards left the old installation intact; the verified candidate is retained under apps/desktop/release-reliability-final-20261028/win-unpacked. No debugger was enabled and no credentials were exported to the Mac.
