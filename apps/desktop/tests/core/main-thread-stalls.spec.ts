@@ -20,7 +20,7 @@ test("logs a blocked main thread, where typing waits", async () => {
     const log = join(userDataDir, "logs", "main-thread-stalls.log");
     await expect
       .poll(async () => readFile(log, "utf8").catch(() => ""))
-      .toMatch(/main thread blocked (5\d\d|6\d\d|7\d\d) ms/);
+      .toMatch(/main thread blocked (5\d\d|6\d\d|7\d\d) ms\n {4}\d+ ms in /);
   } finally {
     await h.close();
   }
