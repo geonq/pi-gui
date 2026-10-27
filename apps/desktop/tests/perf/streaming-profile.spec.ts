@@ -3,17 +3,21 @@
  * Not a regression test: it measures per-delta cost in main and in the renderer
  * on a realistic long thread and prints the numbers.
  */
-import { writeFile } from "node:fs/promises";
+import { cp, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 import type { SessionDriverEvent, SessionRef } from "@pi-gui/session-driver";
 import {
   createSessionViaIpc,
   getDesktopState,
+  getSelectedTranscript,
   launchDesktop,
   makeUserDataDir,
   makeWorkspace,
+  seedAgentDir,
   selectSession,
   seedTranscriptMessages,
+  waitForTimelineLayout,
   waitForWorkspaceByPath,
   type DesktopHarness,
 } from "../helpers/electron-app";
@@ -404,6 +408,261 @@ test("streaming cost on a short thread", async () => {
 test("streaming cost on a long thread", async () => {
   test.setTimeout(600_000);
   await measure("long", SEEDED_MESSAGES);
+});
+
+// Typing into the composer while a thread streams: keydown-to-next-frame latency,
+// with a busy sidebar (many threads) like a real install has.
+test("typing in the composer during a growing answer", async ({}, info) => {
+  test.setTimeout(240_000);
+  const userDataDir = await makeUserDataDir();
+  // PERF_REAL_SESSIONS: a pi sessions folder to copy (never modified) and open, so the sidebar and
+  // transcript are a real install's; PERF_REAL_WORKSPACES lists its folders, PERF_REAL_SESSION_ID
+  // picks the thread.
+  const realSessions = process.env.PERF_REAL_SESSIONS;
+  let agentDir: string | undefined;
+  if (realSessions) {
+    agentDir = join(userDataDir, "agent");
+    await seedAgentDir(agentDir);
+    await cp(realSessions, join(agentDir, "sessions"), { recursive: true });
+  }
+  const h = await launchDesktop(userDataDir, {
+    initialWorkspaces: realSessions
+      ? (process.env.PERF_REAL_WORKSPACES ?? "").split(";").filter(Boolean)
+      : [await makeWorkspace("perf-typing")],
+    testMode: "background",
+    agentDir,
+  });
+  try {
+    const p = await h.firstWindow();
+    if (process.env.PERF_VISIBLE === "1") {
+      // A hidden window produces no frames: animations pause and key acks wait for a frame.
+      // showInactive draws the window without taking focus from whatever the owner is doing.
+      await h.electronApp.evaluate(({ BrowserWindow }) => {
+        for (const window of BrowserWindow.getAllWindows()) window.showInactive();
+      });
+    }
+    let sessionRef: SessionRef;
+    if (realSessions) {
+      const wanted = process.env.PERF_REAL_SESSION_ID ?? "";
+      await expect
+        .poll(async () =>
+          (await getDesktopState(p)).workspaces.some((w) =>
+            w.sessions.some((s) => s.id.includes(wanted)),
+          ),
+        )
+        .toBe(true);
+      const realState = await getDesktopState(p);
+      const owner = realState.workspaces.find((w) =>
+        w.sessions.some((s) => s.id.includes(wanted)),
+      )!;
+      const target = owner.sessions.find((s) => s.id.includes(wanted))!;
+      await selectSession(p, target.title);
+      sessionRef = { workspaceId: owner.id, sessionId: target.id };
+    } else {
+      const state = await getDesktopState(p);
+      for (let i = 0; i < Number(process.env.PERF_THREADS ?? 40); i++) {
+        await createSessionViaIpc(p, state.selectedWorkspaceId!, `Sidebar thread ${i}`);
+      }
+      await createSessionViaIpc(p, state.selectedWorkspaceId!, "Typing probe");
+      await selectSession(p, "Typing probe");
+      sessionRef = (
+        await seedTranscriptMessages(h, p, { count: SEEDED_MESSAGES, textFactory: body })
+      ).sessionRef;
+    }
+    await waitForTimelineLayout(p);
+    const runId = `typing-${Date.now()}`;
+    const seededState = await getDesktopState(p);
+    const workspace = seededState.workspaces.find((w) => w.id === sessionRef.workspaceId)!;
+    const session = workspace.sessions.find((s) => s.id === sessionRef.sessionId)!;
+    console.log(
+      `THREADS ${seededState.workspaces.reduce((n, w) => n + w.sessions.length, 0)} TRANSCRIPT ${
+        (await getSelectedTranscript(p))?.transcript.length ?? 0
+      } items`,
+    );
+    const snapshot = {
+      ref: sessionRef,
+      workspace: { workspaceId: workspace.id, path: workspace.path, displayName: workspace.name },
+      title: session.title,
+      status: "running" as const,
+      updatedAt: new Date().toISOString(),
+      preview: "streaming",
+      runningRunId: runId,
+    };
+    await emitNoWait(h, {
+      type: "sessionUpdated",
+      sessionRef,
+      runId,
+      timestamp: snapshot.updatedAt,
+      snapshot,
+    });
+    p.on("pageerror", (error) => console.log("PAGEERROR " + error.message.slice(0, 300)));
+    p.on("console", (message) => {
+      if (message.type() === "error" || message.type() === "warning")
+        console.log(`CONSOLE ${message.type()} ${message.text().slice(0, 300)}`);
+    });
+    const composer = p.getByTestId("composer");
+    await composer.click();
+    // Main-thread cost of simply showing a working thread for 8 s, from Chromium's own counters.
+    const metrics = await p.context().newCDPSession(p);
+    await metrics.send("Performance.enable");
+    const read = async () =>
+      Object.fromEntries(
+        (
+          (await metrics.send("Performance.getMetrics")) as {
+            metrics: Array<{ name: string; value: number }>;
+          }
+        ).metrics.map((m) => [m.name, m.value]),
+      );
+    await p.waitForTimeout(4000);
+    const idleBefore = await read();
+    await p.waitForTimeout(8000);
+    const idleAfter = await read();
+    const idleCost = Object.fromEntries(
+      [
+        "TaskDuration",
+        "ScriptDuration",
+        "RecalcStyleDuration",
+        "RecalcStyleCount",
+        "LayoutDuration",
+        "LayoutCount",
+      ].map((name) => [
+        name,
+        name.endsWith("Duration")
+          ? Math.round(((idleAfter[name] ?? 0) - (idleBefore[name] ?? 0)) * 1000)
+          : (idleAfter[name] ?? 0) - (idleBefore[name] ?? 0),
+      ]),
+    );
+    console.log("IDLE_RUNNING_COST_8S " + JSON.stringify(idleCost));
+    const cdp = process.env.PERF_CPU === "1" ? await p.context().newCDPSession(p) : null;
+    if (cdp) {
+      await cdp.send("Profiler.enable");
+      await cdp.send("Profiler.setSamplingInterval", { interval: 200 });
+      await cdp.send("Profiler.start");
+    }
+    await p.evaluate(() => {
+      const latencies: number[] = [];
+      let renders = 0;
+      const onKey = (event: KeyboardEvent) => {
+        const at = event.timeStamp;
+        // The next frame after the key, then the task after that frame: the key is on screen.
+        requestAnimationFrame(() => {
+          const channel = new MessageChannel();
+          channel.port1.onmessage = () => latencies.push(performance.now() - at);
+          channel.port2.postMessage(null);
+        });
+      };
+      document.addEventListener("keydown", onKey, true);
+      const observer = new MutationObserver((records) => (renders += records.length));
+      observer.observe(document.body, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+      });
+      (window as unknown as { finishTypingSample: () => unknown }).finishTypingSample = () => {
+        document.removeEventListener("keydown", onKey, true);
+        observer.disconnect();
+        return { latencies, domMutations: renders };
+      };
+    });
+    await patchMain(h);
+    await startMainSample(h);
+    let streaming = true;
+    let eventCount = 0;
+    // Time for the renderer to accept each key, seen from outside it: what a person feels.
+    const pressMs: number[] = [];
+    const text = "the quick brown fox jumps over the lazy dog ".repeat(
+      Number(process.env.PERF_TEXT_REPEAT ?? 3),
+    );
+    await Promise.all([
+      (async () => {
+        for (let i = 0; streaming && process.env.PERF_NO_STREAM !== "1"; i++) {
+          eventCount += 1;
+          await emitNoWait(h, {
+            type: "assistantDelta",
+            sessionRef,
+            runId,
+            timestamp: new Date().toISOString(),
+            text: `token${i} `,
+          });
+          await emitNoWait(h, {
+            type: "sessionUpdated",
+            sessionRef,
+            runId,
+            timestamp: new Date().toISOString(),
+            snapshot: { ...snapshot, updatedAt: new Date().toISOString(), preview: `token${i}` },
+          });
+          await new Promise((resolve) => setTimeout(resolve, 15));
+        }
+      })(),
+      (async () => {
+        try {
+          for (const [index, char] of [...text].entries()) {
+            const pressStarted = performance.now();
+            const pressed = await Promise.race([
+              p.keyboard.press(char === " " ? "Space" : char).then(() => {
+                pressMs.push(performance.now() - pressStarted);
+                return true;
+              }),
+              new Promise<false>((resolve) => setTimeout(() => resolve(false), 5000)),
+            ]);
+            if (!pressed) {
+              const alive = await Promise.race([
+                p.evaluate(() => ({
+                  active:
+                    document.activeElement?.getAttribute("data-testid") ??
+                    document.activeElement?.tagName,
+                })),
+                new Promise<string>((resolve) =>
+                  setTimeout(() => resolve("renderer unresponsive"), 5000),
+                ),
+              ]);
+              throw new Error(`key ${index} (${char}) stalled; renderer: ${JSON.stringify(alive)}`);
+            }
+            await new Promise((resolve) => setTimeout(resolve, 40));
+          }
+        } finally {
+          streaming = false;
+        }
+      })(),
+    ]);
+    const main = await stopMainSample(h);
+    await expect(composer).toHaveValue(text);
+    const sample = await p.evaluate(() =>
+      (
+        window as unknown as {
+          finishTypingSample: () => { latencies: number[]; domMutations: number };
+        }
+      ).finishTypingSample(),
+    );
+    const percentile = (values: number[], ratio: number) =>
+      [...values].sort((a, b) => a - b)[
+        Math.min(values.length - 1, Math.floor(values.length * ratio))
+      ] ?? 0;
+    const result = {
+      label: process.env.PERF_LABEL ?? "checkout",
+      seeded: SEEDED_MESSAGES,
+      keys: sample.latencies.length,
+      p50KeyToFrameMs: Number(percentile(sample.latencies, 0.5).toFixed(1)),
+      p95KeyToFrameMs: Number(percentile(sample.latencies, 0.95).toFixed(1)),
+      maxKeyToFrameMs: Number(percentile(sample.latencies, 1).toFixed(1)),
+      p50PressMs: Number(percentile(pressMs, 0.5).toFixed(1)),
+      p95PressMs: Number(percentile(pressMs, 0.95).toFixed(1)),
+      maxPressMs: Number(percentile(pressMs, 1).toFixed(1)),
+      domMutations: sample.domMutations,
+      mainSends: main.sends,
+      events: eventCount,
+    };
+    console.log("TYPING_RESULT " + JSON.stringify(result));
+    if (cdp) {
+      const { profile } = await cdp.send("Profiler.stop");
+      const profilePath = info.outputPath("typing.cpuprofile");
+      await writeFile(profilePath, JSON.stringify(profile));
+      console.log("TYPING_PROFILE " + profilePath);
+    }
+  } finally {
+    await h.close();
+  }
 });
 
 // A paced stream and actual renderer wheel input, separate from the CPU-profile
