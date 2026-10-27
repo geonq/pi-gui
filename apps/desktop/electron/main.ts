@@ -72,6 +72,7 @@ import { createRemoteNotificationStore } from "./platform/remote-notification-so
 import { NotificationPermissionService } from "./platform/notification-permission";
 import { openReleasesPage } from "./platform/update-checker";
 import { AppUpdater } from "./platform/update-installer";
+import { watchMainThreadStalls } from "./platform/main-thread-stalls";
 import { registerUpdateIpc } from "./platform/register-update-ipc";
 import { ThemeManager } from "./platform/theme-manager";
 import { windowBackgroundFor } from "../contracts/theme";
@@ -1318,6 +1319,7 @@ app
       remoteDesktopClient = new RemoteDesktopHttpClient(config);
     }
     traceStartup("electron ready");
+    watchMainThreadStalls(path.join(configuredUserDataDir, "logs"));
     if (process.platform === "win32" && windowTestMode !== "background") {
       launchWindow = createWindow({ deferContent: true });
     }
