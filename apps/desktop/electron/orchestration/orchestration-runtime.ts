@@ -178,6 +178,7 @@ function createReadThreadTool(
     promptGuidelines: [
       "Use read_thread with a thread id returned by list_threads or create_child_thread.",
       "Prefer reading a child thread before summarizing its status back to the parent.",
+      "A child claim without its evidence (command output, file:line, measurement) is unverified: send the child back with send_message_to_thread to check it, and never present it to the user as a finding.",
     ],
     parameters: {
       type: "object",
