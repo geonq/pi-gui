@@ -135,6 +135,8 @@ function normalizeLaunchOptions(
 
 function electronCliArgs(entry?: string): string[] {
   const args = entry ? [entry] : [];
+  if (process.platform === "win32")
+    args.push("--disable-frame-rate-limit", "--disable-backgrounding-occluded-windows");
   if (process.platform === "linux") {
     // A never-shown X11 window draws ~1.5 frames/s, which starves rAF-driven layout
     // and native wheel scrolling in background test mode.
@@ -269,9 +271,13 @@ function createDesktopHarness(electronApp: ElectronApplication): DesktopHarness 
       // placeholder and hang on domcontentloaded.
       page = await waitForDesktopRendererPage(electronApp);
       await page.waitForLoadState("domcontentloaded");
-      await page.waitForFunction(() => Boolean(globalThis.window.piApp), undefined, {
-        timeout: 15_000,
-      });
+      try {
+        await page.waitForFunction(() => Boolean(globalThis.window.piApp), undefined, {
+          timeout: 15_000,
+        });
+      } catch (error) {
+        throw new Error(`${String(error)}\nLast app output:\n${outputTail.join("\n")}`);
+      }
     }
     return page;
   }
@@ -425,6 +431,7 @@ function buildDesktopLaunchEnv(
   }
   const env = {
     ...baseEnv,
+    PI_REMOTE_DESKTOP_CLIENT: "0",
     PI_APP_USER_DATA_DIR: userDataDir,
     PI_APP_INITIAL_WORKSPACES: (options.initialWorkspaces ?? []).join(delimiter),
     PI_APP_TEST_MODE: options.testMode ?? process.env.PI_APP_TEST_MODE ?? "foreground",

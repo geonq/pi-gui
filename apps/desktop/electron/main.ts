@@ -157,11 +157,7 @@ if (process.platform === "darwin" && !remoteDesktopDefaultsDisabled) {
     process.env.PI_GUI_INTEGRATED_LAUNCH = "1";
   }
 }
-if (
-  process.platform === "win32" &&
-  process.env.PI_APP_TEST_MODE === undefined &&
-  process.env.PI_APP_TEST_LANE === undefined
-) {
+if (process.platform === "win32" && !remoteDesktopDefaultsDisabled) {
   const hostConfigPath =
     process.env.PI_REMOTE_DESKTOP_HOST_CONFIG?.trim() ||
     "D:\\Pi\\pi-ecosystem\\.state\\remote-desktop\\host.json";

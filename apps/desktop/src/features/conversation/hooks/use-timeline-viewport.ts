@@ -111,6 +111,7 @@ export function useTimelineViewport({
     const generation = current.generation;
     current.frame = requestAnimationFrame(() => {
       current.frame = 0;
+      current.syncPasses = 0;
       if (model.current !== current || current.generation !== generation) return;
       setVersion((value) => value + 1);
     });
@@ -178,6 +179,8 @@ export function useTimelineViewport({
   useLayoutEffect(() => {
     if (!pane || !active) return;
     const observer = new ResizeObserver(() => {
+      // Hidden panes have no usable geometry. Wait for their next resize.
+      if (pane.clientWidth === 0 || pane.clientHeight === 0) return;
       const current = model.current;
       const width = Math.min(
         pane.clientWidth,
@@ -286,8 +289,6 @@ export function useTimelineViewport({
       cancelAnimationFrame(current.frame);
       current.frame = 0;
       setVersion((value) => value + 1);
-    } else {
-      current.syncPasses = 0;
     }
     markLayout(pane, measured && !current.frame ? "settled" : "settling");
     if (current.key) saved.current.set(current.key, destination(current.state));

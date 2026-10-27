@@ -34,7 +34,7 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
     JSON.stringify({
       defaultProvider: provider,
       defaultModel: model,
-      defaultThinkingLevel: "off",
+      defaultThinkingLevel: process.env.PI_GUI_THINKING_LEVEL || "off",
       enabledModels: [`${provider}/${model}`],
     }),
   );
@@ -130,7 +130,7 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
     const current = harness;
     harness = undefined;
     try {
-      if (!page.isClosed() && (await page.getByTestId("composer").count()))
+      if (page && !page.isClosed() && (await page.getByTestId("composer").count()))
         composerInputs.push({
           phase,
           at: Date.now(),
@@ -156,7 +156,7 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
   const start = async (prompt: string) => {
     await page
       .getByRole("complementary")
-      .getByRole("button", { name: "New thread", exact: true })
+      .getByRole("button", { name: "New chat", exact: true })
       .click();
     await page.getByLabel("New thread prompt", { exact: true }).fill(prompt);
     await page.getByRole("button", { name: "Start thread", exact: true }).click();
@@ -374,7 +374,7 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
       await page.locator(".archived-thread-group__toggle").click();
       await row(bravo).hover();
       await row(bravo)
-        .getByLabel(/^Restore /)
+        .getByLabel(/^Unarchive /)
         .click();
       await expect(page.locator(".archived-thread-group")).toHaveCount(0);
       await select(bravo);
