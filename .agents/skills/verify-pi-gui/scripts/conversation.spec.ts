@@ -1,9 +1,10 @@
 import { test, expect, type Page } from "@playwright/test";
 import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import {
   launchDesktop,
+  launchDesktopByExecutable,
   type DesktopHarness,
 } from "../../../../apps/desktop/tests/helpers/electron-app";
 
@@ -13,6 +14,8 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
   const source = process.env.PI_APP_REAL_AUTH_SOURCE_DIR;
   const provider = process.env.PI_GUI_PROVIDER;
   const model = process.env.PI_GUI_MODEL;
+  const executable = process.env.PI_GUI_EXECUTABLE?.trim();
+  const minimizeProof = process.env.PI_GUI_MINIMIZE_PROOF === "1";
   if (process.env.PI_APP_REAL_AUTH !== "1" || !source || !provider || !model) {
     throw new Error(
       "BLOCKED: conversation proof requires explicit real-auth source, provider and model; it never skips to a pass",
@@ -71,12 +74,16 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
     );
   };
   const launch = async () => {
-    harness = await launchDesktop(profile, {
+    const launchedAt = Date.now();
+    const launchOptions = {
       agentDir,
       initialWorkspaces: [workspace],
       scrubProviderEnv: true,
-      envOverrides: { PI_APP_TEST_MODE: undefined },
-    });
+      envOverrides: { PI_APP_TEST_MODE: undefined, PI_GUI_INTEGRATED_LAUNCH: "1" },
+    };
+    harness = executable
+      ? await launchDesktopByExecutable(resolve(executable), profile, launchOptions)
+      : await launchDesktop(profile, launchOptions);
     runs.push({ pid: harness.electronApp.process().pid!, closed: false });
     await harness.focusWindow();
     page = await harness.firstWindow();
@@ -104,6 +111,8 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
     });
     const identity = await harness.electronApp.evaluate(({ app, BrowserWindow }) => ({
       pid: process.pid,
+      executable: process.execPath,
+      packaged: app.isPackaged,
       appPath: app.getAppPath(),
       userData: app.getPath("userData"),
       visible: BrowserWindow.getAllWindows()[0]?.isVisible(),
@@ -114,11 +123,19 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
     const documentFocused = await page.evaluate(() => document.hasFocus());
     await writeFile(
       join(evidence, `${phase}-doctor.json`),
-      JSON.stringify({ ...identity, documentFocused }, null, 2),
+      JSON.stringify(
+        { ...identity, documentFocused, launchToInteractiveMs: Date.now() - launchedAt },
+        null,
+        2,
+      ),
     );
     expect(identity).toMatchObject({ visible: true, testMode: null, testHooks: false });
     expect(identity.focused || documentFocused).toBe(true);
-    expect(resolve(identity.appPath)).toBe(resolve("apps/desktop"));
+    if (executable) {
+      expect(identity.packaged).toBe(true);
+      expect(resolve(identity.executable)).toBe(resolve(executable));
+      expect(resolve(identity.appPath)).toBe(resolve(dirname(executable), "resources", "app.asar"));
+    } else expect(resolve(identity.appPath)).toBe(resolve("apps/desktop"));
     expect(resolve(identity.userData)).toBe(resolve(profile));
     await harness.electronApp
       .context()
@@ -296,7 +313,37 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
         .soft(page.getByTestId("composer"), "Alpha draft must survive thread switches")
         .toHaveValue(drafts.alpha);
       await checkpoint("switch-during-run");
+      if (minimizeProof) {
+        await harness!.electronApp.evaluate(({ BrowserWindow }) =>
+          BrowserWindow.getAllWindows()[0]!.minimize(),
+        );
+        await expect
+          .poll(() =>
+            harness!.electronApp.evaluate(({ BrowserWindow }) =>
+              BrowserWindow.getAllWindows()[0]!.isMinimized(),
+            ),
+          )
+          .toBe(true);
+      }
       await idle(bravo);
+      if (minimizeProof) {
+        await expect
+          .poll(() =>
+            harness!.electronApp.evaluate(({ BrowserWindow }) =>
+              BrowserWindow.getAllWindows()[0]!.isMinimized(),
+            ),
+          )
+          .toBe(true);
+        await harness!.focusWindow();
+        await page
+          .getByTestId("composer")
+          .fill("A complete draft after minimizing a running agent.");
+        await expect(page.getByTestId("composer")).toHaveValue(
+          "A complete draft after minimizing a running agent.",
+        );
+        await checkpoint("minimize-restore");
+        await page.getByTestId("composer").fill(drafts.alpha);
+      }
       await select(bravo);
       await expect(assistant().last()).toContainText("BRAVO_DONE", { timeout: 20_000 });
       await expect(assistant()).not.toContainText("ALPHA_DONE");
@@ -364,6 +411,25 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
         .soft(page.getByTestId("composer"), "Bravo draft must survive thread switches/archive")
         .toHaveValue(drafts.bravo);
       await checkpoint("draft-isolation");
+      if (process.env.PI_GUI_THINKING_LEVEL && process.env.PI_GUI_THINKING_LEVEL !== "off") {
+        // Providers may return encrypted reasoning with no display text even at high effort.
+        const thinkingRows = page.getByTestId("timeline-thinking");
+        const count = await thinkingRows.count();
+        await writeFile(
+          join(evidence, "thinking-observation.json"),
+          JSON.stringify({ visibleRows: count, thinkingLevel: process.env.PI_GUI_THINKING_LEVEL }),
+        );
+        if (count > 0) {
+          const thinking = thinkingRows.last();
+          const button = thinking.getByRole("button");
+          await expect(button).toHaveAttribute("aria-expanded", "false");
+          await button.click();
+          await expect(thinking.getByTestId("timeline-thinking-body")).toContainText(/\S/);
+          await checkpoint("thinking-expanded");
+          await button.click();
+          await expect(button).toHaveAttribute("aria-expanded", "false");
+        }
+      }
     });
     await test.step("Archive and restore Bravo through the sidebar", async () => {
       await row(bravo).hover();

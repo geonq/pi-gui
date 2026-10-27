@@ -47,7 +47,7 @@ Each run uses a scratch workspace and isolated profile. The conversation proof c
 
 ## Doctor
 
-On each launch, focus the owned app and perform the recipe's read-only identity checks: app path resolves to this checkout's `apps/desktop`, userData equals this run's profile, native window is visible and focused, test mode is absent, and main-process test hooks are absent. `firstWindow()` waits for DOM load and the preload bridge. Doctor JSON records actual paths and PID. Successful sending validates usable authentication; a configured provider name alone does not.
+On each launch, focus the owned app and perform the recipe's read-only identity checks: app path resolves to this checkout's `apps/desktop`, userData equals this run's profile, native window is visible and focused, test mode is absent, and main-process test hooks are absent. `firstWindow()` waits for DOM load and the preload bridge. With PI_GUI_EXECUTABLE set, the conversation recipe instead launches that exact packaged executable with an isolated profile and verifies its executable path, packaged state and app.asar path. PI_GUI_MINIMIZE_PROOF=1 adds minimize/restore during a real run. Doctor JSON records actual paths and PID. Successful sending validates usable authentication; a configured provider name alone does not.
 
 If launch fails or auth is rejected, capture the error and stop that attempt. A map entry and a build are not runtime proof.
 
