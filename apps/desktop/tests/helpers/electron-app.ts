@@ -227,7 +227,7 @@ async function launchDesktopExecutable(
 
 function isPlaceholderElectronPage(page: Page): boolean {
   const url = page.url();
-  return url === "" || url === "about:blank";
+  return url === "" || url === "about:blank" || url.startsWith("data:text/html");
 }
 
 async function waitForDesktopRendererPage(
