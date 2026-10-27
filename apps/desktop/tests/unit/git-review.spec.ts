@@ -32,6 +32,7 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
 async function repository(unborn = false): Promise<string> {
   const cwd = await mkdtemp(join(tmpdir(), "pi-gui-git-review-test-"));
   await git(cwd, "init", "-b", "trunk");
+  await git(cwd, "config", "core.autocrlf", "false");
   await git(cwd, "config", "user.email", "review@example.invalid");
   await git(cwd, "config", "user.name", "Review fixture");
   if (!unborn) {
@@ -56,7 +57,7 @@ async function fileContent(review: GitReviewSnapshot, path: string) {
   const file = review.files.find((entry) => entry.path === path);
   expect(file).toBeDefined();
   const result = await readGitReviewFile(review, file!.id);
-  expect(result.state).toBe("available");
+  expect(result.state, result.state === "failed" ? result.message : undefined).toBe("available");
   if (result.state !== "available") throw new Error(result.message);
   return { file: file!, result };
 }
@@ -168,14 +169,21 @@ test("detects same-status byte and executable-mode changes before reading or sta
   expect(await git(cwd, "diff", "--cached")).toBe("");
   const second = await uncommitted(cwd);
   await chmod(join(cwd, "file.txt"), 0o755);
-  expect(await checkGitReviewFileCurrent(second, second.files[0]!.id)).toMatchObject({
-    state: "stale",
-  });
+  if (process.platform === "win32") {
+    expect(await checkGitReviewFileCurrent(second, second.files[0]!.id)).toBeNull();
+  } else {
+    expect(await checkGitReviewFileCurrent(second, second.files[0]!.id)).toMatchObject({
+      state: "stale",
+    });
+  }
 });
 
 test("stages and unstages exact pathological paths, rename pairs, and unborn additions", async () => {
   const cwd = await repository();
-  const odd = ' :(glob)* spaced\t"quoted"\nname.txt';
+  const odd =
+    process.platform === "win32"
+      ? " -[glob] spaced 'quoted' name.txt"
+      : ' :(glob)* spaced\t"quoted"\nname.txt';
   await writeFile(join(cwd, odd), "odd content\n");
   let review = await uncommitted(cwd);
   let file = review.files.find((entry) => entry.path === odd)!;
@@ -325,12 +333,14 @@ test("renders symlink text without following its target and reports oversized co
   const cwd = await repository();
   const secret = join(await mkdtemp(join(tmpdir(), "pi-review-outside-")), "secret.txt");
   await writeFile(secret, "outside-content-must-not-be-read");
-  await symlink(secret, join(cwd, "link"));
+  if (process.platform !== "win32") await symlink(secret, join(cwd, "link"));
   await writeFile(join(cwd, "large.txt"), Buffer.alloc(8 * 1024 * 1024 + 1, 65));
   const review = await uncommitted(cwd);
-  const link = (await fileContent(review, "link")).result;
-  expect(link.patch).toContain(secret);
-  expect(link.patch).not.toContain("outside-content-must-not-be-read");
+  if (process.platform !== "win32") {
+    const link = (await fileContent(review, "link")).result;
+    expect(link.patch).toContain(secret);
+    expect(link.patch).not.toContain("outside-content-must-not-be-read");
+  }
   const large = (await fileContent(review, "large.txt")).result;
   expect(large.coverage.state).toBe("partial");
   expect(large.coverage.notes.join(" ")).toContain("8 MiB");

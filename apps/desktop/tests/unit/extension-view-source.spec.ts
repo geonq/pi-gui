@@ -59,17 +59,25 @@ test("desktop asset validation rejects symlink escapes at registration and servi
     await mkdir(build, { recursive: true });
     await writeFile(source, "export default () => {};");
     await writeFile(outside, "secret");
-    await symlink(outside, path.join(build, "escape.js"));
+    await mkdir(path.join(directory, "outside"));
+    await writeFile(path.join(directory, "outside", "secret.js"), "secret");
+    await symlink(
+      path.join(directory, "outside"),
+      path.join(build, "escape"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
     await expect(
       validateDesktopExtensionSource(
         {
           source: pathToFileURL(source).href,
-          frontend: pathToFileURL(path.join(build, "escape.js")),
+          frontend: pathToFileURL(path.join(build, "escape", "secret.js")),
         },
         [{ resolvedPath: source }],
       ),
     ).rejects.toThrow("inside its loaded extension");
-    await expect(resolveDesktopExtensionAsset(build, "escape.js")).rejects.toThrow("outside");
+    await expect(resolveDesktopExtensionAsset(build, "escape/secret.js")).rejects.toThrow(
+      "outside",
+    );
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

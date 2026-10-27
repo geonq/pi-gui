@@ -111,7 +111,7 @@ test("captures raw bytes, modes, symlink targets and deletions without changing 
   await unlink(join(workspace, "deleted.txt"));
   const outside = join(directory, "outside-secret");
   await writeFile(outside, "external contents must never enter a snapshot");
-  await symlink(outside, join(workspace, "external-link"));
+  if (process.platform !== "win32") await symlink(outside, join(workspace, "external-link"));
 
   const indexBefore = await readFile(join(workspace, ".git", "index"));
   const headBefore = await readFile(join(workspace, ".git", "HEAD"));
@@ -126,12 +126,18 @@ test("captures raw bytes, modes, symlink targets and deletions without changing 
   expect(await git(store.repositoryPath, ["show", `${capture.treeOid}:binary.bin`])).toEqual(
     Buffer.from([0, 255, 10, 13, 0]),
   );
-  expect(await git(store.repositoryPath, ["show", `${capture.treeOid}:external-link`])).toEqual(
-    Buffer.from(outside),
-  );
+  if (process.platform !== "win32") {
+    expect(await git(store.repositoryPath, ["show", `${capture.treeOid}:external-link`])).toEqual(
+      Buffer.from(outside),
+    );
+  }
   const tree = (await git(store.repositoryPath, ["ls-tree", "-r", capture.treeOid])).toString();
-  expect(tree).toContain("120000 blob");
-  expect(tree).toMatch(/100755 blob [a-f0-9]+\tscript\.sh/);
+  if (process.platform !== "win32") expect(tree).toContain("120000 blob");
+  expect(tree).toMatch(
+    process.platform === "win32"
+      ? /100644 blob [a-f0-9]+\tscript\.sh/
+      : /100755 blob [a-f0-9]+\tscript\.sh/,
+  );
   expect(tree).not.toContain("deleted.txt");
   expect(tree).not.toContain("private.secret");
   expect(tree).not.toContain("global-ignored.txt");
@@ -245,9 +251,13 @@ test("an untracked nested repository is skipped with a coverage note instead of 
 
 test("private batching handles spaces and newlines in storage roots and source filenames", async () => {
   const { directory, workspace } = await fixture();
-  const userData = join(directory, 'app data\n"quoted"');
+  const userData = join(
+    directory,
+    process.platform === "win32" ? "app data 'quoted'" : 'app data\n"quoted"',
+  );
   const store = new TurnCheckpointStore(userData, { timeoutMs: 10_000 });
-  const path = ' source\t"quoted"\nfile.txt';
+  const path =
+    process.platform === "win32" ? " source 'quoted' file.txt" : ' source\t"quoted"\nfile.txt';
   await writeFile(join(workspace, path), "raw content\r\n");
   const capture = await store.capture(workspace);
   available(capture);
@@ -478,7 +488,11 @@ test("sparse, conflicted and directory-symlink checkouts remain explicitly unava
   expect(await readFile(join(workspace, ".git", "index"))).toEqual(conflictedIndex);
   await git(workspace, ["add", "nested/file.txt"]);
   await rename(join(workspace, "nested"), join(directory, "outside"));
-  await symlink(join(directory, "outside"), join(workspace, "nested"));
+  await symlink(
+    join(directory, "outside"),
+    join(workspace, "nested"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
   expect(await store.capture(workspace)).toMatchObject({
     state: "unavailable",
     code: "unsafe-symlink",
@@ -683,7 +697,11 @@ test("incremental captures reread only changed files and still see same-size rew
 
   // A tracked directory replaced by a symlink is refused even though its file is unchanged.
   await rename(join(workspace, "nested"), join(workspace, "..", "moved-nested"));
-  await symlink(join(workspace, "..", "moved-nested"), join(workspace, "nested"));
+  await symlink(
+    join(workspace, "..", "moved-nested"),
+    join(workspace, "nested"),
+    process.platform === "win32" ? "junction" : "dir",
+  );
   expect(await store.capture(workspace)).toMatchObject({
     state: "unavailable",
     code: "unsafe-symlink",

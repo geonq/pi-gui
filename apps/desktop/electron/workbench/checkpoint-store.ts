@@ -594,7 +594,11 @@ export class TurnCheckpointStore {
           "Git returned an invalid snapshot object inventory.",
         );
       }
-      await rm(captureDirectory, { recursive: true, force: true });
+      await rm(captureDirectory, {
+        recursive: true,
+        force: true,
+        maxRetries: process.platform === "win32" ? 5 : 0,
+      });
       spoolPath = undefined;
       signal.throwIfAborted();
       const files = new Map<string, CachedFile>();
@@ -683,7 +687,12 @@ export class TurnCheckpointStore {
               );
       return { ...result, fileCount, byteCount, durationMs: Date.now() - started };
     } finally {
-      if (spoolPath) await rm(spoolPath, { recursive: true, force: true });
+      if (spoolPath)
+        await rm(spoolPath, {
+          recursive: true,
+          force: true,
+          maxRetries: process.platform === "win32" ? 5 : 0,
+        });
       // These are this capture's newly created scratch indexes, not user or checkpoint data.
       await Promise.all(
         [indexPath, `${indexPath}.lock`].map(async (path) => {
@@ -1096,7 +1105,14 @@ function git(
         killSignal: "SIGKILL",
         maxBuffer: 16 * 1024 * 1024,
       },
-      (error, stdout) => (error ? reject(error) : accept(stdout)),
+      (error, stdout) => {
+        // execFile reports AbortError before Windows has released the process's
+        // working directory. Cleanup must wait for the actual process exit.
+        if (error && signal.aborted && child.exitCode === null && child.signalCode === null) {
+          child.once("close", () => reject(error));
+        } else if (error) reject(error);
+        else accept(stdout);
+      },
     );
     child.stdin?.on("error", () => undefined);
     child.stdin?.end(input);

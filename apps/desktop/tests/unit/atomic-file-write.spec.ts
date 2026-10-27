@@ -16,6 +16,8 @@ test("keeps ui-state readable while a new version replaces it", async () => {
       try {
         await readFile(filePath, "utf8");
         reads += 1;
+        // Model independent readers yielding between reads rather than an I/O spin loop.
+        await new Promise<void>((resolve) => setTimeout(resolve, 10));
       } catch (error) {
         if (!isMissingFile(error)) {
           throw error;

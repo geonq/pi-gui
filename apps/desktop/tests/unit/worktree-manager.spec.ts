@@ -246,7 +246,11 @@ test("app worktree paths are matched inside the profile root only, even before i
     expect(await isAppWorktreePath(join(root, "worktrees", "..", "repo"))).toBe(false);
     // Git reports resolved paths; a root reached through a symlink must still match.
     await mkdir(join(root, "real", "worktrees", "repo", "task-2"), { recursive: true });
-    await symlink(join(root, "real"), join(root, "linked"));
+    await symlink(
+      join(root, "real"),
+      join(root, "linked"),
+      process.platform === "win32" ? "junction" : "dir",
+    );
     const throughLink = appWorktreeRootMatcher(join(root, "linked", "worktrees"));
     expect(
       await throughLink(await realpath(join(root, "real", "worktrees", "repo", "task-2"))),

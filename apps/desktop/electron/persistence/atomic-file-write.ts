@@ -163,19 +163,21 @@ async function promoteToTarget(
 }
 
 async function renameReplace(src: string, dest: string): Promise<void> {
-  try {
-    await rename(src, dest);
-    return;
-  } catch (error) {
-    if (!isReplaceRenameError(error)) {
-      throw error;
+  // Windows readers and virus scanners can temporarily deny replacement. Keep
+  // the primary in place while retrying; unlinking it exposes missing state.
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await rename(src, dest);
+      return;
+    } catch (error) {
+      if (process.platform !== "win32" || !isReplaceRenameError(error) || attempt >= 20) {
+        throw error;
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, Math.min(5 * 2 ** attempt, 100) + (attempt % 7)),
+      );
     }
   }
-
-  // Windows rename cannot atomically replace an existing file; remove the
-  // destination first, then rename into the now-free path.
-  await cleanupTempFile(dest);
-  await rename(src, dest);
 }
 
 async function fsyncDir(dir: string): Promise<void> {
