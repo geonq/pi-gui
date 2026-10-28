@@ -77,6 +77,8 @@ This is not a dry-run: conversation mode contacts the configured provider, consu
 
 ## Cleanup
 
+Conversation verification copies the selected credential into its private profile. If OAuth refresh rotates it, the recipe preserves the refreshed credential in the designated source under the SDK-compatible file lock, only if that source still matches the original credential. It preserves other providers and never overwrites a newer login. The evidence records only whether a refresh was preserved.
+
 Both recipes close only their owned Electron applications in `finally`, including assertion/trace failures, and record the PIDs in `cleanup.json`. Confirm those processes exited and the proof artifacts still exist. For launch failure, inspect Playwright's teardown/error; terminate only a verified owned PID if stranded, never by process name.
 
 Root `AGENTS.md` prohibits deleting temporary artifacts without approval. Retain scratch state and the private profile; do not put that private credential-bearing directory into shared evidence. Request explicit cleanup authorization before deleting retained private state. Process teardown still completes on every attempted run.

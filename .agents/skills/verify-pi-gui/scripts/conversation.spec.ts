@@ -1,3 +1,4 @@
+import { preserveProofAuth } from "../../../../apps/desktop/scripts/preserve-proof-auth.cjs";
 import { test, expect, type Page } from "@playwright/test";
 import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -480,6 +481,13 @@ test("real conversation: stream, switch, tool, stop, archive, restart", async ()
     throw error;
   } finally {
     await close();
+    const authRefresh = await preserveProofAuth({
+      sourcePath: join(source, "auth.json"),
+      privatePath: join(agentDir, "auth.json"),
+      provider,
+      initialCredential: auth[provider],
+    });
+    await writeFile(join(evidence, "auth-refresh.json"), JSON.stringify({ result: authRefresh }));
     await writeFile(
       join(evidence, "composer-inputs.json"),
       JSON.stringify(composerInputs, null, 2),
