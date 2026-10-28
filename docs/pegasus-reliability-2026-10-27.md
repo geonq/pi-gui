@@ -1,44 +1,52 @@
-# Pegasus reliability verification ? 2026-10-27
+# Pegasus reliability verification ? 2026-10-28
 
 ## Changes
 
-- Bound synchronous timeline measurement passes across an entire animation frame, and ignore zero-size panes until their next resize. Previously the counter could reset within a nested render chain.
-- Preserve the saved state file during Windows replacement contention instead of unlinking the destination. Retry transient replacement locks with a bounded backoff.
-- Give Git for Windows its recognized /dev/null path when producing addition/deletion patches. Wait for aborted checkpoint processes to release their working directory, and tolerate transient Windows scratch-directory locks.
-- Canonicalize the workspace root before returning extension file paths on macOS, where /tmp resolves to /private/tmp.
-- Isolate visible verification from the installed remote desktop host, prevent hidden Windows test-window frame throttling, preserve launch errors, and update stale New chat/Unarchive proof selectors. Optional PI_GUI_THINKING_LEVEL enables a real reasoning run.
-- Adapt Windows fixtures to supported filenames and directory junctions. POSIX executable-bit and file-symlink assertions remain on macOS; Windows does not gain that coverage by passing these fixtures.
+- Replaced whole-state work on streamed-token paths and bounded timeline measurement passes across a complete animation frame. Zero-size panes wait for resize instead of re-entering layout.
+- Preserved Windows state files during replacement contention, corrected Git-for-Windows addition/deletion patch paths, and waited for aborted Git processes before scratch cleanup. Windows fixtures use supported paths; POSIX assertions remain on macOS.
+- Aligned the GUI and native extension on Pi SDK 1.3.0. The extension reuses host modules only when installed versions match, with resolution limited to its source and compiled runtime. Packaged Anthropic SDK is the version required by Pi.
+- Moved Claude provider compilation to a short-lived worker. Complete compiled directories are published atomically, keyed by source contents, Node version and resolved SDK imports. Tests cover cold/warm caches, source changes, concurrent publication, failed transforms and real default provider registration.
+- Kept Stop responsive during pending startup hooks. Cancellation is applied when the provider run starts, and subsequent messages complete normally.
+- Displayed a restrictive-CSP loading shell while the selected workspace prepares. Initialization no longer waits for animation frames: an occluded Windows window can stop receiving them. Packaged verification now retains native frame scheduling.
+- Preserved original managed directory permissions during installation, retained rollback packages, verified the installed asar hash and checked managed-state readiness. Normal installed launch now reaches its saved workspace and host API.
+- Preserved rotated OAuth credentials from isolated conversation verification under the source file lock, with a comparison against the original credential. Newer logins and other providers are preserved. Four synthetic regressions pass.
+- Updated coding-principles and desktop-verification skills with performance budgets, off-thread compilation, SDK compatibility, native scheduling, accurate extension-loaded checks and permission-preserving activation.
 
-## Evidence
+## Verification
 
-Final Windows desktop unit suite: **431 passed, 3 existing skips** (434 discovered). Final isolated macOS unit suite: **433 passed, 1 existing skip**. Viewport/thinking Electron checks: **7/7 on Windows**, **8/8 on macOS including the hidden-window stress check**. The separate Windows hidden-window stress check passed. Both builds and typechecks passed; affected-file lint and architecture guards passed.
+| Lane                                                            | Result                                            |
+| --------------------------------------------------------------- | ------------------------------------------------- |
+| Windows desktop units                                           | 431 passed, 3 existing skips                      |
+| SDK driver integration                                          | 173 passed                                        |
+| Ecosystem regression suite                                      | 215 passed, 3 skips; 218 discovered               |
+| Proof credential-preservation tests                             | 4 passed                                          |
+| Final Windows hidden-window/viewport/thinking Electron checks   | 8 passed                                          |
+| Deterministic startup loading-shell regression                  | Passed                                            |
+| Packaged native-scheduling startup with real extension defaults | Passed; 18 registered tools, no error diagnostics |
+| Final package runtime dependency graph                          | Passed                                            |
+| Desktop types, affected-file lint, architecture guards          | Passed                                            |
+| Earlier isolated macOS desktop units                            | 433 passed, 1 existing skip                       |
+| Earlier macOS viewport/thinking/hidden Electron checks          | 8 passed                                          |
+| Both updated skills                                             | Validated                                         |
 
-The visible real-provider journey used OpenAI / gpt-6-luna with high reasoning and passed all ten checkpoints: streaming, reading and typing during growth, completion, thread switching while a tool ran, tool completion, Stop, draft isolation, archive/unarchive, and both chats after process restart. Both owned processes exited. Source profile credentials stayed on Windows. Screenshots were inspected; the Thinking row appears collapsed in a real response. Expanded thinking is also covered by the fixture-backed Electron check.
+The preceding packaged OpenAI journey passed all 11 checkpoints, including typing during output growth, native Windows minimize/restore, tools, Stop, thread switching, archive/restore and persistence after restart. Both owned processes exited. Its 310 frame intervals had p95 17.2 ms, maximum 18.7 ms and none above 33 ms. Evidence: .artifacts/verify-pi-gui/run-final-package-20261028/. Real expanded reasoning was visually inspected in the earlier packaged candidate; a later response contained no displayable reasoning, which correctly produced no empty Thinking row.
 
-Retained local live evidence: .artifacts/verify-pi-gui/run-codex-20261027e/. Its streaming frame sample contained 410 intervals: p95 17 ms, maximum 17.8 ms, none above 33 ms. These are short diagnostic samples, not an input-latency guarantee. Earlier failed attempts and their artifacts remain retained.
+The final Pi 1.3 live-provider recheck stopped at authentication: its designated source returned OAuth invalid_grant. No provider fallback was used. Recovery of this task's earlier refreshed login is awaiting explicit authorization after automatic approval review rejected searching temporary credential profiles. The credential-preservation fix prevents this verification recipe from stranding its designated source on future refreshes.
 
-Mac verification ran from an isolated /tmp checkout copied from this source. The older dirty Mac checkout was preserved. Windows and Mac foreground builds were development Electron surfaces; the installed Pegasus package was not replaced or used as proof of these source changes.
+## Startup evidence
 
-## Limits
+Earlier warm profiling found a 682 ms JavaScript import stall. With the real extension's 18 tools and diagnostics checked, cold-cache startup measured 2.694 s versus 2.240 s without the extension; warm-cache startup measured 2.464 s versus 2.198 s. Neither recorded a main-thread stall. Evidence: .artifacts/startup-valid-cold-20261028/ and .artifacts/startup-valid-warm-20261028/.
 
-The original intermittent freeze was not reproduced with its original component stack. The update counter fix removes an identified unbounded-chain risk and the new stress test passes; this does not prove every possible freeze is eliminated. Native minimize/refocus and long-duration use of the installed package still need separate coverage.
+The final native-scheduling package reached its extension-enabled workspace in 2.433 s in an isolated profile. Its first plain binary launch took 5.302 s, illustrating cold binary variability. Evidence: .artifacts/native-scheduling-startup-20261028/.
 
-Startup still has a measurable import/platform cost. Ecosystem wrappers now import the public event-stream module rather than the SDK-wide export, but the extension still loads the coding-agent SDK and Electron has its own startup work. No claim of eliminated launch pauses is made.
+Normal installed launch, including managed-profile preparation and the saved workspace, logged shell loaded at 2.376 s, store initialized at 4.617 s and renderer loaded at 5.116 s. The local host API confirmed all nine saved workspaces and no running sessions. The old build had remained at its startup shell until one native minimize/restore released its awaited animation frames; the installed fix removes that gate. These samples distinguish binary/platform work, workspace preparation and blocking; they are not a universal latency guarantee.
 
-Memory changes live in the separate ecosystem repository: full-content term indexing, compact returned cards, worker-based tool requests, and unchanged-cache reuse. Curated notes do not need generated summaries. The existing 80-question v2 retrieval benchmark improved R@1 from 68.8% to 70.0%; ecosystem tests passed 209 with 3 existing skips. Native extension changes and their dependencies were saved in focused local Git commits.
+The installed runtime corresponds to 6366146 at D:/Pi/app. Original and subsequent packages remain under D:/Pi/rollback/. Local hash, activation and normal-launch evidence are retained in D:/Pi/tasks/pegasus-native-startup-deployment-20261028.json and installed-native-startup-proof.json.
 
-## Follow-up: packaged startup and responsiveness (2026-10-28)
+## Other scope and evidence limits
 
-Build 057380c adds a script-free, restrictive-CSP loading shell on Windows. The shell paints before extension initialization and keeps the main chat unavailable until its runtime is ready. A deterministic test holds an extension at a file gate and confirms the visible startup status before releasing it. This improves startup feedback; it does not remove the extension import CPU cost. Inactive workspaces continue to load on selection rather than all being preloaded.
+Memory implementation and the native extension are committed in the separate ecosystem repository. Search now covers full chat and note bodies while returning compact cards; the 693 curated notes do not need generated summaries to expose their deeper text. The held-out 80-question evaluation improved rank-one retrieval from 68.8% to 70.0% and rank-three from 80.0% to 81.3%, with scope probes still rejected. Full-text coverage removes the summary-only limitation; it does not imply perfect retrieval.
 
-The final packaged binary passed all 11 real OpenAI checkpoints, including minimize/restore during a running tool, complete typing during output growth, Stop, archive/unarchive and both conversations after restart. Both owned processes exited. The final frame sample had 310 intervals, p95 17.2 ms, maximum 18.7 ms and none above 33 ms. Evidence: .artifacts/verify-pi-gui/run-final-package-20261028/. Final packaged runtime dependencies, typechecking, affected-file lint and architecture guards passed. Ten focused startup/viewport/thinking regressions and a separate Windows native minimize test passed.
+The original intermittent render-loop stack was not recovered. Its identified unbounded measurement chain is fixed, and the hidden-window stress regression passes. Long-duration real usage remains useful evidence for any other cause.
 
-Expanded real OpenAI thinking was inspected in the earlier packaged candidate's thinking-expanded.png. The final provider run returned no displayable reasoning text; the observation is recorded explicitly, and the product correctly showed no empty thinking row. That provider difference does not establish a renderer failure.
-
-Startup profiling measured approximately 1.86 seconds without the managed extension and 2.95 seconds with it in one warm-machine comparison, with a 682 ms JavaScript stall attributed to extension import. A separate confirmed-active Node compile-cache experiment did not improve latency or stalls, so it was not enabled. Cold binary launches varied more and are not represented by that warm sample.
-
-Mac native minimization remains unverified: both the app window and plain diagnostic Electron windows ignored minimization on this macOS 27.0.1 host. Changing focus/setup and using the OS accessibility control did not establish a successful minimize. The user was informed and foreground Mac runs were stopped. Earlier fixture-backed Mac checks remain distinct from this failed native lane.
-
-The coding-principles skill now includes first-principles performance diagnosis, token/keystroke hot paths, staged warmup budgets and truthful evidence requirements. The verification skill now covers responsiveness, exact packaged identity, empty provider reasoning, bounded native diagnostics and safe activation. Both skills validate.
-
-Activation is pending the owner's restart choice after Pegasus was reopened during the swap. The update guards left the old installation intact; the verified candidate is retained under apps/desktop/release-reliability-final-20261028/win-unpacked. No debugger was enabled and no credentials were exported to the Mac.
+On the macOS 27.0.1 host, minimization failed for both Electron and a normally launched standalone AppKit app, including after restarting Dock. The desktop was on-console and unlocked. This native lane remains inconclusive at the OS boundary; it is not presented as a Pegasus-specific regression or a passing minimize test. The Mac's older dirty checkout was preserved, and no credentials were exported there.
