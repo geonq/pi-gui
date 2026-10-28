@@ -1320,11 +1320,9 @@ app
       launchWindow = createWindow({ deferContent: true });
       const startupHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Pegasus startup</title><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#111;color:#bbb;font:14px system-ui;color-scheme:dark}.status{display:flex;align-items:center;gap:12px}.spinner{width:16px;height:16px;border:2px solid #444;border-top-color:#ddd;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spinner{animation:none}}</style></head><body><div class="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Opening your workspace...</span></div></body></html>`;
       await launchWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(startupHtml)}`);
-      // Paint the loading shell before extension imports occupy the main thread.
-      await launchWindow.webContents.executeJavaScript(
-        "new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))",
-      );
-      traceStartup("startup shell painted");
+      // A minimized or occluded window may never receive animation frames.
+      // The loaded shell can paint while async initialization prepares its runtime.
+      traceStartup("startup shell loaded");
     }
 
     // On macOS, packaged builds already render the dock icon from `icon.icns`
@@ -1831,9 +1829,11 @@ app
       );
       // A host that restarted may run a new build; the version banner should not wait hours for it.
       remoteDesktopClient.onReady(() => {
-        void createAppUpdater().refreshHostVersion().catch((error: unknown) => {
-          console.error("[updater] Host version refresh failed", error);
-        });
+        void createAppUpdater()
+          .refreshHostVersion()
+          .catch((error: unknown) => {
+            console.error("[updater] Host version refresh failed", error);
+          });
       });
       remoteDesktopClient.subscribe((event: RemoteDesktopEvent) => {
         if (event.type === "stateChanged") {

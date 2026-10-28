@@ -15,6 +15,7 @@ test("profiles packaged startup with and without the managed native extension", 
     elapsedMs: number;
     logs: string[];
     stalls: string;
+    extensionTools?: number;
   }> = [];
   for (const enabled of [false, true]) {
     const userData = await makeUserDataDir("pegasus-startup-profile-");
@@ -46,12 +47,38 @@ test("profiles packaged startup with and without the managed native extension", 
         p.getByRole("complementary").getByRole("button", { name: "New chat", exact: true }),
       ).toBeVisible();
       const elapsedMs = Date.now() - started;
+      const readNative = () =>
+        p.evaluate(async () => {
+          const state = await window.piApp!.getState();
+          return Object.values(state.runtimeByWorkspace)
+            .flatMap((runtime) => runtime?.extensions ?? [])
+            .find((record) => record.path.replaceAll("\\", "/").endsWith("/native-extension.mjs"));
+        });
+      if (enabled) {
+        await writeFile(test.info().outputPath("native-startup.log"), logs.join("\n"));
+        await expect
+          .poll(readNative, {
+            message: "the managed extension must load, rather than silently failing",
+          })
+          .toBeDefined();
+      }
+      const native = enabled ? await readNative() : undefined;
+      if (enabled) {
+        await writeFile(
+          test.info().outputPath("native-extension.json"),
+          JSON.stringify(native, null, 2),
+        );
+        expect(native?.enabled).toBe(true);
+        expect(native?.diagnostics.filter((item) => item.type === "error")).toEqual([]);
+        expect(native?.tools.some((tool) => tool.name === "select_role")).toBe(true);
+      }
       await p.screenshot({
         path: test.info().outputPath(enabled ? "native-startup.png" : "plain-startup.png"),
       });
       samples.push({
         nativeExtension: enabled,
         elapsedMs,
+        extensionTools: native?.tools.length,
         logs,
         stalls: await readFile(join(userData, "logs", "main-thread-stalls.log"), "utf8").catch(
           () => "",

@@ -217,7 +217,9 @@ async function launchDesktopExecutable(
 ): Promise<DesktopHarness> {
   const electronApp = await electron.launch({
     executablePath,
-    args: electronCliArgs(),
+    // Packaged proof must use the native Windows scheduler; timing flags can
+    // conceal a startup or minimize hang that the installed application hits.
+    args: process.platform === "win32" ? [] : electronCliArgs(),
     cwd: dirname(executablePath),
     env,
   });
