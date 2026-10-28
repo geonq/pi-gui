@@ -229,7 +229,7 @@ interface ManagedSessionRecord {
   cancellationRequested: boolean;
   /** A prompt is in Pi's pre-run steps (input handlers, auth, before_agent_start). */
   promptStarting: boolean;
-  /** Stop arrived during those steps, where Pi's abort is a no-op; abort at agent_start. */
+  /** Stop arrived before agent_start; abort again when the provider run starts. */
   abortOnRunStart: boolean;
   pendingRunOutcome: RunOutcome | undefined;
   queuedMessages: SessionQueuedMessage[];
@@ -1508,11 +1508,24 @@ export class SessionSupervisor {
     }
 
     record.cancellationRequested = true;
-    if (record.promptStarting && !record.session.isStreaming) {
+    const starting = record.promptStarting;
+    if (starting) {
       record.abortOnRunStart = true;
     }
     try {
-      await record.session.abort();
+      const aborted = record.session.abort();
+      // SDK abort waits for idle, which can be blocked by a pending startup hook.
+      // Stop must still return promptly; agent_start applies the deferred abort.
+      if (starting) {
+        aborted.catch((error: unknown) => {
+          console.warn(
+            `[pi-sdk-driver] startup abort failed for ${sessionKey(record.ref)}:`,
+            error,
+          );
+        });
+      } else {
+        await aborted;
+      }
     } catch (error) {
       // Abort is best-effort. Even if the runtime reports a failure we still
       // reset local run state below so the UI does not stay stuck on "running".
@@ -2777,6 +2790,7 @@ export class SessionSupervisor {
 
     switch (event.type) {
       case "agent_start":
+        record.promptStarting = false;
         if (record.abortOnRunStart && record.session) {
           record.abortOnRunStart = false;
           record.session.abort().catch((error: unknown) => {

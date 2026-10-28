@@ -12,7 +12,9 @@ import { createAgentSessionRuntimeWithNpmFallback } from "../dist/npm-package-fa
 type StreamFunction = AgentSessionRuntime["session"]["agent"]["streamFunction"];
 
 /** A fake provider that, like a real one, ends with "aborted" once its signal fires. */
+let streamCalls = 0;
 const streamFunction: StreamFunction = (model, _context, options) => {
+  streamCalls++;
   const stream = createAssistantMessageEventStream();
   const message: AssistantMessage = {
     role: "assistant",
@@ -151,7 +153,7 @@ await test("Stop pressed while Pi is still starting a run cancels that run", asy
 
   const sent = driver.sendUserMessage(ref, { text: "first" });
   await reached;
-  assert.equal(runtime.session.isStreaming, false, "Pi has not started the run yet");
+  assert.equal(streamCalls, 0, "the provider has not started while the startup hook is held");
   await driver.cancelCurrentRun(ref);
   release();
   await sent;
