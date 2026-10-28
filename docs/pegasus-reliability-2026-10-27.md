@@ -29,9 +29,11 @@
 | Earlier macOS viewport/thinking/hidden Electron checks          | 8 passed                                          |
 | Both updated skills                                             | Validated                                         |
 
-The preceding packaged OpenAI journey passed all 11 checkpoints, including typing during output growth, native Windows minimize/restore, tools, Stop, thread switching, archive/restore and persistence after restart. Both owned processes exited. Its 310 frame intervals had p95 17.2 ms, maximum 18.7 ms and none above 33 ms. Evidence: .artifacts/verify-pi-gui/run-final-package-20261028/. Real expanded reasoning was visually inspected in the earlier packaged candidate; a later response contained no displayable reasoning, which correctly produced no empty Thinking row.
+The final live journey used the installed D:/Pi/app/Pegasus.exe with OpenAI / gpt-6-luna at high reasoning and native Windows frame scheduling. All 12 checkpoints passed: streaming, reading and typing during growth, completion, thread switching, native minimize/restore during a tool run, tool completion, Stop, draft isolation, expanded thinking, archive/restore and both conversations after restart. Doctor confirmed the installed packaged executable, visible/focused window and no test hooks. Both owned processes exited. The 218 frame intervals had p95 and maximum 7.2 ms, with none above 33 ms. Stop aborted the running command in 1.123 s and its completion file remained absent. Evidence: .artifacts/verify-pi-gui/run-installed-final-20261028/.
 
-The final Pi 1.3 live-provider recheck stopped at authentication: its designated source returned OAuth invalid_grant. No provider fallback was used. Recovery of this task's earlier refreshed login is awaiting explicit authorization after automatic approval review rejected searching temporary credential profiles. The credential-preservation fix prevents this verification recipe from stranding its designated source on future refreshes.
+The actual installed streaming/typing and expanded-thinking screenshots were inspected visually. OpenAI emitted displayable reasoning in this final run. Earlier responses without reasoning remain valid observations; the renderer does not invent empty Thinking rows.
+
+After explicit authorization, the OpenAI credential was recovered only from this task's exact known successful verification profile, with matching account identity checked. Claude and other account entries were preserved. The final live journey refreshed successfully, and auth-refresh.json confirms that its refreshed credential was preserved in the designated source under the file lock. Earlier failed attempts and their artifacts remain retained.
 
 ## Startup evidence
 
