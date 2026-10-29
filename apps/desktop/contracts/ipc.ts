@@ -198,6 +198,7 @@ export const desktopIpc = {
   terminalSetTitle: "pi-gui:terminal-set-title",
   terminalSetFocused: "pi-gui:terminal-set-focused",
   sidePanelSetFocused: "pi-gui:side-panel-set-focused",
+  reportRendererStall: "pi-gui:report-renderer-stall",
   terminalData: "pi-gui:terminal-data",
   terminalExit: "pi-gui:terminal-exit",
   terminalError: "pi-gui:terminal-error",

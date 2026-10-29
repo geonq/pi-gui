@@ -25,3 +25,31 @@ test("logs a blocked main thread, where typing waits", async () => {
     await h.close();
   }
 });
+
+test("logs a slow window frame with the script that held it", async () => {
+  const userDataDir = await makeUserDataDir();
+  const h = await launchDesktop(userDataDir, {
+    initialWorkspaces: [await makeWorkspace("renderer-stalls")],
+    testMode: "background",
+  });
+  try {
+    const window = await h.firstWindow();
+    // The app document must be the one loaded: a timer set before it commits dies with the old one.
+    await expect(window.getByTestId("sidebar-usage")).toBeVisible();
+    // From a page timer: work Playwright runs directly carries no script attribution.
+    await window.evaluate(() => {
+      setTimeout(() => {
+        const until = Date.now() + 300;
+        while (Date.now() < until) {
+          // Hold the window the way a heavy render would.
+        }
+      }, 0);
+    });
+    const log = join(userDataDir, "logs", "renderer-stalls.log");
+    await expect
+      .poll(async () => readFile(log, "utf8").catch(() => ""))
+      .toMatch(/ms \(blocking \d+ ms\) in [\w?-]+\n.*\n {4}(29\d|3\d\d|4\d\d) ms in .* via TimerHandler:setTimeout/);
+  } finally {
+    await h.close();
+  }
+});

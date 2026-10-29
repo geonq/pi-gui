@@ -7,6 +7,7 @@ import type { AccountLimits, UsageLimitWindow } from "../../contracts/usage";
 
 // One provider call per account at most every 5 minutes, and only while Usage is open or refreshed.
 const CACHE_MS = 300_000;
+const EMPTY_RETRY_MS = 20_000;
 const ANTHROPIC = "https://api.anthropic.com";
 const OAUTH_BETA = "oauth-2025-04-20";
 const CLAUDE_WINDOWS = [
@@ -47,6 +48,10 @@ export function readAccountLimits(
       readAntigravityLimits(),
     ]).then(([claude, codex, agy]) => {
       lastRead = [...claude, ...(codex ? [codex] : []), ...(agy ? [agy] : [])];
+      // An account without numbers (token not yet renewed, request failed) is re-read on the next
+      // open or refresh instead of staying blank for five minutes.
+      if (lastRead.some((entry) => entry.windows.length === 0) && cached?.value === value)
+        cached = { at: Date.now() - CACHE_MS + EMPTY_RETRY_MS, value };
       return lastRead;
     });
     cached = { at: Date.now(), value };

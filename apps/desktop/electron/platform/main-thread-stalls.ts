@@ -1,6 +1,8 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { Session } from "node:inspector";
 import path from "node:path";
+import { ipcMain } from "electron";
+import { desktopIpc } from "../../contracts/ipc";
 
 const TICK_MS = 100;
 const REPORT_MS = 250;
@@ -80,6 +82,24 @@ export function watchMainThreadStalls(logDirectory: string): void {
     }
   }, TICK_MS);
   timer.unref();
+}
+
+/**
+ * Slow window frames the preload reports (100 ms or more), written next to the main-thread log so
+ * a freeze shows on whichever side caused it.
+ */
+export function watchRendererStalls(logDirectory: string): void {
+  const file = path.join(logDirectory, "renderer-stalls.log");
+  let written = 0;
+  ipcMain.on(desktopIpc.reportRendererStall, (_event, report: unknown) => {
+    if (typeof report !== "string" || written >= MAX_LINES) return;
+    written += 1;
+    mkdir(logDirectory, { recursive: true })
+      .then(() => appendFile(file, `${new Date().toISOString()} ${report.slice(0, 2000)}\n`))
+      .catch((error: unknown) => {
+        console.error("[main] writing renderer-stalls.log failed", error);
+      });
+  });
 }
 
 /** The functions with the most time during [fromUs, toUs], wall-clock microseconds. */

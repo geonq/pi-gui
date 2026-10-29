@@ -298,6 +298,9 @@ export function AccountLimitsCard({
                   {account.name}
                 </span>
               </div>
+              {account.windows.length === 0 ? (
+                <p className="usage-limits__empty">{account.note ?? "No numbers yet"}</p>
+              ) : null}
               {account.windows.map((window) => {
                 const remaining = Math.max(0, Math.min(100, 100 - window.usedPercent));
                 const brand = providerColor(account.id);

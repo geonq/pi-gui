@@ -364,8 +364,12 @@ const BarInner = memo(function BarInner({
         // Apply rounded corners:
         // - For non-stacked: always apply
         // - For stacked with gap: apply to all bars
-        // - For stacked without gap: only apply to the last series
-        const applyRounding = !stacked || stackGap > 0 || isLastSeries;
+        // - For stacked without gap: only the outermost segment of this row, so a row whose
+        //   later series are empty still gets its rounded end
+        const isOutermost = lines
+          .slice(seriesIndex + 1)
+          .every((line) => typeof d[line.dataKey] !== "number" || d[line.dataKey] === 0);
+        const applyRounding = !stacked || stackGap > 0 || isOutermost;
         const effectiveRx = applyRounding ? cornerRadius : 0;
         const effectiveRy = applyRounding ? cornerRadius : 0;
 

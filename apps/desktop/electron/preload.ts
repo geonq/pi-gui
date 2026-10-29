@@ -707,6 +707,69 @@ const piDesktopApi =
     : localPiDesktopApi;
 
 contextBridge.exposeInMainWorld("piApp", piDesktopApi);
+watchRendererStalls();
+
+/**
+ * Every window frame held up by work (a task of 100 ms or more), with the scripts that ran in it, goes to main's
+ * renderer-stalls.log: a frozen window then shows which code froze it.
+ */
+function watchRendererStalls(): void {
+  // The preload compiles without DOM types; only these page globals are used.
+  const page = globalThis as unknown as {
+    readonly PerformanceObserver: {
+      readonly supportedEntryTypes?: readonly string[];
+      new (callback: (list: { getEntries(): readonly LongFrame[] }) => void): {
+        observe(options: { readonly type: string; readonly buffered: boolean }): void;
+      };
+    };
+    readonly document: {
+      querySelector(selector: string): { getAttribute(name: string): string | null } | null;
+    };
+  };
+  if (!page.PerformanceObserver.supportedEntryTypes?.includes("long-animation-frame")) return;
+  interface LongFrameScript {
+    readonly duration: number;
+    readonly forcedStyleAndLayoutDuration: number;
+    readonly invoker: string;
+    readonly sourceFunctionName: string;
+    readonly sourceURL: string;
+    readonly sourceCharPosition: number;
+  }
+  interface LongFrame {
+    readonly startTime: number;
+    readonly duration: number;
+    readonly blockingDuration: number;
+    readonly renderStart: number;
+    readonly styleAndLayoutStart: number;
+    readonly scripts: readonly LongFrameScript[];
+  }
+  const ms = (value: number) => `${Math.round(value)} ms`;
+  new page.PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+      // Blocking time, not frame length: a hidden or minimized window paints once a second, and
+      // those long but idle frames delayed nothing.
+      if (entry.blockingDuration < 50) continue;
+      const end = entry.startTime + entry.duration;
+      const view =
+        page.document.querySelector("[data-testid$='-view']")?.getAttribute("data-testid") ?? "?";
+      const lines = [
+        `frame ${ms(entry.duration)} (blocking ${ms(entry.blockingDuration)}) in ${view}`,
+        `    render ${ms(entry.renderStart ? end - entry.renderStart : 0)}, style+layout ${ms(entry.styleAndLayoutStart ? end - entry.styleAndLayoutStart : 0)}`,
+        ...[...entry.scripts]
+          .sort((a, b) => b.duration - a.duration)
+          .slice(0, 6)
+          .map(
+            (script) =>
+              `    ${ms(script.duration)} in ${script.sourceFunctionName || "(anon)"} ${script.sourceURL.split(/[\\/]/).at(-1) ?? ""}:${script.sourceCharPosition} via ${script.invoker}` +
+              (script.forcedStyleAndLayoutDuration
+                ? ` (forced layout ${ms(script.forcedStyleAndLayoutDuration)})`
+                : ""),
+          ),
+      ];
+      ipcRenderer.send(desktopIpc.reportRendererStall, lines.join("\n"));
+    }
+  }).observe({ type: "long-animation-frame", buffered: true });
+}
 
 function createIpcWorkspaceFolderAdapter(
   device: WorkspaceFolderDevice,

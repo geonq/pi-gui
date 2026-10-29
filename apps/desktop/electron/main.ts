@@ -72,7 +72,7 @@ import { createRemoteNotificationStore } from "./platform/remote-notification-so
 import { NotificationPermissionService } from "./platform/notification-permission";
 import { openReleasesPage } from "./platform/update-checker";
 import { AppUpdater } from "./platform/update-installer";
-import { watchMainThreadStalls } from "./platform/main-thread-stalls";
+import { watchMainThreadStalls, watchRendererStalls } from "./platform/main-thread-stalls";
 import { registerUpdateIpc } from "./platform/register-update-ipc";
 import { ThemeManager } from "./platform/theme-manager";
 import { windowBackgroundFor } from "../contracts/theme";
@@ -1316,6 +1316,7 @@ app
     }
     traceStartup("electron ready");
     watchMainThreadStalls(path.join(configuredUserDataDir, "logs"));
+    watchRendererStalls(path.join(configuredUserDataDir, "logs"));
     if (process.platform === "win32" && windowTestMode !== "background") {
       launchWindow = createWindow({ deferContent: true });
       const startupHtml = `<!doctype html><html><head><meta charset="utf-8"><title>Pegasus startup</title><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><style>html,body{height:100%;margin:0}body{display:grid;place-items:center;background:#111;color:#bbb;font:14px system-ui;color-scheme:dark}.status{display:flex;align-items:center;gap:12px}.spinner{width:16px;height:16px;border:2px solid #444;border-top-color:#ddd;border-radius:50%;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}@media(prefers-reduced-motion:reduce){.spinner{animation:none}}</style></head><body><div class="status" role="status"><span class="spinner" aria-hidden="true"></span><span>Opening your workspace...</span></div></body></html>`;
