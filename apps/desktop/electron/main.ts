@@ -10,6 +10,7 @@ import {
   Notification,
   protocol,
   shell,
+  type Tray,
   type MenuItemConstructorOptions,
   type MessageBoxOptions,
 } from "electron";
@@ -73,6 +74,7 @@ import { NotificationPermissionService } from "./platform/notification-permissio
 import { openReleasesPage } from "./platform/update-checker";
 import { AppUpdater } from "./platform/update-installer";
 import { watchMainThreadStalls, watchRendererStalls } from "./platform/main-thread-stalls";
+import { installAppTray } from "./platform/app-tray";
 import { registerUpdateIpc } from "./platform/register-update-ipc";
 import { ThemeManager } from "./platform/theme-manager";
 import { windowBackgroundFor } from "../contracts/theme";
@@ -208,6 +210,7 @@ const themeManager = new ThemeManager();
 let mainWindow: BrowserWindow | null = null;
 // Windows-only frame shown before the store starts; it receives the content afterwards.
 let launchWindow: BrowserWindow | undefined;
+let appTray: Tray | undefined;
 let notificationManager: NotificationManager | undefined;
 let remoteNotifications: ReturnType<typeof createRemoteNotificationStore> | undefined;
 let notificationPermissionService: NotificationPermissionService | undefined;
@@ -1279,7 +1282,8 @@ if (!hasSingleInstanceLock) {
   app.exit(0);
 }
 
-app.on("second-instance", () => {
+/** Brings a Pegasus window forward, opening one if every window was closed (to the tray). */
+function showAppWindow(): void {
   // A repeat launch can arrive before the window owner exists.
   const window = windowOwner?.foreground() ?? launchWindow;
   if (!window) {
@@ -1291,7 +1295,9 @@ app.on("second-instance", () => {
   }
   window.show();
   window.focus();
-});
+}
+
+app.on("second-instance", showAppWindow);
 
 app
   .whenReady()
@@ -1670,9 +1676,7 @@ app
             body: problem.fix ?? "Sign in again to keep using it in Pi.",
           });
           notice.on("click", () => {
-            const window = windowOwner.foreground();
-            window?.show();
-            window?.focus();
+            showAppWindow();
             void store.setActiveView("usage").catch(() => undefined);
           });
           notice.show();
@@ -1950,6 +1954,10 @@ app
     void notificationPermissionService.getCurrentStatus().catch((error: unknown) => {
       console.error("[main] getCurrentStatus failed", error);
     });
+    // Closing the window keeps Pegasus in the tray on Windows; test launches still quit with it.
+    if (process.platform === "win32" && appTestMode === undefined) {
+      appTray = installAppTray({ icon: appIcon, onOpen: showAppWindow, onQuit: () => app.quit() });
+    }
 
     app.on("activate", () => {
       if ((windowOwner?.size() ?? BrowserWindow.getAllWindows().length) === 0) {
@@ -1968,6 +1976,8 @@ app
   });
 
 app.on("window-all-closed", () => {
+  // The tray keeps Pegasus running; its Quit item (or a system shutdown) ends it.
+  if (appTray) return;
   // macOS normally keeps the app alive after its final window closes. The
   // Electron harness closes windows to end each isolated run, so let explicit
   // test-mode launches quit instead of leaving their process behind forever.
