@@ -1956,9 +1956,15 @@ function severityFromText(text: string): OrchestrationEvidenceRecord["severity"]
 }
 
 function truncateEvidenceDetail(text: string): string {
-  const normalized = text.replace(/\s+/g, " ").trim();
-  return normalized.length > 260 ? `${normalized.slice(0, 257)}...` : normalized;
+  // Only the first 260 characters survive, so normalize a bounded head instead of the whole output:
+  // whole tool outputs ran through the regex on every session event (~0.25 s of main thread).
+  const head = text.length > EVIDENCE_HEAD_CHARS ? text.slice(0, EVIDENCE_HEAD_CHARS) : text;
+  const normalized = head.replace(/\s+/g, " ").trim();
+  return normalized.length > 260 || head.length < text.length
+    ? `${normalized.slice(0, 257)}...`
+    : normalized;
 }
+const EVIDENCE_HEAD_CHARS = 4096;
 
 function evidenceId(prefix: string, sourceId: string): string {
   return `${prefix}:${sourceId}`;
