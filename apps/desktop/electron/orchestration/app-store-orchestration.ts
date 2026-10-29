@@ -722,10 +722,14 @@ function projectOrchestrationChildrenForSession(
 ): readonly OrchestrationChildThread[] {
   const now = new Date().toISOString();
   const children = store.orchestrationState().orchestrationChildren;
-  const parentEvidenceByChild = parentEvidenceIndex(store, children);
-  return children.map((child) =>
+  const isTarget = (child: OrchestrationChildThread) =>
     child.childWorkspaceId === sessionRef.workspaceId &&
-    child.childSessionId === sessionRef.sessionId
+    child.childSessionId === sessionRef.sessionId;
+  // Evidence only for the child this event touched: indexing every child's parent transcript on
+  // each event cost ~0.3 s of main-thread time once threads grew, and evidence is per child.
+  const parentEvidenceByChild = parentEvidenceIndex(store, children.filter(isTarget));
+  return children.map((child) =>
+    isTarget(child)
       ? projectOrchestrationChild(store, child, now, parentEvidenceByChild.get(child.id) ?? [])
       : child,
   );
