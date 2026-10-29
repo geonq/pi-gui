@@ -76,7 +76,7 @@ test("shows images a tool returned in its row, not their base64 text", async () 
       .toBe(4);
 
     await tool.locator(".timeline-tool__header").click();
-    const body = tool.locator(".timeline-tool__pre");
+    const body = tool.locator(".timeline-tool__body");
     await expect(body).toContainText("[image/png image]");
     await expect(body).not.toContainText(PNG_BASE64.slice(0, 24));
 

@@ -468,7 +468,14 @@ function TimelineToolCallItem({
                   <CopyIcon />
                 </button>
               </div>
-              <pre className="timeline-tool__pre">{formatToolContent(item.input, item.output)}</pre>
+              {readableToolInput(item.input) !== undefined ? (
+                <pre className="timeline-tool__pre timeline-tool__pre--input">
+                  {readableToolInput(item.input)}
+                </pre>
+              ) : null}
+              {readableToolOutput(item.output) !== undefined ? (
+                <pre className="timeline-tool__pre">{readableToolOutput(item.output)}</pre>
+              ) : null}
             </>
           )}
         </div>
@@ -541,14 +548,45 @@ function countDiffStats(diff: string): { added: number; removed: number } {
 }
 
 function formatToolContent(input: unknown, output: unknown): string {
-  const parts: string[] = [];
-  if (input !== undefined) {
-    parts.push(typeof input === "string" ? input : stringifyToolValue(input));
+  return [readableToolInput(input), readableToolOutput(output)]
+    .filter((part): part is string => part !== undefined)
+    .join("\n\n");
+}
+
+/**
+ * Arguments as a person reads them: a shell command as `$ command`, other fields as `key: value`
+ * with multi-line text kept as written, instead of escaped JSON.
+ */
+function readableToolInput(input: unknown): string | undefined {
+  if (input === undefined) return undefined;
+  if (typeof input === "string") return input;
+  if (!input || typeof input !== "object" || Array.isArray(input)) return stringifyToolValue(input);
+  const { command, ...rest } = input as Record<string, unknown>;
+  const lines = typeof command === "string" ? [`$ ${command}`] : [];
+  if (command !== undefined && typeof command !== "string") rest.command = command;
+  for (const [key, value] of Object.entries(rest)) {
+    if (value === undefined) continue;
+    lines.push(typeof value === "string" ? `${key}: ${value}` : `${key}: ${stringifyToolValue(value)}`);
   }
-  if (output !== undefined) {
-    parts.push(typeof output === "string" ? output : stringifyToolValue(output));
+  return lines.join("\n");
+}
+
+/** A tool result's text parts verbatim (images show as thumbnails above); other shapes as JSON. */
+function readableToolOutput(output: unknown): string | undefined {
+  if (output === undefined) return undefined;
+  if (typeof output === "string") return output;
+  const content = (output as { content?: unknown } | null)?.content;
+  if (Array.isArray(content) && content.length > 0) {
+    const parts = content.map((part: unknown) => {
+      const block = part as { type?: unknown; text?: unknown; mimeType?: unknown } | null;
+      if (block?.type === "text" && typeof block.text === "string") return block.text;
+      if (block?.type === "image")
+        return `[${typeof block.mimeType === "string" ? block.mimeType : "image"} image]`;
+      return undefined;
+    });
+    if (parts.every((part) => part !== undefined)) return parts.join("\n");
   }
-  return parts.join("\n\n");
+  return stringifyToolValue(output);
 }
 
 function statusLabel(status: "running" | "success" | "error") {

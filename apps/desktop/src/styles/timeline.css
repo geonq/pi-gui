@@ -92,6 +92,11 @@
   font-weight: var(--font-semibold);
 }
 
+/* It floats over the transcript, so it reads as glass like the other floating chips. */
+.enable-transparency .timeline-jump {
+  backdrop-filter: var(--glass-blur) var(--glass-saturation);
+}
+
 /* ---- Entrance / streaming motion --------------------------------------- */
 
 @keyframes timeline-enter {
@@ -623,6 +628,16 @@
   white-space: pre-wrap;
   word-break: break-word;
   color: var(--ink);
+}
+
+/* The call reads as the header line(s); its output follows below a hairline. */
+.timeline-tool__pre--input {
+  color: var(--ink-strong);
+}
+
+.timeline-tool__pre--input + .timeline-tool__pre {
+  border-top: 1px solid var(--line);
+  color: var(--muted-strong);
 }
 
 .timeline-tool__meta {

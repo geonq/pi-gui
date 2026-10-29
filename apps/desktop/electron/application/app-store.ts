@@ -494,11 +494,13 @@ export class DesktopAppStore {
     this.orchestrationOwner = createOrchestrationOwner({
       driver: this.driver,
       initialize: () => this.initialize(),
+      // No structuredClone, for the reason given in the state snapshot below: state is written
+      // immutably, and this ran several times per session event, holding input for up to 0.7 s.
       orchestrationState: () => ({
         selectedWorkspaceId: this.state.selectedWorkspaceId,
         selectedSessionId: this.state.selectedSessionId,
-        workspaces: structuredClone(this.state.workspaces),
-        orchestrationChildren: structuredClone(this.state.orchestrationChildren),
+        workspaces: this.state.workspaces,
+        orchestrationChildren: this.state.orchestrationChildren,
       }),
       replaceOrchestrationChildren: (children) => {
         this.state = { ...this.state, orchestrationChildren: [...children] };
