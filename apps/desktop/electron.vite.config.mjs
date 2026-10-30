@@ -31,6 +31,7 @@ export default defineConfig(({ command }) => {
         rollupOptions: {
           input: {
             main: path.resolve(projectRoot, "electron/main.ts"),
+            "codex-limits-worker": path.resolve(projectRoot, "electron/usage/codex-limits-worker.ts"),
           },
         },
       },

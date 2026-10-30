@@ -1,5 +1,7 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { readdir, stat } from "node:fs/promises";
+import { Worker } from "node:worker_threads";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -17,7 +19,7 @@ export async function readCodexLiveLimits(owner?: string): Promise<AccountLimits
   try {
     const binary = await findManagedCodexBinary(home);
     if (!binary) return null;
-    const response = await readRateLimits(binary, home);
+    const response = await readRateLimitsInWorker(binary, home);
     return parseCodexLiveLimits(response, owner);
   } catch {
     // The saved-session snapshot remains available if the managed CLI or live endpoint is unavailable.
@@ -161,7 +163,30 @@ function asObject(value: unknown): JsonObject | undefined {
     : undefined;
 }
 
-function readRateLimits(binary: string, home: string): Promise<unknown> {
+/**
+ * readRateLimits in codex-limits-worker.js (built next to main.js), so spawning codex.exe never blocks
+ * the main thread. Falls back to an in-process read where that file is absent (unbundled test runs).
+ */
+function readRateLimitsInWorker(binary: string, home: string): Promise<unknown> {
+  const script = join(__dirname, "codex-limits-worker.js");
+  if (!existsSync(script)) return readRateLimits(binary, home);
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(script, { workerData: { binary, home } });
+    let replied = false;
+    worker.once("message", (result: { readonly value?: unknown; readonly error?: string }) => {
+      replied = true;
+      void worker.terminate();
+      if (result.error !== undefined) reject(new Error(result.error));
+      else resolve(result.value);
+    });
+    worker.once("error", reject);
+    worker.once("exit", (code) => {
+      if (!replied) reject(new Error(`codex limits worker exited (${code})`));
+    });
+  });
+}
+
+export function readRateLimits(binary: string, home: string): Promise<unknown> {
   return new Promise((resolve, reject) => {
     const child = spawn(binary, ["app-server"], {
       cwd: home,
