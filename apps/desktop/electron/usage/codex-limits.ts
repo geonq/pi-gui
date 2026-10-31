@@ -165,11 +165,14 @@ function asObject(value: unknown): JsonObject | undefined {
 
 /**
  * readRateLimits in codex-limits-worker.js (built next to main.js), so spawning codex.exe never blocks
- * the main thread. Falls back to an in-process read where that file is absent (unbundled test runs).
+ * the main thread. The bundler moves this module into out/main/chunks/ (main and the worker share it),
+ * so the worker is looked up one level up as well; only unbundled test runs read in-process.
  */
 function readRateLimitsInWorker(binary: string, home: string): Promise<unknown> {
-  const script = join(__dirname, "codex-limits-worker.js");
-  if (!existsSync(script)) return readRateLimits(binary, home);
+  const script = [__dirname, join(__dirname, "..")]
+    .map((directory) => join(directory, "codex-limits-worker.js"))
+    .find((candidate) => existsSync(candidate));
+  if (!script) return readRateLimits(binary, home);
   return new Promise((resolve, reject) => {
     const worker = new Worker(script, { workerData: { binary, home } });
     let replied = false;
