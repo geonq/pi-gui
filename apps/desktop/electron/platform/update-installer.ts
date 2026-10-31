@@ -68,6 +68,7 @@ export class AppUpdater {
   start(): () => void {
     const run = () => void this.check().catch(() => undefined);
     this.timers = [setTimeout(run, INITIAL_DELAY_MS), setInterval(run, CHECK_INTERVAL_MS)];
+    void pruneUpdateDownloads(path.join(app.getPath("userData"), "updates"), app.getVersion());
     return () => {
       for (const timer of this.timers) clearTimeout(timer);
       this.timers = [];
@@ -194,6 +195,19 @@ async function fetchOk(url: string): Promise<Response> {
  * Runs the NSIS installer silently into the current install folder once Pegasus and its helper
  * processes have exited, then starts the new version. Every step is logged next to the installer.
  */
+/**
+ * Once a version runs, the downloads of every other version are dead weight (about 1 GB each on the Mac,
+ * where nothing removed them). The running version's folder stays: it holds previous.app, the rollback copy.
+ */
+export async function pruneUpdateDownloads(directory: string, currentVersion: string): Promise<void> {
+  const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+  await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory() && entry.name !== currentVersion)
+      .map((entry) => rm(path.join(directory, entry.name), { recursive: true, force: true }).catch(() => undefined)),
+  );
+}
+
 async function installWindows(installer: string, directory: string): Promise<void> {
   const installDir = path.dirname(process.execPath);
   const quote = (value: string) => `'${value.replaceAll("'", "''")}'`;

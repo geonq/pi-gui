@@ -1,7 +1,14 @@
 import { expect, test } from "@playwright/test";
 import { hostVersionDrift } from "../../contracts/updates";
 import { releaseAssets } from "../../electron/platform/update-checker";
-import { installerAssetName, parseChecksums } from "../../electron/platform/update-installer";
+import { mkdir, mkdtemp, readdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import {
+  installerAssetName,
+  parseChecksums,
+  pruneUpdateDownloads,
+} from "../../electron/platform/update-installer";
 
 test("each platform installs only its own release asset", () => {
   expect(installerAssetName("1.0.9", "win32", "x64")).toBe("Pegasus-1.0.9-x64-setup.exe");
@@ -49,4 +56,15 @@ test("the Mac notices when its Windows host runs another version", () => {
   expect(hostVersionDrift({ ...status, hostVersion: "1.0.9" })).toBeUndefined();
   expect(hostVersionDrift({ ...status, hostVersion: "1.0.10" })).toBe("host-newer");
   expect(hostVersionDrift({ ...status, hostVersion: "1.0.8" })).toBe("host-older");
+});
+
+test("only the running version's update download is kept", async () => {
+  const root = await mkdtemp(path.join(tmpdir(), "pegasus-updates-"));
+  for (const version of ["1.0.10", "1.0.13", "1.0.21"]) {
+    await mkdir(path.join(root, version, "extracted"), { recursive: true });
+    await writeFile(path.join(root, version, "Pegasus.zip"), "x");
+  }
+  await pruneUpdateDownloads(root, "1.0.21");
+  expect(await readdir(root)).toEqual(["1.0.21"]);
+  await pruneUpdateDownloads(path.join(root, "missing"), "1.0.21");
 });
